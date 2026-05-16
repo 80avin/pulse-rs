@@ -88,6 +88,12 @@ pub enum TaggingError {
 
     #[error("Tokenizer error: {0}")]
     Tokenizer(String),
+
+    #[error("Image decode error: {0}")]
+    ImageDecode(String),
+
+    #[error("Image network error: {0}")]
+    ImageNetwork(String),
 }
 
 #[derive(Debug, Error)]

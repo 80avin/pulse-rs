@@ -18,37 +18,39 @@ Feed Item (new)
     │
     ▼
 [1] Text Normalization
-    - Strip HTML tags
-    - Decode HTML entities
-    - Collapse whitespace
-    - Truncate to 512 tokens (for model compat) / 2000 chars (for rules)
+    - Strip HTML tags, decode entities, collapse whitespace
+    - Truncate to 512 tokens / 2000 chars
     - Combine: title + " " + body_text
     │
     ▼
-[2] Tagging Engine (dispatched by feature flag)
+[2] Text Tagging (rule engine + NLI)
     │
-    ├─ Phase 1: Rule Engine
-    │    - Evaluate ordered list of TagRules against normalized text
-    │    - Each rule: {pattern: Regex, tag: String, confidence: f32, explanation: String}
-    │    - Multiple rules can match; all matching tags are stored
+    ├─ Rule Engine (always active)
+    │    - Keyword/regex patterns, DomainMatch, structural signals
+    │    - High-precision tags: show-hn, ask-hn, paywall, video, job-posting
     │
-    └─ Phase 4: ONNX Model Inference
-         - Tokenize text using model's tokenizer (rust-tokenizers or tokenizers crate)
-         - Run forward pass via ort (ONNX Runtime)
-         - Get embeddings or classification logits
-         - Map logits/cosine-similarity to tag labels with confidence scores
-         - Generate explanation from top activated features
+    └─ NLI Cross-Encoder (optional, requires model download)
+         - DeBERTa v3 xsmall, ~83MB, entailment-based zero-shot classification
+         - Semantic tags: technical, tutorial, research, news, discussion,
+           security, ai-ml, privacy, policy, science, clickbait
     │
     ▼
-[3] Tag Storage
-    - INSERT OR REPLACE into ai_tags
-    - Upsert per (item_id, tag, tagger_source) unique constraint
+[3] Vision Tagging (optional, requires vision model download)
+    - Runs during enrichment, after text tagging
+    - Only for items with image URLs (i.redd.it, imgur, etc.)
+    - CLIP ViT-B/32 vision encoder, ~53MB download
+    - Zero-shot: cosine similarity vs pre-computed label embeddings
+    - Visual tags: meme, screenshot, photo-share, infographic
     │
     ▼
-[4] Filter Evaluation
+[4] Tag Storage
+    - ON CONFLICT(item_id, tag, tagger_source) DO UPDATE
+    - tagger_source: 'rule' | 'model' | 'vision-model'
+    │
+    ▼
+[5] Filter Evaluation
     - Check active filter_rules against new tags
     - Auto-hide items matching hide rules
-    - Emit notification for highlight rules
 ```
 
 ## Phase 1: Rule Engine
@@ -388,12 +390,135 @@ Android-specific considerations for ONNX inference:
 4. **Memory**: ONNX session keeps the model in memory while active. On low-memory events (Android's `onTrimMemory`), unload the session and reload on next use.
 5. **NNAPI**: ONNX Runtime supports Android's Neural Networks API for hardware acceleration. This can reduce inference time by 2-4x on modern Snapdragon chips. Enable via `ort::ExecutionProvider::NNAPI` when available.
 
+## Phase 2.5: Vision Tagging (CLIP Zero-Shot)
+
+Addresses the ~40% of Reddit posts that are image-only and currently invisible to the text pipeline.
+
+### Problem
+
+Image posts (Reddit `i.redd.it`, galleries, Imgur) have no body text. Title is often vague ("Help", "Fun", "I miss winters", "aaj ka dinner"). The text pipeline has zero signal. Community/regional feeds are ~40% image posts.
+
+### Model: CLIP ViT-B/32 (vision encoder only)
+
+CLIP (Contrastive Language-Image Pre-training) trains a vision encoder and text encoder jointly so their embedding spaces are aligned. Cosine similarity between an image embedding and a text label embedding ("a meme post") produces meaningful zero-shot classification scores — the same principle as NLI entailment for text.
+
+**Download size:** ~53MB (vision encoder, q4f16 quantized). The text encoder is NOT downloaded by users — label embeddings for our fixed tag set are pre-computed offline and bundled in the binary as const arrays (~16KB).
+
+**Why not the Qwen3.5-0.8B vision encoder:** That model's vision encoder produces patch token sequences for an LLM decoder. Its embedding space is not aligned with text labels. Zero-shot image→text classification requires a CLIP-family model where both encoders are trained together in a shared embedding space.
+
+### Vision Tags
+
+| Tag | Description | Example items |
+|---|---|---|
+| `meme` | Image-based meme, reaction, humor post | "State mentioned!!!!", "Our city is too big BTW" |
+| `screenshot` | Screenshot of tweet, article, code, error, news | "Level of Journalism in our city" |
+| `photo-share` | Personal photo — food, travel, scenery, event | "aaj ka dinner", "I miss winters already" |
+
+These tags supplement text tags — an item can be both `technical` (from text) and `screenshot` (from vision).
+
+### Pipeline Integration
+
+Vision tagging runs during enrichment, after text tagging. It does not run during sync (no image downloading in the sync hot path).
+
+```
+enrich_item(item):
+  1. OpenGraph fetch (existing)
+  2. if has_image_url(item) && vision_model_loaded:
+       a. GET image URL (max 10MB, timeout 15s, skip on error)
+       b. Decode JPEG/PNG → RGB pixels
+       c. Resize to 224×224 (bilinear), normalize with CLIP mean/std
+       d. ONNX forward pass → [1, 512] embedding
+       e. L2-normalize embedding
+       f. For each vision label: cosine_sim(embedding, label_embedding)
+       g. Apply tag where sim ≥ threshold (per-label, tuned empirically)
+       h. Store tags: tagger_source = 'vision-model'
+```
+
+`has_image_url(item)` returns true when:
+- `item.url` host is `i.redd.it`, `preview.redd.it`, `imgur.com`, `i.imgur.com`
+- `item.url` ends with `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`
+- `item.url` host is `reddit.com/gallery` (skip — gallery has multiple images, too complex for v1)
+
+### Pre-Computed Label Embeddings
+
+Label embeddings are computed once offline using the CLIP text encoder with carefully chosen prompts. The prompts are designed to be visually discriminable (CLIP was trained on image-caption pairs, so visual language works better than abstract category names):
+
+```
+meme:        "a meme or funny reaction image with text overlay"
+screenshot:  "a screenshot of a webpage, tweet, news article, or app"
+photo-share: "a personal photograph of food, scenery, or everyday life"
+```
+
+Multiple prompts per label are averaged and L2-normalized:
+
+```rust
+// In src/ai/vision_labels.rs — generated offline, do not edit by hand
+pub static VISION_LABELS: &[VisionTagLabel] = &[
+    VisionTagLabel {
+        tag: "meme",
+        threshold: 0.24,
+        // embedding: averaged CLIP text embedding for meme prompts
+        embedding: &[0.0234, -0.0412, ...],  // 512 floats
+    },
+    ...
+];
+```
+
+To regenerate (requires Python + transformers installed):
+```bash
+python scripts/compute_clip_labels.py > crates/pulse-core/src/ai/vision_labels.rs
+```
+
+### Image Preprocessing
+
+```
+CLIP normalization:
+  mean = [0.48145466, 0.4578275, 0.40821073]
+  std  = [0.26862954, 0.26130258, 0.27577711]
+
+Steps:
+  1. Decode image bytes → RGB pixels (image crate)
+  2. Resize shortest side to 224, then center crop to 224×224
+  3. Convert to f32, divide by 255.0
+  4. Subtract mean, divide by std, per channel
+  5. Arrange as [1, 3, 224, 224] NCHW tensor
+```
+
+### Model Management
+
+Vision model is independent of the text model — different registry, separate download:
+
+```
+pulse ai download --type vision clip-vit-b32
+pulse ai model list --type vision
+pulse ai model set --type vision clip-vit-b32
+pulse ai model unset --type vision   # disable vision tagging
+```
+
+Files stored at: `{data_dir}/models/vision/{model_name}/vision_model.onnx`
+
+### What This Does NOT Do
+
+- **OCR** (reading text overlaid on memes): requires a separate OCR model or VLM
+- **Video frames**: `v.redd.it` posts skipped — frame extraction is out of scope
+- **Gallery posts**: `reddit.com/gallery` posts skipped — multiple images, ambiguous
+- **Context understanding**: CLIP classifies "what does this look like" not "what does this mean"
+
+### Known Limitations
+
+1. **Multilingual text on images**: CLIP's text encoder was trained on English. Text overlaid on images in Hindi/Hinglish is not decoded — only the visual appearance is classified.
+2. **Threshold calibration**: Initial thresholds are approximate. Run `pulse ai vision-debug <image_url>` to inspect raw cosine similarities.
+3. **Image download cost**: One JPEG download per image post during enrichment. Rate-limited by the enrichment queue. Respects existing `should_enrich()` guards.
+4. **NSFW content**: CLIP will assign embeddings to NSFW images. The tagger does not add NSFW-specific tags. Community moderation remains the user's responsibility via feed selection.
+
+---
+
 ## Known Limitations
 
-1. **Zero-shot classification accuracy**: The bi-encoder cosine-similarity approach (document embedding vs. label description embedding) achieves ~55-70% macro F1 on topic classification tasks. The commonly cited 75-85% figures apply to NLI-based zero-shot models (which use an entailment head — a different approach). Mitigation: (a) the rule engine provides a deterministic, high-precision floor for structural tags; (b) model tags are presented as "fuzzy signal" in the UI with a visually distinct treatment from rule tags; (c) high-accuracy alternative: `cross-encoder/nli-MiniLM2-L6-H768` uses NLI and achieves ~80% but is ~85MB. Document this clearly so users have correct expectations.
+1. **Zero-shot classification accuracy (text NLI)**: NLI cross-encoder achieves ~75-85% macro F1. The rule engine provides a high-precision floor for structural tags. Tags are fuzzy signals, not ground truth.
 
-2. **Multilingual support**: Models above are English-focused. Non-English feeds will have lower accuracy. Future: add multilingual model option (paraphrase-multilingual-MiniLM).
+2. **Multilingual support**: Models are English-focused. Non-English feeds (Hinglish, Hindi) produce unreliable NLI scores near the threshold. Language detection guard is a future improvement.
 
-3. **Context window**: BERT-family models are limited to 512 tokens. Long articles are truncated. Mitigation: use the first 400 tokens of body text, always including the full title.
+3. **Context window**: BERT-family models are limited to 512 tokens. Long articles are truncated to first 400 tokens (title always included).
 
-4. **Model staleness**: Tag categories evolve as the internet does. "Ragebait" patterns from 2024 may not match 2026 patterns. Mitigation: rule engine rules are user-editable; model updates via model version bumps.
+4. **Model staleness**: Tag categories evolve over time. Rule engine rules are user-editable; model updates via version bumps.

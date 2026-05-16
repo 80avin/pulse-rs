@@ -4,6 +4,8 @@ use crate::error::TaggingError;
 use crate::types::{ItemId, FeedType};
 use crate::ai::rules::{RuleEngine, evaluate_low_effort};
 use crate::ai::onnx::OnnxTagger;
+use crate::ai::vision::VisionTagger;
+use crate::feeds::enrich::is_image_url;
 use crate::storage::DbHandle;
 use crate::storage::queries::get_item;
 
@@ -52,11 +54,12 @@ pub async fn tagger_task(
     db: DbHandle,
     rule_engine: Arc<RuleEngine>,
     onnx_tagger: Option<Arc<OnnxTagger>>,
+    vision_tagger: Option<Arc<VisionTagger>>,
 ) {
     tracing::info!("Tagger task started");
 
     while let Some(req) = rx.recv().await {
-        match process_tag_request(&db, &rule_engine, onnx_tagger.as_deref(), &req).await {
+        match process_tag_request(&db, &rule_engine, onnx_tagger.as_deref(), vision_tagger.as_deref(), &req).await {
             Ok(tag_count) => {
                 tracing::debug!(item_id = %req.item_id, tags = tag_count, "Item tagged");
             }
@@ -73,6 +76,7 @@ pub(crate) async fn process_tag_request(
     db: &DbHandle,
     rule_engine: &RuleEngine,
     onnx_tagger: Option<&OnnxTagger>,
+    vision_tagger: Option<&VisionTagger>,
     req: &TagRequest,
 ) -> Result<usize, TaggingError> {
     let item_id = req.item_id.clone();
@@ -82,6 +86,33 @@ pub(crate) async fn process_tag_request(
         get_item(&pool, &item_id).await
     }).await.map_err(TaggingError::Storage)?;
 
+    // ── Vision path: image-only items bypass text pipeline ────────────────────
+    // Image URLs (i.redd.it, etc.) have no body text; run CLIP instead of NLI.
+    let is_image = item.url.as_deref().map(is_image_url).unwrap_or(false);
+    if is_image {
+        if let Some(vision) = vision_tagger {
+            if let Some(ref url) = item.url {
+                match vision.classify_image_url(url).await {
+                    Ok(vision_tags) if !vision_tags.is_empty() => {
+                        let count = vision_tags.len();
+                        db.insert_ai_tags(req.item_id.clone(), vision_tags).await
+                            .map_err(TaggingError::Storage)?;
+                        return Ok(count);
+                    }
+                    Ok(_) => {
+                        // No tags above threshold — that's fine, no tags inserted
+                        return Ok(0);
+                    }
+                    Err(e) => {
+                        tracing::debug!(url = %url, "Vision tagging failed: {}", e);
+                        // Fall through to text pipeline (may also find nothing useful)
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Text path: NLI + rule engine ──────────────────────────────────────────
     let mut tags = if let Some(onnx) = onnx_tagger {
         // ONNX path: semantic classification for content tags
         let mut onnx_tags = match onnx.classify(&item, &feed_type) {

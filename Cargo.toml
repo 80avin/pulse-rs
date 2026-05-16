@@ -58,3 +58,6 @@ regex = "1"
 
 # HTML stripping
 scraper = "0.21"
+
+# Image decode + resize for CLIP vision pipeline
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }

@@ -17,6 +17,7 @@ sync = []
 search = []
 ai-rules = []
 ai-onnx = ["dep:ort", "dep:tokenizers"]
+ai-vision = ["dep:ort", "dep:image"]
 
 [dependencies]
 tokio = { workspace = true }
@@ -35,6 +36,7 @@ scraper = { workspace = true }
 futures = "0.3"
 ort = { workspace = true, optional = true }
 tokenizers = { workspace = true, optional = true }
+image = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

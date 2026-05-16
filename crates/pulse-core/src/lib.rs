@@ -11,7 +11,7 @@ pub mod types;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use crate::ai::{RuleEngine, TaggerHandle, OnnxTagger, default_rules, tagger_task, TAGGER_QUEUE_SIZE};
+use crate::ai::{RuleEngine, TaggerHandle, OnnxTagger, VisionTagger, default_rules, tagger_task, TAGGER_QUEUE_SIZE};
 use crate::ai::tagger::process_tag_request;
 use crate::ai::tagger::TagRequest;
 use crate::feeds::{fetch_enrichment, should_enrich, is_image_url, RedditAuth};
@@ -39,8 +39,10 @@ pub struct PulseCore {
     pub search: SearchService,
     pub config: Arc<PulseConfig>,
     pub rule_engine: Arc<RuleEngine>,
-    /// ONNX tagger — Some when a model is loaded, None when running rules-only.
+    /// NLI cross-encoder — Some when a text model is loaded, None for rules-only.
     pub onnx_tagger: Option<Arc<OnnxTagger>>,
+    /// CLIP vision encoder — Some when a vision model is loaded.
+    pub vision_tagger: Option<Arc<VisionTagger>>,
 }
 
 impl PulseCore {
@@ -99,6 +101,31 @@ impl PulseCore {
             }
         };
 
+        // Try loading the active vision model (non-fatal if absent)
+        let vision_tagger: Option<Arc<VisionTagger>> = {
+            let active_vision_file = config.data_dir.join("active_vision_model");
+            if let Ok(model_name) = std::fs::read_to_string(&active_vision_file) {
+                let model_name = model_name.trim().to_string();
+                let model_dir = config.data_dir.join("models").join(&model_name);
+                match VisionTagger::load(&model_dir) {
+                    Ok(t) => {
+                        tracing::info!(model = %model_name, "CLIP vision tagger loaded");
+                        Some(Arc::new(t))
+                    }
+                    Err(crate::error::TaggingError::ModelNotLoaded) => {
+                        tracing::debug!(model = %model_name, "Vision model files not found or ai-vision feature disabled");
+                        None
+                    }
+                    Err(e) => {
+                        tracing::warn!(model = %model_name, error = %e, "Failed to load vision model");
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        };
+
         // Spawn the AI tagger task
         let (tagger_tx, tagger_rx) = mpsc::channel(TAGGER_QUEUE_SIZE);
         let tagger_handle = TaggerHandle::new(tagger_tx);
@@ -107,8 +134,9 @@ impl PulseCore {
         let db_for_tagger = db.clone();
         let engine_for_task = rule_engine.clone();
         let onnx_for_task = onnx_tagger.clone();
+        let vision_for_task = vision_tagger.clone();
         tokio::spawn(async move {
-            tagger_task(tagger_rx, db_for_tagger, engine_for_task, onnx_for_task).await;
+            tagger_task(tagger_rx, db_for_tagger, engine_for_task, onnx_for_task, vision_for_task).await;
         });
 
         // Build Reddit auth from config if credentials are provided
@@ -135,6 +163,7 @@ impl PulseCore {
             config,
             rule_engine,
             onnx_tagger,
+            vision_tagger,
         })
     }
 
@@ -416,7 +445,7 @@ impl PulseCore {
                     item_id: item.id.clone(),
                     feed_type: feed.feed_type.clone(),
                 };
-                match process_tag_request(&self.db, &self.rule_engine, self.onnx_tagger.as_deref(), &req).await {
+                match process_tag_request(&self.db, &self.rule_engine, self.onnx_tagger.as_deref(), self.vision_tagger.as_deref(), &req).await {
                     Ok(n) => {
                         tags_created += n;
                         items_processed += 1;
@@ -508,6 +537,42 @@ impl PulseCore {
     /// Return the path where model files should be placed for a given model name.
     pub fn model_dir(&self, model_name: &str) -> std::path::PathBuf {
         self.config.data_dir.join("models").join(model_name)
+    }
+
+    // ─── Vision model management ──────────────────────────────────────────────
+
+    pub fn active_vision_model_name(&self) -> Option<String> {
+        let path = self.config.data_dir.join("active_vision_model");
+        std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+    }
+
+    pub fn set_active_vision_model(&self, model_name: &str) -> Result<(), PulseError> {
+        let model_dir = self.config.data_dir.join("models").join(model_name);
+        if !model_dir.join("vision_model_q4f16.onnx").exists() {
+            return Err(PulseError::NotFound(format!(
+                "vision model '{}' not found at {:?} — download vision_model_q4f16.onnx there first",
+                model_name, model_dir
+            )));
+        }
+        if !model_dir.join("label_embeddings.bin").exists() {
+            return Err(PulseError::NotFound(format!(
+                "label_embeddings.bin not found for '{}' — run scripts/compute_clip_labels.py first",
+                model_name
+            )));
+        }
+        let active_file = self.config.data_dir.join("active_vision_model");
+        std::fs::write(&active_file, model_name)
+            .map_err(|e| PulseError::Config(format!("failed to write active_vision_model: {e}")))?;
+        Ok(())
+    }
+
+    pub fn unset_active_vision_model(&self) -> Result<(), PulseError> {
+        let active_file = self.config.data_dir.join("active_vision_model");
+        if active_file.exists() {
+            std::fs::remove_file(&active_file)
+                .map_err(|e| PulseError::Config(format!("failed to remove active_vision_model: {e}")))?;
+        }
+        Ok(())
     }
 
     // ─── Stats ────────────────────────────────────────────────────────────────
