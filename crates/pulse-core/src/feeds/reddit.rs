@@ -4,9 +4,11 @@ use uuid::Uuid;
 use crate::error::FeedError;
 use crate::types::{Feed, FeedItem};
 use crate::feeds::normalize::{strip_html, count_words, collapse_whitespace, decode_html_entities};
+use crate::feeds::reddit_auth::RedditAuth;
 
 const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)";
 const REDDIT_BASE: &str = "https://www.reddit.com";
+const REDDIT_OAUTH_BASE: &str = "https://oauth.reddit.com";
 
 /// Result of a Reddit fetch
 pub struct RedditFetchResult {
@@ -84,7 +86,7 @@ struct CrosspostParent {
     post_hint: Option<String>,
 }
 
-pub async fn fetch_reddit(client: &Client, feed: &Feed) -> Result<RedditFetchResult, FeedError> {
+pub async fn fetch_reddit(client: &Client, feed: &Feed, auth: Option<&RedditAuth>) -> Result<RedditFetchResult, FeedError> {
     let fetched_at = chrono::Utc::now().timestamp();
 
     // Prefer explicit source_config; fall back to parsing from the feed URL.
@@ -99,9 +101,15 @@ pub async fn fetch_reddit(client: &Client, feed: &Feed) -> Result<RedditFetchRes
         .unwrap_or("hot");
     let limit = 100u32;
 
-    let fetch_url = format!("{}/r/{}/{}.json?limit={}", REDDIT_BASE, subreddit, sort, limit);
+    // Authenticated requests use oauth.reddit.com (higher rate limits, no TLS fingerprint issues).
+    let base = if auth.is_some() { REDDIT_OAUTH_BASE } else { REDDIT_BASE };
+    let fetch_url = format!("{}/r/{}/{}.json?limit={}", base, subreddit, sort, limit);
 
     let mut req = client.get(&fetch_url).header("User-Agent", USER_AGENT);
+    if let Some(reddit_auth) = auth {
+        let token = reddit_auth.token(client).await?;
+        req = req.header("Authorization", format!("Bearer {}", token));
+    }
     if let Some(ref etag) = feed.etag { req = req.header("If-None-Match", etag); }
     if let Some(ref lm) = feed.last_modified { req = req.header("If-Modified-Since", lm); }
 

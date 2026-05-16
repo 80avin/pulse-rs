@@ -33,6 +33,14 @@ struct Cli {
     #[arg(long, global = true)]
     db: Option<PathBuf>,
 
+    /// Reddit OAuth2 client ID (script app). Also read from REDDIT_CLIENT_ID env var.
+    #[arg(long, global = true, env = "REDDIT_CLIENT_ID")]
+    reddit_client_id: Option<String>,
+
+    /// Reddit OAuth2 client secret. Also read from REDDIT_CLIENT_SECRET env var.
+    #[arg(long, global = true, env = "REDDIT_CLIENT_SECRET")]
+    reddit_client_secret: Option<String>,
+
     /// Output as JSON (machine-readable)
     #[arg(long, global = true)]
     json: bool,
@@ -80,13 +88,17 @@ async fn main() {
         .init();
 
     // Build config
-    let config = if let Some(ref data_dir) = cli.data_dir {
+    let mut config = if let Some(ref data_dir) = cli.data_dir {
         PulseConfig::default_config().with_data_dir(data_dir.clone())
     } else if let Some(ref db_path) = cli.db {
         PulseConfig::default_config().with_db_path(db_path.clone())
     } else {
         PulseConfig::default_config()
     };
+
+    if let (Some(id), Some(secret)) = (cli.reddit_client_id, cli.reddit_client_secret) {
+        config = config.with_reddit_auth(id, secret);
+    }
 
     // Initialize PulseCore
     let core = match PulseCore::init(config).await {

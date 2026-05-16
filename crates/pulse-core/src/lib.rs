@@ -14,7 +14,7 @@ use tokio::sync::mpsc;
 use crate::ai::{RuleEngine, TaggerHandle, OnnxTagger, default_rules, tagger_task, TAGGER_QUEUE_SIZE};
 use crate::ai::tagger::process_tag_request;
 use crate::ai::tagger::TagRequest;
-use crate::feeds::{fetch_enrichment, should_enrich, is_image_url};
+use crate::feeds::{fetch_enrichment, should_enrich, is_image_url, RedditAuth};
 use crate::config::PulseConfig;
 use crate::error::PulseError;
 use crate::storage::actor::{db_writer_task, DbHandle};
@@ -111,8 +111,17 @@ impl PulseCore {
             tagger_task(tagger_rx, db_for_tagger, engine_for_task, onnx_for_task).await;
         });
 
+        // Build Reddit auth from config if credentials are provided
+        let reddit_auth = match (config.reddit_client_id.as_deref(), config.reddit_client_secret.as_deref()) {
+            (Some(id), Some(secret)) => {
+                tracing::info!("Reddit OAuth2 enabled (client_id={}...)", &id[..id.len().min(8)]);
+                Some(Arc::new(RedditAuth::new(id.to_string(), secret.to_string())))
+            }
+            _ => None,
+        };
+
         // Initialize the sync scheduler
-        let scheduler = Arc::new(SyncScheduler::new(db.clone(), tagger_handle.clone()));
+        let scheduler = Arc::new(SyncScheduler::new(db.clone(), tagger_handle.clone(), reddit_auth));
 
         let timeline = TimelineService::new(db.clone());
         let search = SearchService::new(db.clone());

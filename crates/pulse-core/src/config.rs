@@ -15,6 +15,10 @@ pub struct PulseConfig {
     pub max_backoff_secs: u64,
     /// Whether we're running on Android (affects some pragmas and sync behavior)
     pub is_android: bool,
+    /// Reddit OAuth2 script-app client ID (from reddit.com/prefs/apps)
+    pub reddit_client_id: Option<String>,
+    /// Reddit OAuth2 script-app client secret
+    pub reddit_client_secret: Option<String>,
 }
 
 impl PulseConfig {
@@ -30,6 +34,8 @@ impl PulseConfig {
             max_failure_streak: 10,
             max_backoff_secs: 14400, // 4 hours
             is_android: cfg!(target_os = "android"),
+            reddit_client_id: None,
+            reddit_client_secret: None,
         }
     }
 
@@ -43,6 +49,13 @@ impl PulseConfig {
     pub fn with_data_dir(mut self, data_dir: PathBuf) -> Self {
         self.data_dir = data_dir.clone();
         self.db_path = data_dir.join("pulse.db");
+        self
+    }
+
+    /// Set Reddit OAuth2 credentials (client-credentials / script-app flow).
+    pub fn with_reddit_auth(mut self, client_id: String, client_secret: String) -> Self {
+        self.reddit_client_id = Some(client_id);
+        self.reddit_client_secret = Some(client_secret);
         self
     }
 
