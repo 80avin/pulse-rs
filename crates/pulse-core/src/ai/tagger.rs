@@ -3,6 +3,7 @@ use tokio::sync::mpsc;
 use crate::error::TaggingError;
 use crate::types::{ItemId, FeedType};
 use crate::ai::rules::{RuleEngine, evaluate_low_effort};
+use crate::ai::onnx::OnnxTagger;
 use crate::storage::DbHandle;
 use crate::storage::queries::get_item;
 
@@ -34,7 +35,7 @@ impl TaggerHandle {
             Err(mpsc::error::TrySendError::Full(_)) => {
                 tracing::warn!(
                     item_id = %item_id,
-                    "Tagging queue is full (capacity {}); item skipped. Run 'pulse ai retag --pending' to re-queue.",
+                    "Tagging queue is full (capacity {}); item skipped. Run 'pulse ai run' to retag.",
                     TAGGER_QUEUE_SIZE
                 );
             }
@@ -46,36 +47,21 @@ impl TaggerHandle {
 }
 
 /// The tagging background task.
-/// Runs a rule engine against incoming item IDs and stores the results via DbHandle.
 pub async fn tagger_task(
     mut rx: mpsc::Receiver<TagRequest>,
     db: DbHandle,
     rule_engine: Arc<RuleEngine>,
+    onnx_tagger: Option<Arc<OnnxTagger>>,
 ) {
     tracing::info!("Tagger task started");
 
     while let Some(req) = rx.recv().await {
-        match process_tag_request(&db, &rule_engine, &req).await {
+        match process_tag_request(&db, &rule_engine, onnx_tagger.as_deref(), &req).await {
             Ok(tag_count) => {
-                tracing::debug!(
-                    item_id = %req.item_id,
-                    tags = tag_count,
-                    "Item tagged successfully"
-                );
-            }
-            Err(TaggingError::ModelNotLoaded) => {
-                tracing::error!(
-                    "AI model not available; disabling tagging. \
-                     Run 'pulse ai model download' to configure a model."
-                );
-                break;
+                tracing::debug!(item_id = %req.item_id, tags = tag_count, "Item tagged");
             }
             Err(e) => {
-                tracing::warn!(
-                    item_id = %req.item_id,
-                    error = %e,
-                    "Tagging failed (non-fatal)"
-                );
+                tracing::warn!(item_id = %req.item_id, error = %e, "Tagging failed (non-fatal)");
             }
         }
     }
@@ -86,20 +72,41 @@ pub async fn tagger_task(
 pub(crate) async fn process_tag_request(
     db: &DbHandle,
     rule_engine: &RuleEngine,
+    onnx_tagger: Option<&OnnxTagger>,
     req: &TagRequest,
 ) -> Result<usize, TaggingError> {
     let item_id = req.item_id.clone();
     let feed_type = req.feed_type.clone();
 
-    // Fetch the item from the database using the reader pool
     let item = db.with_reader(|pool| async move {
         get_item(&pool, &item_id).await
     }).await.map_err(TaggingError::Storage)?;
 
-    // Evaluate rules
-    let mut tags = rule_engine.evaluate(&item, &feed_type);
+    let mut tags = if let Some(onnx) = onnx_tagger {
+        // ONNX path: semantic classification for content tags
+        let mut onnx_tags = match onnx.classify(&item, &feed_type) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!("ONNX classify failed, falling back to rules: {}", e);
+                rule_engine.evaluate(&item, &feed_type)
+            }
+        };
 
-    // Special-case: low-effort (requires compound condition)
+        // Supplement with ALL rule tags — rules provide high-precision keyword matches
+        // that ONNX misses (exact domain names, title prefixes, etc.)
+        for rule_tag in rule_engine.evaluate(&item, &feed_type) {
+            if !onnx_tags.iter().any(|t| t.tag == rule_tag.tag) {
+                onnx_tags.push(rule_tag);
+            }
+        }
+
+        onnx_tags
+    } else {
+        // Rules-only path
+        rule_engine.evaluate(&item, &feed_type)
+    };
+
+    // low-effort always evaluated by compound logic regardless of model
     if let Some(low_effort_tag) = evaluate_low_effort(&item, &feed_type) {
         if !tags.iter().any(|t| t.tag == "low-effort") {
             tags.push(low_effort_tag);
@@ -107,7 +114,6 @@ pub(crate) async fn process_tag_request(
     }
 
     let tag_count = tags.len();
-
     if !tags.is_empty() {
         db.insert_ai_tags(req.item_id.clone(), tags).await
             .map_err(TaggingError::Storage)?;

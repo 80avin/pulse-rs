@@ -82,6 +82,12 @@ pub enum TaggingError {
 
     #[error("Rule evaluation error: {0}")]
     Rule(String),
+
+    #[error("ONNX inference error: {0}")]
+    Onnx(String),
+
+    #[error("Tokenizer error: {0}")]
+    Tokenizer(String),
 }
 
 #[derive(Debug, Error)]

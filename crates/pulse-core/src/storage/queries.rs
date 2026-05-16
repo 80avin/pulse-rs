@@ -173,6 +173,9 @@ pub async fn get_timeline(
     if filter.is_saved.is_some() {
         conditions.push("ist.is_saved = ?".to_string());
     }
+    if filter.tag.is_some() {
+        conditions.push("EXISTS (SELECT 1 FROM ai_tags _tf WHERE _tf.item_id = fi.id AND _tf.tag = ?)".to_string());
+    }
 
     let where_clause = conditions.join(" AND ");
 
@@ -212,6 +215,9 @@ pub async fn get_timeline(
     }
     if let Some(s) = filter.is_saved {
         query = query.bind(s as i64);
+    }
+    if let Some(ref t) = filter.tag {
+        query = query.bind(t.as_str());
     }
     query = query.bind(fetch_limit);
 
@@ -368,6 +374,79 @@ pub async fn get_ai_tags(pool: &SqlitePool, item_id: &ItemId) -> Result<Vec<AiTa
             created_at: row.try_get("created_at").map_err(StorageError::Sqlite)?,
         })
     }).collect()
+}
+
+/// Minimal item record returned for enrichment candidates
+pub struct EnrichCandidate {
+    pub id: ItemId,
+    pub url: String,
+    pub feed_id: String,
+    pub body_text: Option<String>,
+}
+
+/// Return items that have not yet been enriched (no `enriched_at` in source_meta)
+/// and have an external URL. Ordered newest-first.
+pub async fn get_pending_enrichment(
+    pool: &SqlitePool,
+    feed_id_filter: Option<&str>,
+    limit: usize,
+) -> Result<Vec<EnrichCandidate>, StorageError> {
+    let rows = if let Some(fid) = feed_id_filter {
+        sqlx::query(
+            "SELECT id, url, feed_id, body_text FROM feed_items
+             WHERE url IS NOT NULL
+               AND json_extract(source_meta, '$.enriched_at') IS NULL
+               AND feed_id = ?
+             ORDER BY published_at DESC
+             LIMIT ?"
+        )
+        .bind(fid)
+        .bind(limit as i64)
+        .fetch_all(pool)
+        .await
+        .map_err(StorageError::Sqlite)?
+    } else {
+        sqlx::query(
+            "SELECT id, url, feed_id, body_text FROM feed_items
+             WHERE url IS NOT NULL
+               AND json_extract(source_meta, '$.enriched_at') IS NULL
+             ORDER BY published_at DESC
+             LIMIT ?"
+        )
+        .bind(limit as i64)
+        .fetch_all(pool)
+        .await
+        .map_err(StorageError::Sqlite)?
+    };
+
+    use sqlx::Row;
+    rows.iter().map(|r| Ok(EnrichCandidate {
+        id: r.try_get("id").map_err(StorageError::Sqlite)?,
+        url: r.try_get("url").map_err(StorageError::Sqlite)?,
+        feed_id: r.try_get("feed_id").map_err(StorageError::Sqlite)?,
+        body_text: r.try_get("body_text").map_err(StorageError::Sqlite)?,
+    })).collect()
+}
+
+/// Count items still pending enrichment
+pub async fn count_pending_enrichment(
+    pool: &SqlitePool,
+    feed_id_filter: Option<&str>,
+) -> Result<i64, StorageError> {
+    if let Some(fid) = feed_id_filter {
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM feed_items
+             WHERE url IS NOT NULL
+               AND json_extract(source_meta, '$.enriched_at') IS NULL
+               AND feed_id = ?"
+        ).bind(fid).fetch_one(pool).await.map_err(StorageError::Sqlite)
+    } else {
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM feed_items
+             WHERE url IS NOT NULL
+               AND json_extract(source_meta, '$.enriched_at') IS NULL"
+        ).fetch_one(pool).await.map_err(StorageError::Sqlite)
+    }
 }
 
 /// Get database statistics

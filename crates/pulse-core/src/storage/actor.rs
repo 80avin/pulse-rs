@@ -64,6 +64,16 @@ pub enum DbCommand {
         feed_id: FeedId,
         reply: oneshot::Sender<DbResult<()>>,
     },
+
+    /// Update an item's body_text and source_meta after enrichment.
+    /// body_text is only written if the item currently has no body_text (COALESCE).
+    /// source_meta is always updated via json_set.
+    EnrichItem {
+        item_id: ItemId,
+        body_text: Option<String>,
+        source_meta_patch: serde_json::Value,
+        reply: oneshot::Sender<DbResult<()>>,
+    },
 }
 
 /// The DB writer actor task. Uses a single-connection pool to serialize writes.
@@ -116,6 +126,11 @@ pub async fn db_writer_task(
 
             DbCommand::DeleteFeed { feed_id, reply } => {
                 let result = delete_feed(&pool, &feed_id).await;
+                let _ = reply.send(result);
+            }
+
+            DbCommand::EnrichItem { item_id, body_text, source_meta_patch, reply } => {
+                let result = enrich_item(&pool, &item_id, body_text.as_deref(), &source_meta_patch).await;
                 let _ = reply.send(result);
             }
         }
@@ -503,6 +518,58 @@ async fn delete_feed(pool: &SqlitePool, feed_id: &FeedId) -> DbResult<()> {
     Ok(())
 }
 
+async fn enrich_item(
+    pool: &SqlitePool,
+    item_id: &ItemId,
+    body_text: Option<&str>,
+    source_meta_patch: &serde_json::Value,
+) -> DbResult<()> {
+    // Merge patch fields into existing source_meta using json_set.
+    // Build a dynamic json_set expression for each patch key.
+    let patch_obj = match source_meta_patch.as_object() {
+        Some(m) => m,
+        None => return Ok(()),
+    };
+
+    if patch_obj.is_empty() {
+        return Ok(());
+    }
+
+    // Build: json_set(source_meta, '$.k1', ?, '$.k2', ?, ...)
+    let mut set_expr = String::from("json_set(source_meta");
+    let mut bindings: Vec<String> = Vec::new();
+    for (k, v) in patch_obj {
+        set_expr.push_str(&format!(", '$.{}', ?", k));
+        bindings.push(match v {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Null => "null".to_string(),
+            other => other.to_string(),
+        });
+    }
+    set_expr.push(')');
+
+    // Two separate updates to avoid unnecessary FTS trigger when body_text is unchanged.
+    // 1. Update source_meta always (no FTS trigger — trigger only watches body_text/title/author)
+    let meta_sql = format!("UPDATE feed_items SET source_meta = {} WHERE id = ?", set_expr);
+    let mut q = sqlx::query(&meta_sql);
+    for b in &bindings { q = q.bind(b); }
+    q.bind(item_id).execute(pool).await.map_err(StorageError::Sqlite)?;
+
+    // 2. Update body_text only if provided AND item currently has none (triggers FTS update)
+    if let Some(bt) = body_text {
+        sqlx::query(
+            "UPDATE feed_items SET body_text = ? WHERE id = ? AND body_text IS NULL"
+        )
+        .bind(bt)
+        .bind(item_id)
+        .execute(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
+    }
+
+    Ok(())
+}
+
 // ─── DbHandle ───────────────────────────────────────────────────────────────
 
 /// A cloneable handle to the DB writer actor and a read pool.
@@ -579,6 +646,16 @@ impl DbHandle {
     /// Delete a feed and all its items
     pub async fn delete_feed(&self, feed_id: FeedId) -> DbResult<()> {
         self.send(|reply| DbCommand::DeleteFeed { feed_id, reply }).await
+    }
+
+    /// Update an item's body_text (if currently null) and merge source_meta fields.
+    pub async fn enrich_item(
+        &self,
+        item_id: ItemId,
+        body_text: Option<String>,
+        source_meta_patch: serde_json::Value,
+    ) -> DbResult<()> {
+        self.send(|reply| DbCommand::EnrichItem { item_id, body_text, source_meta_patch, reply }).await
     }
 
     /// Get reference to reader pool for read-only queries

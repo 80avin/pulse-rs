@@ -261,3 +261,31 @@ pub struct DbStats {
     pub tag_count: i64,
     pub db_size_bytes: i64,
 }
+
+/// Outcome of enriching a single item
+#[derive(Debug, Clone)]
+pub enum EnrichStatus {
+    Ok,
+    Image,
+    Skipped,
+    Error(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct EnrichItemResult {
+    pub item_id: String,
+    pub url: String,
+    pub status: EnrichStatus,
+    pub og_title: Option<String>,
+    pub og_description: Option<String>,
+    pub og_image: Option<String>,
+}
+
+/// Aggregate stats for an enrichment run
+#[derive(Debug, Default, Clone)]
+pub struct EnrichStats {
+    pub enriched: usize,
+    pub image_posts: usize,
+    pub skipped: usize,
+    pub errors: usize,
+}

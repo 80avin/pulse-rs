@@ -12,6 +12,7 @@ use commands::{
     ai::AiArgs,
     db::DbArgs,
     diag::DiagArgs,
+    enrich::EnrichArgs,
     feed::FeedArgs,
     group::GroupArgs,
     item::ItemArgs,
@@ -24,7 +25,11 @@ use commands::{
 #[derive(Debug, Parser)]
 #[command(name = "pulse", version, about)]
 struct Cli {
-    /// Override database path
+    /// Override data directory (DB + models). Takes precedence over --db.
+    #[arg(long, global = true)]
+    data_dir: Option<PathBuf>,
+
+    /// Override database path (ignored if --data-dir is set)
     #[arg(long, global = true)]
     db: Option<PathBuf>,
 
@@ -54,6 +59,8 @@ enum Commands {
     Search(SearchArgs),
     /// Control the sync engine
     Sync(SyncArgs),
+    /// Enrich items with Open Graph metadata and crosspost content
+    Enrich(EnrichArgs),
     /// AI tagging pipeline management
     Ai(AiArgs),
     /// Database utilities
@@ -73,7 +80,9 @@ async fn main() {
         .init();
 
     // Build config
-    let config = if let Some(ref db_path) = cli.db {
+    let config = if let Some(ref data_dir) = cli.data_dir {
+        PulseConfig::default_config().with_data_dir(data_dir.clone())
+    } else if let Some(ref db_path) = cli.db {
         PulseConfig::default_config().with_db_path(db_path.clone())
     } else {
         PulseConfig::default_config()
@@ -97,6 +106,7 @@ async fn main() {
         Commands::Item(args) => commands::item::run(args, &core, global_json).await,
         Commands::Search(args) => commands::search::run(args, &core, global_json).await,
         Commands::Sync(args) => commands::sync::run(args, &core, global_json).await,
+        Commands::Enrich(args) => commands::enrich::run(args, &core, global_json).await,
         Commands::Ai(args) => commands::ai::run(args, &core, global_json).await,
         Commands::Db(args) => commands::db::run(args, &core, global_json).await,
         Commands::Diag(args) => commands::diag::run(args, &core, global_json).await,

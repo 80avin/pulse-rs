@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod db;
 pub mod diag;
+pub mod enrich;
 pub mod feed;
 pub mod group;
 pub mod item;

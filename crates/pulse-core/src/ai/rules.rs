@@ -54,7 +54,6 @@ impl RulePattern {
     fn matched_text<'a>(&'a self, text: &'a str) -> Option<&'a str> {
         match self {
             RulePattern::Keyword(kw) => {
-                // Check if keyword appears in the text (case-insensitive)
                 if text.to_lowercase().contains(kw.as_str()) {
                     Some(kw.as_str())
                 } else {
@@ -171,30 +170,88 @@ impl RuleEngine {
 /// Build the default set of rules
 pub fn default_rules() -> Vec<TagRule> {
     vec![
+        // ── Core content-type tags ─────────────────────────────────────────────
+
         TagRule {
             id: "technical".to_string(),
             tag: "technical".to_string(),
             confidence: 0.80,
             explanation_template: "matched keyword '{matched_text}' in content".to_string(),
             patterns: vec![
-                RulePattern::Keyword("github.com".to_string()),
-                RulePattern::Keyword("crates.io".to_string()),
-                RulePattern::Keyword("npm".to_string()),
+                // languages
+                RulePattern::Keyword("rust".to_string()),
+                RulePattern::Keyword("python".to_string()),
+                RulePattern::Keyword("typescript".to_string()),
+                RulePattern::Keyword("javascript".to_string()),
+                RulePattern::Keyword("golang".to_string()),
+                RulePattern::Keyword("erlang".to_string()),
+                RulePattern::Keyword("elixir".to_string()),
+                RulePattern::Keyword("haskell".to_string()),
+                RulePattern::Keyword("zig ".to_string()),
+                RulePattern::Keyword("c++".to_string()),
+                RulePattern::Keyword("java ".to_string()),
+                RulePattern::Keyword("swift ".to_string()),
+                RulePattern::Keyword("kotlin".to_string()),
+                RulePattern::Keyword("ocaml".to_string()),
+                // infrastructure / tooling
                 RulePattern::Keyword("docker".to_string()),
                 RulePattern::Keyword("kubernetes".to_string()),
+                RulePattern::Keyword("linux".to_string()),
+                RulePattern::Keyword("git ".to_string()),
+                RulePattern::Keyword("llvm".to_string()),
+                RulePattern::Keyword("wasm".to_string()),
+                RulePattern::Keyword("webassembly".to_string()),
+                RulePattern::Keyword("compiler".to_string()),
+                RulePattern::Keyword("interpreter".to_string()),
+                RulePattern::Keyword("runtime".to_string()),
+                RulePattern::Keyword("cpu ".to_string()),
+                RulePattern::Keyword("gpu ".to_string()),
+                // software engineering concepts
                 RulePattern::Keyword(" api ".to_string()),
                 RulePattern::Keyword("framework".to_string()),
                 RulePattern::Keyword("library".to_string()),
                 RulePattern::Keyword("algorithm".to_string()),
                 RulePattern::Keyword("performance".to_string()),
-                RulePattern::Keyword("rust".to_string()),
-                RulePattern::Keyword("python".to_string()),
-                RulePattern::Keyword("typescript".to_string()),
-                RulePattern::Keyword("golang".to_string()),
-                RulePattern::Keyword(" sql".to_string()),
-                RulePattern::Keyword("linux".to_string()),
+                RulePattern::Keyword("sql".to_string()),
+                RulePattern::Keyword("database".to_string()),
+                RulePattern::Keyword("open source".to_string()),
+                RulePattern::Keyword("concurrency".to_string()),
+                RulePattern::Keyword("package manager".to_string()),
+                RulePattern::Keyword("terminal".to_string()),
+                RulePattern::Keyword("debugging".to_string()),
+                RulePattern::Keyword("refactor".to_string()),
+                RulePattern::Keyword("memory safety".to_string()),
+                RulePattern::Keyword("type system".to_string()),
+                // Rust-specific / systems programming
+                RulePattern::Keyword("struct".to_string()),
+                RulePattern::Keyword(" trait".to_string()),
+                RulePattern::Keyword(" macro".to_string()),
+                RulePattern::Keyword(" crate".to_string()),
+                RulePattern::Keyword(" async".to_string()),
+                RulePattern::Keyword("orm".to_string()),
+                RulePattern::Keyword("ownership".to_string()),
+                RulePattern::Keyword("borrow".to_string()),
+                RulePattern::Keyword("-rs".to_string()),   // catches image-rs, tokio-rs, etc.
+                RulePattern::Keyword("mpsc".to_string()),
+                RulePattern::Keyword("tokio".to_string()),
+                RulePattern::Keyword("serde".to_string()),
+                RulePattern::Keyword("axum".to_string()),
+                RulePattern::Keyword("actix".to_string()),
+                RulePattern::Keyword("rayon".to_string()),
+                // graphics / game dev
+                RulePattern::Keyword("shader".to_string()),
+                RulePattern::Keyword("rendering".to_string()),
+                RulePattern::Keyword("opengl".to_string()),
+                RulePattern::Keyword("vulkan".to_string()),
+                RulePattern::Keyword("webgl".to_string()),
+                RulePattern::Keyword("blending".to_string()),
+                // registries / hosting
+                RulePattern::Keyword("github.com".to_string()),
+                RulePattern::Keyword("crates.io".to_string()),
+                RulePattern::Keyword("npm".to_string()),
                 RulePattern::DomainMatch("github.com".to_string()),
                 RulePattern::DomainMatch("crates.io".to_string()),
+                RulePattern::DomainMatch("gitlab.com".to_string()),
             ],
             scope: RuleScope::All,
             require_all: false,
@@ -215,6 +272,18 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("introduction to".to_string()),
                 RulePattern::Keyword("beginner".to_string()),
                 RulePattern::Keyword("walkthrough".to_string()),
+                RulePattern::Keyword("how i built".to_string()),
+                RulePattern::Keyword("how i wrote".to_string()),
+                RulePattern::Keyword("from scratch".to_string()),
+                RulePattern::Keyword("deep dive".to_string()),
+                RulePattern::Keyword("by example".to_string()),
+                RulePattern::Keyword("in practice".to_string()),
+                RulePattern::Keyword("made simple".to_string()),
+                RulePattern::Keyword("under the hood".to_string()),
+                RulePattern::Keyword("explained".to_string()),
+                RulePattern::Keyword("understanding".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)write your own ").unwrap()),
+                RulePattern::Regex(Regex::new(r"(?i)build (a|an|your) ").unwrap()),
             ],
             scope: RuleScope::TitleOnly,
             require_all: false,
@@ -236,7 +305,13 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("benchmark".to_string()),
                 RulePattern::Keyword("evaluation".to_string()),
                 RulePattern::Keyword("methodology".to_string()),
+                RulePattern::Keyword("peer review".to_string()),
+                RulePattern::Keyword("experiment".to_string()),
+                RulePattern::Keyword("hypothesis".to_string()),
+                RulePattern::Keyword("analysis".to_string()),
                 RulePattern::DomainMatch("arxiv.org".to_string()),
+                RulePattern::DomainMatch("semanticscholar.org".to_string()),
+                RulePattern::DomainMatch("scholar.google.com".to_string()),
             ],
             scope: RuleScope::All,
             require_all: false,
@@ -253,11 +328,24 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("releases".to_string()),
                 RulePattern::Keyword("launches".to_string()),
                 RulePattern::Keyword("acquires".to_string()),
+                RulePattern::Keyword("acquisition".to_string()),
                 RulePattern::Keyword("raises".to_string()),
                 RulePattern::Keyword("funding".to_string()),
                 RulePattern::Keyword("partnership".to_string()),
                 RulePattern::Keyword("breach".to_string()),
                 RulePattern::Keyword("outage".to_string()),
+                RulePattern::Keyword("shuts down".to_string()),
+                RulePattern::Keyword("taken offline".to_string()),
+                RulePattern::Keyword("has been hacked".to_string()),
+                RulePattern::Keyword("data center".to_string()),
+                RulePattern::Keyword("layoffs".to_string()),
+                RulePattern::Keyword("laid off".to_string()),
+                RulePattern::Keyword("fired".to_string()),
+                RulePattern::Keyword("ipo".to_string()),
+                RulePattern::Keyword("merger".to_string()),
+                RulePattern::Keyword("update".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\$\d+[bm]\b").unwrap()),
+                RulePattern::Regex(Regex::new(r"(?i)\d+[bm] (in |deal|funding|valuation)").unwrap()),
             ],
             scope: RuleScope::TitleOnly,
             require_all: false,
@@ -275,12 +363,189 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("discussion:".to_string()),
                 RulePattern::Keyword("thoughts on".to_string()),
                 RulePattern::Keyword("what do you think".to_string()),
+                RulePattern::Keyword("what's your take".to_string()),
                 RulePattern::Keyword("opinion".to_string()),
+                RulePattern::Keyword("i believe".to_string()),
+                RulePattern::Keyword("has anyone".to_string()),
+                RulePattern::Keyword("should we".to_string()),
+                RulePattern::Keyword("is it worth".to_string()),
+                RulePattern::Keyword("pros and cons".to_string()),
+                RulePattern::Keyword("unpopular opinion".to_string()),
+                RulePattern::Keyword("change my mind".to_string()),
             ],
             scope: RuleScope::TitleOnly,
             require_all: false,
             enabled: true,
         },
+
+        // ── Topic tags ─────────────────────────────────────────────────────────
+
+        TagRule {
+            id: "security".to_string(),
+            tag: "security".to_string(),
+            confidence: 0.85,
+            explanation_template: "matched security keyword '{matched_text}'".to_string(),
+            patterns: vec![
+                RulePattern::Keyword("vulnerability".to_string()),
+                RulePattern::Keyword("exploit".to_string()),
+                RulePattern::Keyword("cve-".to_string()),
+                RulePattern::Keyword("zero-day".to_string()),
+                RulePattern::Keyword("ransomware".to_string()),
+                RulePattern::Keyword("malware".to_string()),
+                RulePattern::Keyword("phishing".to_string()),
+                RulePattern::Keyword("supply chain attack".to_string()),
+                RulePattern::Keyword("penetration test".to_string()),
+                RulePattern::Keyword("cryptography".to_string()),
+                RulePattern::Keyword("encryption".to_string()),
+                RulePattern::Keyword("cybersecurity".to_string()),
+                RulePattern::Keyword("infosec".to_string()),
+                RulePattern::Keyword("threat actor".to_string()),
+                RulePattern::Keyword("data breach".to_string()),
+                RulePattern::Keyword("authentication".to_string()),
+                RulePattern::Keyword("authorization".to_string()),
+                RulePattern::Keyword("injection attack".to_string()),
+                RulePattern::Keyword("xss".to_string()),
+                RulePattern::Keyword("csrf".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\bcve\b").unwrap()),
+            ],
+            scope: RuleScope::All,
+            require_all: false,
+            enabled: true,
+        },
+
+        TagRule {
+            id: "ai-ml".to_string(),
+            tag: "ai-ml".to_string(),
+            confidence: 0.85,
+            explanation_template: "matched AI/ML keyword '{matched_text}'".to_string(),
+            patterns: vec![
+                RulePattern::Keyword("machine learning".to_string()),
+                RulePattern::Keyword("deep learning".to_string()),
+                RulePattern::Keyword("neural network".to_string()),
+                RulePattern::Keyword("large language model".to_string()),
+                RulePattern::Keyword("llm".to_string()),
+                RulePattern::Keyword("gpt".to_string()),
+                RulePattern::Keyword("openai".to_string()),
+                RulePattern::Keyword("anthropic".to_string()),
+                RulePattern::Keyword("gemini".to_string()),
+                RulePattern::Keyword("claude".to_string()),
+                RulePattern::Keyword("transformer".to_string()),
+                RulePattern::Keyword("diffusion model".to_string()),
+                RulePattern::Keyword("stable diffusion".to_string()),
+                RulePattern::Keyword("midjourney".to_string()),
+                RulePattern::Keyword("reinforcement learning".to_string()),
+                RulePattern::Keyword("fine-tuning".to_string()),
+                RulePattern::Keyword("prompt engineering".to_string()),
+                RulePattern::Keyword("inference".to_string()),
+                RulePattern::Keyword("embedding".to_string()),
+                RulePattern::Keyword("generative ai".to_string()),
+                RulePattern::Keyword("chatbot".to_string()),
+                RulePattern::Keyword("hugging face".to_string()),
+                RulePattern::Keyword("sigmoid".to_string()),
+                RulePattern::Keyword("attention mechanism".to_string()),
+                RulePattern::Keyword("backpropagation".to_string()),
+                RulePattern::Keyword("tokenization".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\bai\b").unwrap()),
+                RulePattern::DomainMatch("huggingface.co".to_string()),
+            ],
+            scope: RuleScope::All,
+            require_all: false,
+            enabled: true,
+        },
+
+        TagRule {
+            id: "privacy".to_string(),
+            tag: "privacy".to_string(),
+            confidence: 0.85,
+            explanation_template: "matched privacy keyword '{matched_text}'".to_string(),
+            patterns: vec![
+                RulePattern::Keyword("surveillance".to_string()),
+                RulePattern::Keyword("facial recognition".to_string()),
+                RulePattern::Keyword("user tracking".to_string()),
+                RulePattern::Keyword("cross-site tracking".to_string()),
+                RulePattern::Keyword("gdpr".to_string()),
+                RulePattern::Keyword("ccpa".to_string()),
+                RulePattern::Keyword("biometric".to_string()),
+                RulePattern::Keyword("data collection".to_string()),
+                RulePattern::Keyword("mass surveillance".to_string()),
+                RulePattern::Keyword("palantir".to_string()),
+                RulePattern::Keyword("location data".to_string()),
+                RulePattern::Keyword("browser fingerprint".to_string()),
+                RulePattern::Keyword("private browsing".to_string()),
+                RulePattern::Keyword("vpn".to_string()),
+                RulePattern::Keyword("tor browser".to_string()),
+                RulePattern::Keyword("end-to-end encryption".to_string()),
+                RulePattern::Keyword("anonymity".to_string()),
+            ],
+            scope: RuleScope::All,
+            require_all: false,
+            enabled: true,
+        },
+
+        TagRule {
+            id: "policy".to_string(),
+            tag: "policy".to_string(),
+            confidence: 0.80,
+            explanation_template: "matched policy keyword '{matched_text}'".to_string(),
+            patterns: vec![
+                RulePattern::Keyword("legislation".to_string()),
+                RulePattern::Keyword("regulation".to_string()),
+                RulePattern::Keyword("antitrust".to_string()),
+                RulePattern::Keyword("ftc".to_string()),
+                RulePattern::Keyword("doj ".to_string()),
+                RulePattern::Keyword("congress".to_string()),
+                RulePattern::Keyword("senate".to_string()),
+                RulePattern::Keyword("eu commission".to_string()),
+                RulePattern::Keyword("digital markets act".to_string()),
+                RulePattern::Keyword("gdpr".to_string()),
+                RulePattern::Keyword("net neutrality".to_string()),
+                RulePattern::Keyword("copyright".to_string()),
+                RulePattern::Keyword("patent".to_string()),
+                RulePattern::Keyword("open source license".to_string()),
+                RulePattern::Keyword("ban on".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\bbill\b.{0,30}(pass|sign|veto|introduc)").unwrap()),
+            ],
+            scope: RuleScope::All,
+            require_all: false,
+            enabled: true,
+        },
+
+        TagRule {
+            id: "science".to_string(),
+            tag: "science".to_string(),
+            confidence: 0.80,
+            explanation_template: "matched science keyword '{matched_text}'".to_string(),
+            patterns: vec![
+                RulePattern::Keyword("quantum".to_string()),
+                RulePattern::Keyword("physics".to_string()),
+                RulePattern::Keyword("chemistry".to_string()),
+                RulePattern::Keyword("biology".to_string()),
+                RulePattern::Keyword("astronomy".to_string()),
+                RulePattern::Keyword("neuroscience".to_string()),
+                RulePattern::Keyword("genomics".to_string()),
+                RulePattern::Keyword("crispr".to_string()),
+                RulePattern::Keyword("space exploration".to_string()),
+                RulePattern::Keyword("climate change".to_string()),
+                RulePattern::Keyword("climate model".to_string()),
+                RulePattern::Keyword("particle physics".to_string()),
+                RulePattern::Keyword("superconductor".to_string()),
+                RulePattern::Keyword("semiconductor".to_string()),
+                RulePattern::Keyword("cern".to_string()),
+                RulePattern::Keyword("nasa".to_string()),
+                RulePattern::Keyword("esa ".to_string()),
+                RulePattern::Keyword("quasicrystal".to_string()),
+                RulePattern::Keyword("crystallography".to_string()),
+                RulePattern::Keyword("materials science".to_string()),
+                RulePattern::DomainMatch("nature.com".to_string()),
+                RulePattern::DomainMatch("science.org".to_string()),
+                RulePattern::DomainMatch("newscientist.com".to_string()),
+            ],
+            scope: RuleScope::All,
+            require_all: false,
+            enabled: true,
+        },
+
+        // ── Quality / signal tags ──────────────────────────────────────────────
 
         TagRule {
             id: "clickbait".to_string(),
@@ -335,6 +600,8 @@ pub fn default_rules() -> Vec<TagRule> {
             enabled: false, // disabled by default
         },
 
+        // ── Platform/format tags ───────────────────────────────────────────────
+
         TagRule {
             id: "job-posting".to_string(),
             tag: "job-posting".to_string(),
@@ -346,6 +613,9 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("we're looking for".to_string()),
                 RulePattern::Keyword("join our team".to_string()),
                 RulePattern::Keyword("we are hiring".to_string()),
+                RulePattern::Keyword("job board".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\bis hiring\b").unwrap()),
+                RulePattern::Keyword("freelance".to_string()),
             ],
             scope: RuleScope::All,
             require_all: false,
@@ -356,13 +626,12 @@ pub fn default_rules() -> Vec<TagRule> {
             id: "show-hn".to_string(),
             tag: "show-hn".to_string(),
             confidence: 0.99,
-            explanation_template: "HN Show HN post detected".to_string(),
+            explanation_template: "Show HN post detected".to_string(),
             patterns: vec![
                 RulePattern::Keyword("show hn:".to_string()),
-                RulePattern::FeedType(FeedType::Hn),
             ],
             scope: RuleScope::TitleOnly,
-            require_all: true, // title must contain "Show HN:" AND feed must be HN
+            require_all: false,
             enabled: true,
         },
 
@@ -370,13 +639,12 @@ pub fn default_rules() -> Vec<TagRule> {
             id: "ask-hn".to_string(),
             tag: "ask-hn".to_string(),
             confidence: 0.99,
-            explanation_template: "HN Ask HN post detected".to_string(),
+            explanation_template: "Ask HN post detected".to_string(),
             patterns: vec![
                 RulePattern::Keyword("ask hn:".to_string()),
-                RulePattern::FeedType(FeedType::Hn),
             ],
             scope: RuleScope::TitleOnly,
-            require_all: true, // title must contain "Ask HN:" AND feed must be HN
+            require_all: false,
             enabled: true,
         },
 
@@ -394,6 +662,10 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::DomainMatch("technologyreview.com".to_string()),
                 RulePattern::DomainMatch("economist.com".to_string()),
                 RulePattern::DomainMatch("bloomberg.com/news".to_string()),
+                RulePattern::DomainMatch("fortune.com".to_string()),
+                RulePattern::DomainMatch("thenational.scot".to_string()),
+                RulePattern::DomainMatch("telegraph.co.uk".to_string()),
+                RulePattern::DomainMatch("washingtonpost.com".to_string()),
             ],
             scope: RuleScope::All,
             require_all: false,
@@ -410,6 +682,11 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::DomainMatch("youtu.be".to_string()),
                 RulePattern::DomainMatch("vimeo.com".to_string()),
                 RulePattern::DomainMatch("twitch.tv".to_string()),
+                // Title signals when post links to an external page about a video
+                RulePattern::Keyword("on youtube".to_string()),
+                RulePattern::Keyword("on twitch".to_string()),
+                RulePattern::Keyword("on vimeo".to_string()),
+                RulePattern::Keyword("live on youtube".to_string()),
             ],
             scope: RuleScope::All,
             require_all: false,
@@ -494,5 +771,35 @@ mod tests {
         let item = make_item("5 reasons why Rust is amazing", None, None);
         let results = engine.evaluate(&item, &FeedType::Rss);
         assert!(results.iter().any(|r| r.tag == "clickbait"));
+    }
+
+    #[test]
+    fn test_show_hn_title_only_no_feedtype_required() {
+        let rules = default_rules();
+        let engine = RuleEngine::new(rules);
+        // Works for any feed type
+        let item = make_item("Show HN: My new project", None, None);
+        let results = engine.evaluate(&item, &FeedType::Rss);
+        assert!(results.iter().any(|r| r.tag == "show-hn"));
+        let results_hn = engine.evaluate(&item, &FeedType::Hn);
+        assert!(results_hn.iter().any(|r| r.tag == "show-hn"));
+    }
+
+    #[test]
+    fn test_ai_ml_rule() {
+        let rules = default_rules();
+        let engine = RuleEngine::new(rules);
+        let item = make_item("OpenAI releases new LLM with better reasoning", None, None);
+        let results = engine.evaluate(&item, &FeedType::Rss);
+        assert!(results.iter().any(|r| r.tag == "ai-ml"));
+    }
+
+    #[test]
+    fn test_security_rule() {
+        let rules = default_rules();
+        let engine = RuleEngine::new(rules);
+        let item = make_item("Critical vulnerability in OpenSSL allows remote code execution", None, None);
+        let results = engine.evaluate(&item, &FeedType::Rss);
+        assert!(results.iter().any(|r| r.tag == "security"));
     }
 }

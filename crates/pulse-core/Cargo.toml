@@ -16,7 +16,7 @@ default = ["sync", "search", "ai-rules"]
 sync = []
 search = []
 ai-rules = []
-# ai-onnx = ["dep:ort", "dep:tokenizers"]  # Phase 4
+ai-onnx = ["dep:ort", "dep:tokenizers"]
 
 [dependencies]
 tokio = { workspace = true }
@@ -33,6 +33,8 @@ tracing = { workspace = true }
 regex = { workspace = true }
 scraper = { workspace = true }
 futures = "0.3"
+ort = { workspace = true, optional = true }
+tokenizers = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

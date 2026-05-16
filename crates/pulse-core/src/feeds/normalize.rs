@@ -38,6 +38,19 @@ pub fn normalize_text(title: &str, body: Option<&str>) -> String {
     }
 }
 
+/// Decode HTML entities in a plain-text string (e.g., Reddit API returns `&amp;` in titles).
+/// Reuses the HTML parser because entity decoding is a side effect of fragment parsing.
+pub fn decode_html_entities(s: &str) -> String {
+    let fragment = Html::parse_fragment(s);
+    let mut text = String::with_capacity(s.len());
+    for node in fragment.tree.nodes() {
+        if let scraper::node::Node::Text(t) = node.value() {
+            text.push_str(t);
+        }
+    }
+    text
+}
+
 /// Collapse multiple whitespace characters (including newlines) into a single space
 pub fn collapse_whitespace(s: &str) -> String {
     let mut result = String::with_capacity(s.len());

@@ -21,31 +21,28 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), StorageError> {
         .await
         .map_err(StorageError::Sqlite)?;
 
-    // Apply M0001 if not applied
     if !applied.contains(&1) {
-        apply_m0001(pool).await?;
+        apply_sql(pool, include_str!("../../migrations/M0001_initial.sql"), "M0001").await?;
         sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (1, unixepoch())")
-            .execute(pool)
-            .await
-            .map_err(StorageError::Sqlite)?;
+            .execute(pool).await.map_err(StorageError::Sqlite)?;
         tracing::info!("Applied migration M0001_initial");
+    }
+
+    if !applied.contains(&2) {
+        apply_sql(pool, include_str!("../../migrations/M0002_fts_update_trigger.sql"), "M0002").await?;
+        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (2, unixepoch())")
+            .execute(pool).await.map_err(StorageError::Sqlite)?;
+        tracing::info!("Applied migration M0002_fts_update_trigger");
     }
 
     Ok(())
 }
 
-async fn apply_m0001(pool: &SqlitePool) -> Result<(), StorageError> {
-    let sql = include_str!("../../migrations/M0001_initial.sql");
-
-    // Execute the migration SQL statement by statement
-    // We need to split on semicolons carefully (avoiding those in strings/comments)
+async fn apply_sql(pool: &SqlitePool, sql: &str, name: &str) -> Result<(), StorageError> {
     let mut conn = pool.acquire().await.map_err(StorageError::Sqlite)?;
-
-    // Use sqlx's raw execution for multi-statement SQL
     sqlx::raw_sql(sql)
         .execute(&mut *conn)
         .await
-        .map_err(|e| StorageError::Migration(format!("M0001 failed: {e}")))?;
-
+        .map_err(|e| StorageError::Migration(format!("{name} failed: {e}")))?;
     Ok(())
 }

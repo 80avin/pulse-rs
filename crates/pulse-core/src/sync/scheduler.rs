@@ -81,6 +81,11 @@ impl SyncScheduler {
         let _ = self.cmd_tx.send(cmd);
     }
 
+    /// Expose the shared HTTP client for enrichment and other direct callers.
+    pub fn http_client(&self) -> Client {
+        self.http.clone()
+    }
+
     pub async fn refresh_feed(&self, feed_id: FeedId) {
         self.send_command(SyncCommand::RefreshFeed(feed_id.clone()));
         let has_task = self.tasks.lock().await.contains_key(&feed_id);

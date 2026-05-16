@@ -13,7 +13,7 @@ name = "pulse"
 path = "src/main.rs"
 
 [dependencies]
-pulse-core = { path = "../pulse-core" }
+pulse-core = { path = "../pulse-core", features = ["ai-onnx"] }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
