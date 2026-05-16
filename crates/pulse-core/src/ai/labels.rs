@@ -16,7 +16,7 @@ pub fn tag_labels() -> &'static [TagLabel] {
         TagLabel {
             tag: "technical",
             description: "This is a technical article about software engineering or programming.",
-            threshold: 0.50,
+            threshold: 0.55,
         },
         TagLabel {
             tag: "tutorial",
@@ -30,8 +30,8 @@ pub fn tag_labels() -> &'static [TagLabel] {
         },
         TagLabel {
             tag: "news",
-            description: "This is a news report or company announcement.",
-            threshold: 0.50,
+            description: "This is a news article about a company, government, or organization — acquisitions, layoffs, product launches by established companies, or regulatory events.",
+            threshold: 0.65,
         },
         TagLabel {
             tag: "discussion",

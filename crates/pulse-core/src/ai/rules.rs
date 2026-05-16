@@ -38,7 +38,12 @@ impl RulePattern {
             RulePattern::Regex(re) => re.is_match(text),
             RulePattern::DomainMatch(domain) => {
                 item.url.as_deref()
-                    .map(|u| u.to_lowercase().contains(domain.as_str()))
+                    .map(|u| {
+                        let lower = u.to_lowercase();
+                        // Check ://domain (bare) or .domain (subdomain), avoiding substring false positives
+                        lower.contains(&format!("://{}", domain)) ||
+                        lower.contains(&format!(".{}", domain))
+                    })
                     .unwrap_or(false)
             }
             RulePattern::HasScore { min } => {
@@ -179,7 +184,7 @@ pub fn default_rules() -> Vec<TagRule> {
             explanation_template: "matched keyword '{matched_text}' in content".to_string(),
             patterns: vec![
                 // languages
-                RulePattern::Keyword("rust".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\brust\b").unwrap()),
                 RulePattern::Keyword("python".to_string()),
                 RulePattern::Keyword("typescript".to_string()),
                 RulePattern::Keyword("javascript".to_string()),
@@ -209,28 +214,25 @@ pub fn default_rules() -> Vec<TagRule> {
                 // software engineering concepts
                 RulePattern::Keyword(" api ".to_string()),
                 RulePattern::Keyword("framework".to_string()),
-                RulePattern::Keyword("library".to_string()),
                 RulePattern::Keyword("algorithm".to_string()),
-                RulePattern::Keyword("performance".to_string()),
                 RulePattern::Keyword("sql".to_string()),
                 RulePattern::Keyword("database".to_string()),
                 RulePattern::Keyword("open source".to_string()),
                 RulePattern::Keyword("concurrency".to_string()),
                 RulePattern::Keyword("package manager".to_string()),
-                RulePattern::Keyword("terminal".to_string()),
                 RulePattern::Keyword("debugging".to_string()),
                 RulePattern::Keyword("refactor".to_string()),
                 RulePattern::Keyword("memory safety".to_string()),
                 RulePattern::Keyword("type system".to_string()),
                 // Rust-specific / systems programming
-                RulePattern::Keyword("struct".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\bstruct\b").unwrap()),
                 RulePattern::Keyword(" trait".to_string()),
                 RulePattern::Keyword(" macro".to_string()),
                 RulePattern::Keyword(" crate".to_string()),
                 RulePattern::Keyword(" async".to_string()),
-                RulePattern::Keyword("orm".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\borm\b").unwrap()),
                 RulePattern::Keyword("ownership".to_string()),
-                RulePattern::Keyword("borrow".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\bborrow\b").unwrap()),
                 RulePattern::Keyword("-rs".to_string()),   // catches image-rs, tokio-rs, etc.
                 RulePattern::Keyword("mpsc".to_string()),
                 RulePattern::Keyword("tokio".to_string()),
@@ -296,24 +298,24 @@ pub fn default_rules() -> Vec<TagRule> {
             confidence: 0.80,
             explanation_template: "matched research keyword '{matched_text}'".to_string(),
             patterns: vec![
+                // Title-only: prevents body-text "benchmark"/"experiment" false positives
+                // (software perf testing and casual experimentation both use these words)
                 RulePattern::Keyword("arxiv.org".to_string()),
-                RulePattern::Keyword("paper".to_string()),
-                RulePattern::Keyword("study".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\barxiv\b").unwrap()),
+                RulePattern::Regex(Regex::new(r"(?i)\bstudy\b").unwrap()),
                 RulePattern::Keyword("research".to_string()),
                 RulePattern::Keyword("findings".to_string()),
                 RulePattern::Keyword("dataset".to_string()),
-                RulePattern::Keyword("benchmark".to_string()),
-                RulePattern::Keyword("evaluation".to_string()),
                 RulePattern::Keyword("methodology".to_string()),
                 RulePattern::Keyword("peer review".to_string()),
-                RulePattern::Keyword("experiment".to_string()),
                 RulePattern::Keyword("hypothesis".to_string()),
-                RulePattern::Keyword("analysis".to_string()),
+                RulePattern::Keyword("benchmark".to_string()),
+                RulePattern::Keyword("experiment".to_string()),
                 RulePattern::DomainMatch("arxiv.org".to_string()),
                 RulePattern::DomainMatch("semanticscholar.org".to_string()),
                 RulePattern::DomainMatch("scholar.google.com".to_string()),
             ],
-            scope: RuleScope::All,
+            scope: RuleScope::TitleOnly,
             require_all: false,
             enabled: true,
         },
@@ -429,6 +431,9 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("anthropic".to_string()),
                 RulePattern::Keyword("gemini".to_string()),
                 RulePattern::Keyword("claude".to_string()),
+                RulePattern::Keyword("mistral".to_string()),
+                RulePattern::Keyword("copilot".to_string()),
+                RulePattern::Keyword("chatgpt".to_string()),
                 RulePattern::Keyword("transformer".to_string()),
                 RulePattern::Keyword("diffusion model".to_string()),
                 RulePattern::Keyword("stable diffusion".to_string()),
@@ -436,19 +441,32 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("reinforcement learning".to_string()),
                 RulePattern::Keyword("fine-tuning".to_string()),
                 RulePattern::Keyword("prompt engineering".to_string()),
-                RulePattern::Keyword("inference".to_string()),
-                RulePattern::Keyword("embedding".to_string()),
+                RulePattern::Keyword("embedding model".to_string()),
                 RulePattern::Keyword("generative ai".to_string()),
                 RulePattern::Keyword("chatbot".to_string()),
                 RulePattern::Keyword("hugging face".to_string()),
+                RulePattern::Keyword("onnx".to_string()),
                 RulePattern::Keyword("sigmoid".to_string()),
                 RulePattern::Keyword("attention mechanism".to_string()),
                 RulePattern::Keyword("backpropagation".to_string()),
                 RulePattern::Keyword("tokenization".to_string()),
-                RulePattern::Regex(Regex::new(r"(?i)\bai\b").unwrap()),
                 RulePattern::DomainMatch("huggingface.co".to_string()),
             ],
             scope: RuleScope::All,
+            require_all: false,
+            enabled: true,
+        },
+
+        // \bai\b alone is too noisy in body text; restrict to titles where "AI" signals topic intent
+        TagRule {
+            id: "ai-ml-title".to_string(),
+            tag: "ai-ml".to_string(),
+            confidence: 0.85,
+            explanation_template: "matched AI keyword 'AI' in title".to_string(),
+            patterns: vec![
+                RulePattern::Regex(Regex::new(r"(?i)\bai\b").unwrap()),
+            ],
+            scope: RuleScope::TitleOnly,
             require_all: false,
             enabled: true,
         },
@@ -476,6 +494,9 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("tor browser".to_string()),
                 RulePattern::Keyword("end-to-end encryption".to_string()),
                 RulePattern::Keyword("anonymity".to_string()),
+                RulePattern::Keyword("mullvad".to_string()),
+                RulePattern::Keyword("protonmail".to_string()),
+                RulePattern::Keyword("proton vpn".to_string()),
             ],
             scope: RuleScope::All,
             require_all: false,
@@ -503,7 +524,7 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("patent".to_string()),
                 RulePattern::Keyword("open source license".to_string()),
                 RulePattern::Keyword("ban on".to_string()),
-                RulePattern::Regex(Regex::new(r"(?i)\bbill\b.{0,30}(pass|sign|veto|introduc)").unwrap()),
+                RulePattern::Regex(Regex::new(r"(?i)\bbill\b.{0,50}(pass|sign|veto|introduc|advanc|clear)").unwrap()),
             ],
             scope: RuleScope::All,
             require_all: false,
@@ -530,7 +551,7 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("particle physics".to_string()),
                 RulePattern::Keyword("superconductor".to_string()),
                 RulePattern::Keyword("semiconductor".to_string()),
-                RulePattern::Keyword("cern".to_string()),
+                RulePattern::Regex(Regex::new(r"(?i)\bcern\b").unwrap()),
                 RulePattern::Keyword("nasa".to_string()),
                 RulePattern::Keyword("esa ".to_string()),
                 RulePattern::Keyword("quasicrystal".to_string()),
