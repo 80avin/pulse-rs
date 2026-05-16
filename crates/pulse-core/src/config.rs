@@ -1,0 +1,95 @@
+use std::path::PathBuf;
+
+/// Application configuration
+#[derive(Debug, Clone)]
+pub struct PulseConfig {
+    /// Path to the SQLite database file
+    pub db_path: PathBuf,
+    /// Path to the data directory (models, exports, etc.)
+    pub data_dir: PathBuf,
+    /// Maximum number of sync tasks that can run concurrently
+    pub max_concurrent_syncs: usize,
+    /// Maximum failure streak before a feed is disabled
+    pub max_failure_streak: u32,
+    /// Maximum backoff interval in seconds (4 hours)
+    pub max_backoff_secs: u64,
+    /// Whether we're running on Android (affects some pragmas and sync behavior)
+    pub is_android: bool,
+}
+
+impl PulseConfig {
+    /// Create a config with default settings using the platform data directory
+    pub fn default_config() -> Self {
+        let data_dir = platform_data_dir();
+        let db_path = data_dir.join("pulse.db");
+
+        Self {
+            db_path,
+            data_dir,
+            max_concurrent_syncs: 10,
+            max_failure_streak: 10,
+            max_backoff_secs: 14400, // 4 hours
+            is_android: cfg!(target_os = "android"),
+        }
+    }
+
+    /// Create a config pointing at a specific database path
+    pub fn with_db_path(mut self, db_path: PathBuf) -> Self {
+        self.db_path = db_path;
+        self
+    }
+
+    /// Create a config pointing at a specific data dir
+    pub fn with_data_dir(mut self, data_dir: PathBuf) -> Self {
+        self.data_dir = data_dir.clone();
+        self.db_path = data_dir.join("pulse.db");
+        self
+    }
+
+    /// Path to the models directory
+    pub fn models_dir(&self) -> PathBuf {
+        self.data_dir.join("models")
+    }
+}
+
+impl Default for PulseConfig {
+    fn default() -> Self {
+        Self::default_config()
+    }
+}
+
+/// Returns the platform-appropriate data directory for Pulse.
+///
+/// - Linux/macOS: `$XDG_DATA_HOME/pulse` (fallback: `~/.local/share/pulse`)
+/// - Android: `/data/data/com.avinthakur080.pulse_rs/files`
+/// - Windows: `%APPDATA%\pulse`
+pub fn platform_data_dir() -> PathBuf {
+    #[cfg(target_os = "android")]
+    {
+        PathBuf::from("/data/data/com.avinthakur080.pulse_rs/files")
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let appdata = std::env::var("APPDATA").unwrap_or_else(|_| {
+            dirs_home().unwrap_or_else(|| PathBuf::from(".")).to_string_lossy().into_owned()
+        });
+        PathBuf::from(appdata).join("pulse")
+    }
+
+    #[cfg(not(any(target_os = "android", target_os = "windows")))]
+    {
+        // Linux / macOS: XDG_DATA_HOME or ~/.local/share
+        if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+            if !xdg.is_empty() {
+                return PathBuf::from(xdg).join("pulse");
+            }
+        }
+
+        let home = std::env::var("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("."));
+
+        home.join(".local").join("share").join("pulse")
+    }
+}

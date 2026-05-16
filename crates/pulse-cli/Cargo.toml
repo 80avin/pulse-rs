@@ -1,0 +1,27 @@
+[package]
+name = "pulse-cli"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Command-line interface for the Pulse feed reader"
+edition = "2024"
+
+[[bin]]
+name = "pulse"
+path = "src/main.rs"
+
+[dependencies]
+pulse-core = { path = "../pulse-core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+sqlx = { workspace = true }

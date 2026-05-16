@@ -8,3 +8,25 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Rust
+/target
+Cargo.lock
+
+# Dev artifacts
+/.pulse-test/
+/.cargo-home/
+/.cargo/
+/.idea/
+
+# Personal dotfiles (root is a home dir in this environment)
+.bash_profile
+.bashrc
+.zshrc
+.zprofile
+.profile
+.gitconfig
+.gitmodules
+.ripgreprc
+.mcp.json
+.claude/
