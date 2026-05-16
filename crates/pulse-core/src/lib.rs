@@ -317,6 +317,20 @@ impl PulseCore {
         }).await.map_err(PulseError::Storage)
     }
 
+    /// Fetch a single item by full or prefix ID. Returns body_text, body_html, source_meta.
+    pub async fn get_item(&self, item_id: &ItemId) -> Result<crate::types::FeedItem, PulseError> {
+        let iid = item_id.clone();
+        self.db.with_reader(|pool| async move {
+            storage::queries::get_item(&pool, &iid).await
+        }).await.map_err(PulseError::Storage)
+    }
+
+    /// Clear the ETag, Last-Modified, and source_config cache keys for a feed,
+    /// forcing the next sync to perform a full re-fetch regardless of prior state.
+    pub async fn clear_feed_cache(&self, feed_id: &FeedId) -> Result<(), PulseError> {
+        self.db.clear_feed_cache(feed_id.clone()).await.map_err(PulseError::Storage)
+    }
+
     // ─── Timeline ─────────────────────────────────────────────────────────────
 
     pub async fn get_timeline_page(

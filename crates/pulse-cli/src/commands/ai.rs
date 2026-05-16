@@ -1,8 +1,48 @@
 use clap::{Args, Subcommand};
 use pulse_core::PulseCore;
 use pulse_core::ai::{RuleScope, default_rules};
+use reqwest::Client;
 
 use crate::output::{print_json, print_error};
+
+// ── Known model registry ───────────────────────────────────────────────────────
+
+struct ModelSpec {
+    name: &'static str,
+    description: &'static str,
+    hf_owner: &'static str,
+    hf_repo: &'static str,
+    /// (path_in_repo, filename_in_model_dir)
+    files: &'static [(&'static str, &'static str)],
+    size_mb_approx: u32,
+}
+
+const KNOWN_MODELS: &[ModelSpec] = &[
+    ModelSpec {
+        name: "nli-deberta-v3-xsmall",
+        description: "DeBERTa v3 xsmall NLI cross-encoder — 22M params, ~35 MB quantized (recommended default)",
+        hf_owner: "Xenova",
+        hf_repo: "nli-deberta-v3-xsmall",
+        files: &[
+            ("onnx/model_quantized.onnx", "model_quantized.onnx"),
+            ("tokenizer.json", "tokenizer.json"),
+            ("config.json", "config.json"),
+        ],
+        size_mb_approx: 35,
+    },
+    ModelSpec {
+        name: "nli-deberta-v3-small",
+        description: "DeBERTa v3 small NLI — 44M params, ~68 MB quantized (higher quality, slower)",
+        hf_owner: "Xenova",
+        hf_repo: "nli-deberta-v3-small",
+        files: &[
+            ("onnx/model_quantized.onnx", "model_quantized.onnx"),
+            ("tokenizer.json", "tokenizer.json"),
+            ("config.json", "config.json"),
+        ],
+        size_mb_approx: 68,
+    },
+];
 
 #[derive(Debug, Args)]
 pub struct AiArgs {
@@ -18,6 +58,8 @@ pub enum AiCommand {
     Status(AiStatusArgs),
     /// Show raw ONNX similarity scores for a text (threshold calibration)
     Debug(AiDebugArgs),
+    /// Download an NLI model from HuggingFace and make it active
+    Download(AiDownloadArgs),
     /// Manage the ONNX inference model
     Model(AiModelArgs),
     /// Manage tag rules (rule-based fallback)
@@ -110,11 +152,24 @@ pub struct AiDebugArgs {
     pub text: String,
 }
 
+#[derive(Debug, Args)]
+pub struct AiDownloadArgs {
+    /// Model name to download (default: nli-deberta-v3-xsmall)
+    pub name: Option<String>,
+    /// Do not set this model as active after downloading
+    #[arg(long)]
+    pub no_activate: bool,
+    /// List available models and exit
+    #[arg(long)]
+    pub list: bool,
+}
+
 pub async fn run(args: AiArgs, core: &PulseCore, global_json: bool) -> anyhow::Result<()> {
     match args.command {
         AiCommand::Run(a) => cmd_run(a, core).await,
         AiCommand::Status(a) => cmd_status(a, core, global_json).await,
         AiCommand::Debug(a) => cmd_debug(a, core).await,
+        AiCommand::Download(a) => cmd_model_download(a, core).await,
         AiCommand::Model(a) => cmd_model(a, core, global_json).await,
         AiCommand::Rules(a) => cmd_rules(a, global_json).await,
     }
@@ -187,6 +242,71 @@ async fn cmd_debug(args: AiDebugArgs, core: &PulseCore) -> anyhow::Result<()> {
         let marker = if *prob >= 0.50 { " ✓" } else { "" };
         println!("{:<20}  {:.4}{}", tag, prob, marker);
     }
+    Ok(())
+}
+
+// ── Download command ───────────────────────────────────────────────────────────
+
+async fn cmd_model_download(args: AiDownloadArgs, core: &PulseCore) -> anyhow::Result<()> {
+    if args.list {
+        println!("{:<30}  {:<8}  {}", "NAME", "SIZE", "DESCRIPTION");
+        for m in KNOWN_MODELS {
+            println!("{:<30}  ~{:>4} MB  {}", m.name, m.size_mb_approx, m.description);
+        }
+        return Ok(());
+    }
+
+    let model_name = args.name.as_deref().unwrap_or("nli-deberta-v3-xsmall");
+    let spec = match KNOWN_MODELS.iter().find(|m| m.name == model_name) {
+        Some(s) => s,
+        None => {
+            print_error(&format!("unknown model '{}' — run 'pulse ai download --list' to see options", model_name));
+            return Ok(());
+        }
+    };
+
+    let model_dir = core.model_dir(spec.name);
+    std::fs::create_dir_all(&model_dir)?;
+
+    eprintln!("Downloading {} (~{} MB) from huggingface.co/{}/{} ...",
+        spec.name, spec.size_mb_approx, spec.hf_owner, spec.hf_repo);
+
+    let client = Client::builder()
+        .user_agent("Pulse/0.1 model-downloader")
+        .timeout(std::time::Duration::from_secs(300))
+        .build()?;
+
+    for (hf_path, local_name) in spec.files {
+        let url = format!(
+            "https://huggingface.co/{}/{}/resolve/main/{}",
+            spec.hf_owner, spec.hf_repo, hf_path
+        );
+        let dest = model_dir.join(local_name);
+
+        eprint!("  {} ... ", local_name);
+        std::io::Write::flush(&mut std::io::stderr())?;
+
+        let resp = client.get(&url).send().await
+            .map_err(|e| anyhow::anyhow!("network error fetching {}: {}", local_name, e))?;
+
+        if !resp.status().is_success() {
+            anyhow::bail!("HTTP {} for {}: {}", resp.status(), local_name, url);
+        }
+
+        let bytes = resp.bytes().await
+            .map_err(|e| anyhow::anyhow!("read error for {}: {}", local_name, e))?;
+
+        std::fs::write(&dest, &bytes)?;
+        eprintln!("{:.1} MB", bytes.len() as f64 / 1_048_576.0);
+    }
+
+    eprintln!("Download complete → {}", model_dir.display());
+
+    if !args.no_activate {
+        core.set_active_model(spec.name)?;
+        eprintln!("Active model set to '{}'. Restart pulse to load it.", spec.name);
+    }
+
     Ok(())
 }
 

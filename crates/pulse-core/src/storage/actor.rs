@@ -65,6 +65,13 @@ pub enum DbCommand {
         reply: oneshot::Sender<DbResult<()>>,
     },
 
+    /// Clear ETag, Last-Modified, and last_seen_id from source_config so the
+    /// next sync performs a full re-fetch regardless of prior caching state.
+    ClearFeedCache {
+        feed_id: FeedId,
+        reply: oneshot::Sender<DbResult<()>>,
+    },
+
     /// Update an item's body_text and source_meta after enrichment.
     /// body_text is only written if the item currently has no body_text (COALESCE).
     /// source_meta is always updated via json_set.
@@ -126,6 +133,11 @@ pub async fn db_writer_task(
 
             DbCommand::DeleteFeed { feed_id, reply } => {
                 let result = delete_feed(&pool, &feed_id).await;
+                let _ = reply.send(result);
+            }
+
+            DbCommand::ClearFeedCache { feed_id, reply } => {
+                let result = clear_feed_cache(&pool, &feed_id).await;
                 let _ = reply.send(result);
             }
 
@@ -518,6 +530,26 @@ async fn delete_feed(pool: &SqlitePool, feed_id: &FeedId) -> DbResult<()> {
     Ok(())
 }
 
+async fn clear_feed_cache(pool: &SqlitePool, feed_id: &FeedId) -> DbResult<()> {
+    let now = chrono::Utc::now().timestamp();
+    // Clear ETag + Last-Modified + last_seen_id from source_config in one statement.
+    // json_remove strips last_seen_id; the rest are top-level columns.
+    sqlx::query(
+        "UPDATE feeds SET
+            etag = NULL,
+            last_modified = NULL,
+            source_config = json_remove(source_config, '$.last_seen_id'),
+            updated_at = ?
+         WHERE id = ?"
+    )
+    .bind(now)
+    .bind(feed_id)
+    .execute(pool)
+    .await
+    .map_err(StorageError::Sqlite)?;
+    Ok(())
+}
+
 async fn enrich_item(
     pool: &SqlitePool,
     item_id: &ItemId,
@@ -646,6 +678,11 @@ impl DbHandle {
     /// Delete a feed and all its items
     pub async fn delete_feed(&self, feed_id: FeedId) -> DbResult<()> {
         self.send(|reply| DbCommand::DeleteFeed { feed_id, reply }).await
+    }
+
+    /// Clear ETag, Last-Modified, and last_seen_id so the next sync does a full re-fetch.
+    pub async fn clear_feed_cache(&self, feed_id: FeedId) -> DbResult<()> {
+        self.send(|reply| DbCommand::ClearFeedCache { feed_id, reply }).await
     }
 
     /// Update an item's body_text (if currently null) and merge source_meta fields.

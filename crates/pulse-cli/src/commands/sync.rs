@@ -25,6 +25,9 @@ pub struct SyncRunArgs {
     /// Fire and forget (return immediately)
     #[arg(long)]
     pub detach: bool,
+    /// Clear ETag and last_seen_id before syncing, forcing a full re-fetch
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Debug, Args)]
@@ -68,6 +71,11 @@ async fn cmd_run(args: SyncRunArgs, core: &PulseCore) -> anyhow::Result<()> {
     let mut total = 0usize;
     for feed in &targets {
         let title = feed.title.as_deref().unwrap_or(&feed.url);
+        if args.force {
+            if let Err(e) = core.clear_feed_cache(&feed.id).await {
+                eprintln!("warn: could not clear cache for '{}': {}", title, e);
+            }
+        }
         eprint!("syncing '{}'...", title);
         match core.sync_feed(&feed.id).await {
             Ok(n) => {
