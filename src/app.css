@@ -1,0 +1,47 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #07090c;
+  color: #e6ebf2;
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+#svelte {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+button { cursor: pointer; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #222b38; border-radius: 2px; }
+
+* { scrollbar-width: thin; scrollbar-color: #222b38 transparent; }
+
+input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e6ebf2;
+  width: 100%;
+}
+input::placeholder { color: #454d5b; }
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.syncing { animation: spin 1s linear infinite; display: block; }
+
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.tagging-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+
+/* Safe-area CSS custom properties — populated by env() with 0 fallback */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}

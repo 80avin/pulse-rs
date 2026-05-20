@@ -94,26 +94,26 @@ fn fixtures() -> Vec<Fixture> {
         Fixture {
             title: "Ask HN: How do you deal with information overload?",
             url: None, body: None, feed_type: FeedType::Hn, score: Some(200),
-            must_have: &["ask-hn", "discussion"],
-            must_not_have: &[],
+            must_have: &["ask-hn"],
+            must_not_have: &["discussion"],
         },
         Fixture {
             title: "Ask HN: Best resources for learning systems programming?",
             url: None, body: None, feed_type: FeedType::Hn, score: Some(150),
-            must_have: &["ask-hn", "discussion"],
-            must_not_have: &[],
+            must_have: &["ask-hn"],
+            must_not_have: &["discussion"],
         },
         Fixture {
             title: "Ask HN: Is Rust worth learning in 2025?",
             url: None, body: None, feed_type: FeedType::Hn, score: Some(320),
-            must_have: &["ask-hn", "discussion", "technical"],
-            must_not_have: &[],
+            must_have: &["ask-hn", "technical"],
+            must_not_have: &["discussion"],
         },
         Fixture {
             title: "Ask HN: Who is hiring? (May 2025)",
             url: None, body: None, feed_type: FeedType::Hn, score: Some(5),
-            must_have: &["ask-hn", "discussion", "job-posting"],
-            must_not_have: &[],
+            must_have: &["ask-hn", "job-posting"],
+            must_not_have: &["discussion"],
         },
 
         // ── Technical ────────────────────────────────────────────────────────
@@ -239,36 +239,113 @@ fn fixtures() -> Vec<Fixture> {
             must_not_have: &[],
         },
 
-        // ── Discussion ───────────────────────────────────────────────────────
+        // ── Civic ────────────────────────────────────────────────────────────
+        Fixture {
+            title: "Fuck JKPDD — third power cut this week",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(16),
+            must_have: &["civic"],
+            must_not_have: &["discussion", "marketplace"],
+        },
+        Fixture {
+            title: "Smart City with No Electricity!!",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(24),
+            must_have: &["civic"],
+            must_not_have: &["discussion"],
+        },
+        Fixture {
+            title: "Frequent electricity cuts in our city, what is the real reason?",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(8),
+            must_have: &["civic"],
+            must_not_have: &["discussion"],
+        },
+        // ── Local-rec ────────────────────────────────────────────────────────
+        Fixture {
+            title: "Any good therapists in Delhi?",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(6),
+            must_have: &["local-rec"],
+            must_not_have: &["discussion", "civic"],
+        },
+        Fixture {
+            title: "Best Chicken MOMOS in Delhi?",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(5),
+            must_have: &["local-rec"],
+            must_not_have: &["discussion"],
+        },
+        Fixture {
+            title: "Suggest best dhabha in Delhi other than the usual spots",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(6),
+            must_have: &["local-rec"],
+            must_not_have: &["discussion"],
+        },
+        // These lazy/vague titles must NOT get local-rec
+        Fixture {
+            title: "HELP FOR PMSSS",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(0),
+            must_have: &[],
+            must_not_have: &["discussion", "local-rec"],
+        },
+        Fixture {
+            title: "domicile ke liye kya karu",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(2),
+            must_have: &[],
+            must_not_have: &["discussion", "local-rec"],
+        },
+        // ── Culture ──────────────────────────────────────────────────────────
+        Fixture {
+            title: "Dogri poem of Lala Barkatram",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(11),
+            must_have: &["culture"],
+            must_not_have: &["discussion", "marketplace"],
+        },
+        Fixture {
+            title: "Origin of Kalari (Kaladi) Cheese: A Cultural and Nomadic Journey",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(54),
+            must_have: &["culture"],
+            must_not_have: &["discussion"],
+        },
+        Fixture {
+            title: "Maharaja Hari Singh signed the instrument of accession to India",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(34),
+            must_have: &["culture"],
+            must_not_have: &["discussion"],
+        },
+        // ── Marketplace ──────────────────────────────────────────────────────
+        Fixture {
+            title: "Selling my Dell G-15 Gaming laptop",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(0),
+            must_have: &["marketplace"],
+            must_not_have: &["discussion", "civic"],
+        },
+        Fixture {
+            title: "Anyone selling a kindle?",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(5),
+            must_have: &["marketplace"],
+            must_not_have: &["discussion"],
+        },
+        Fixture {
+            title: "Cook needed Full time for home",
+            url: None, body: None, feed_type: FeedType::Reddit, score: Some(3),
+            must_have: &["marketplace"],
+            must_not_have: &["discussion"],
+        },
+        // ── Opinion/discussion — no tag expected ─────────────────────────────
         Fixture {
             title: "Thoughts on the future of remote work in tech",
             url: None, body: None, feed_type: FeedType::Hn, score: Some(180),
-            must_have: &["discussion"],
-            must_not_have: &[],
-        },
-        Fixture {
-            title: "Has anyone successfully migrated from microservices to a monolith?",
-            url: None, body: None, feed_type: FeedType::Hn, score: Some(220),
-            must_have: &["discussion"],
-            must_not_have: &[],
+            must_have: &[],
+            must_not_have: &["discussion"],
         },
         Fixture {
             title: "Unpopular opinion: TypeScript makes large codebases worse",
             url: None, body: None, feed_type: FeedType::Reddit, score: Some(90),
-            must_have: &["discussion", "technical"],
-            must_not_have: &[],
+            must_have: &["technical"],
+            must_not_have: &["discussion"],
         },
         Fixture {
             title: "Is it worth learning Haskell in 2025?",
             url: None, body: None, feed_type: FeedType::Hn, score: Some(140),
-            must_have: &["discussion", "technical"],
-            must_not_have: &[],
-        },
-        Fixture {
-            title: "Pros and cons of monorepos for large teams",
-            url: None, body: None, feed_type: FeedType::Reddit, score: Some(70),
-            must_have: &["discussion"],
-            must_not_have: &[],
+            must_have: &["technical"],
+            must_not_have: &["discussion"],
         },
 
         // ── Security ─────────────────────────────────────────────────────────
@@ -487,6 +564,116 @@ fn fixtures() -> Vec<Fixture> {
             must_not_have: &[],
         },
 
+        // ── no-context ───────────────────────────────────────────────────────
+        Fixture {
+            title: "kya karu yaar",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["no-context"],
+            must_not_have: &["civic", "local-rec", "marketplace"],
+        },
+        Fixture {
+            title: "help chahiye",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["no-context"],
+            must_not_have: &[],
+        },
+        Fixture {
+            title: "batao yaar kya karna chahiye",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["no-context"],
+            must_not_have: &[],
+        },
+        Fixture {
+            title: "Any ideas?",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["no-context"],
+            must_not_have: &["local-rec"],
+        },
+        Fixture {
+            title: "What should I do?",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["no-context"],
+            must_not_have: &[],
+        },
+        // Specific questions must NOT get no-context (suppression guard)
+        Fixture {
+            title: "Any good therapists in Delhi?",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["local-rec"],
+            must_not_have: &["no-context"],
+        },
+        Fixture {
+            title: "Fuck JKPDD — third power cut this week",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["civic"],
+            must_not_have: &["no-context"],
+        },
+
+        // ── inappropriate ────────────────────────────────────────────────────
+        Fixture {
+            title: "Hotel room for couple in Delhi?",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["inappropriate"],
+            must_not_have: &["local-rec", "marketplace"],
+        },
+        Fixture {
+            title: "Looking for girlfriend in Delhi",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["inappropriate"],
+            must_not_have: &["local-rec"],
+        },
+        Fixture {
+            title: "Hookup in Delhi?",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["inappropriate"],
+            must_not_have: &[],
+        },
+        Fixture {
+            title: "Ladki chahiye Delhi mein",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["inappropriate"],
+            must_not_have: &[],
+        },
+        // PG listing must NOT be inappropriate
+        Fixture {
+            title: "PG for boys available near Gandhi Nagar",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &[],
+            must_not_have: &["inappropriate"],
+        },
+
+        // ── noise ────────────────────────────────────────────────────────────
+        Fixture {
+            title: "Finally ate momos at the new place near Raghunath!",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["noise"],
+            must_not_have: &["civic", "local-rec"],
+        },
+        Fixture {
+            title: "Just got my driving license done!",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["noise"],
+            must_not_have: &[],
+        },
+        Fixture {
+            title: "Look at my gym progress after 3 months",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["noise"],
+            must_not_have: &[],
+        },
+        Fixture {
+            title: "Good morning everyone!",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["noise"],
+            must_not_have: &["civic"],
+        },
+        Fixture {
+            title: "Weekend vibes!",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["noise"],
+            must_not_have: &[],
+        },
+
         // ── Negative cases — should get zero tags ────────────────────────────
         Fixture {
             title: "My weekend hiking trip to the Dolomites",
@@ -499,6 +686,13 @@ fn fixtures() -> Vec<Fixture> {
             url: None, body: None, feed_type: FeedType::Reddit, score: Some(8),
             must_have: &[],
             must_not_have: &["technical", "ai-ml", "security", "research"],
+        },
+        // Legitimate PG listing should not get quality-negative tags
+        Fixture {
+            title: "Room for rent near Trikuta Nagar ₹4500/month",
+            url: None, body: None, feed_type: FeedType::Reddit, score: None,
+            must_have: &["marketplace"],
+            must_not_have: &["inappropriate", "no-context"],
         },
     ]
 }

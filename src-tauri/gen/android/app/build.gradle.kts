@@ -18,7 +18,7 @@ android {
     compileSdk = 36
     namespace = "com.avinthakur080.pulse_rs"
     defaultConfig {
-        manifestPlaceholders["usesCleartextTraffic"] = "false"
+        manifestPlaceholders["usesCleartextTraffic"] = "true"
         applicationId = "com.avinthakur080.pulse_rs"
         minSdk = 24
         targetSdk = 36
@@ -46,7 +46,7 @@ android {
             isJniDebuggable = true
             isMinifyEnabled = false
             packaging {                jniLibs.keepDebugSymbols.add("*/arm64-v8a/*.so")
-                jniLibs.keepDebugSymbols.add("*/armeabi-v7a/*.so")
+                // jniLibs.keepDebugSymbols.add("*/armeabi-v7a/*.so")
                 jniLibs.keepDebugSymbols.add("*/x86/*.so")
                 jniLibs.keepDebugSymbols.add("*/x86_64/*.so")
             }

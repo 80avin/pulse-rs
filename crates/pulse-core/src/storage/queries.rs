@@ -115,6 +115,7 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
     let is_read_i: i64 = row.try_get("is_read").map_err(StorageError::Sqlite)?;
     let is_saved_i: i64 = row.try_get("is_saved").map_err(StorageError::Sqlite)?;
     let is_hidden_i: i64 = row.try_get("is_hidden").map_err(StorageError::Sqlite)?;
+    let signal: f64 = row.try_get("signal").unwrap_or(0.0);
 
     let feed_type = FeedType::from_str(&feed_type_str).unwrap_or(FeedType::Rss);
     let ai_tags: Vec<String> = serde_json::from_str(&ai_tags_json).unwrap_or_default();
@@ -130,6 +131,10 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
         score: row.try_get("score").map_err(StorageError::Sqlite)?,
         comment_count: row.try_get("comment_count").map_err(StorageError::Sqlite)?,
         comment_url: row.try_get("comment_url").map_err(StorageError::Sqlite)?,
+        body_text: row.try_get("body_text").map_err(StorageError::Sqlite)?,
+        body_html: row.try_get("body_html").ok(),
+        external_url: row.try_get("external_url").ok(),
+        og_image: row.try_get("og_image").ok(),
         feed_id: row.try_get("feed_id").map_err(StorageError::Sqlite)?,
         feed_title: row.try_get("feed_title").map_err(StorageError::Sqlite)?,
         feed_type,
@@ -140,6 +145,7 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
         is_saved: is_saved_i != 0,
         is_hidden: is_hidden_i != 0,
         ai_tags,
+        signal,
     })
 }
 
@@ -182,11 +188,14 @@ pub async fn get_timeline(
     let sql = format!(
         "SELECT
             fi.id, fi.title, fi.url, fi.author, fi.published_at, fi.fetched_at,
-            fi.word_count, fi.score, fi.comment_count, fi.comment_url,
+            fi.word_count, fi.score, fi.comment_count, fi.comment_url, fi.body_text, fi.body_html,
+            json_extract(fi.source_meta, '$.external_url') AS external_url,
+            json_extract(fi.source_meta, '$.og_image') AS og_image,
             f.id AS feed_id, f.title AS feed_title, f.feed_type, f.url AS feed_url,
             f.group_id, fg.name AS group_name,
             ist.is_read, ist.is_saved, ist.is_hidden,
-            COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags
+            COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
+            COALESCE(MAX(at.confidence), 0.0) AS signal
          FROM feed_items fi
          JOIN feeds f ON fi.feed_id = f.id
          LEFT JOIN feed_groups fg ON f.group_id = fg.id
@@ -316,11 +325,13 @@ pub async fn search_items(
 ) -> Result<Vec<FeedItemView>, StorageError> {
     let rows = sqlx::query(
         "SELECT fi.id, fi.title, fi.url, fi.author, fi.published_at, fi.fetched_at,
-                fi.word_count, fi.score, fi.comment_count, fi.comment_url,
+                fi.word_count, fi.score, fi.comment_count, fi.comment_url, fi.body_text, fi.body_html,
+                json_extract(fi.source_meta, '$.external_url') AS external_url,
                 f.id AS feed_id, f.title AS feed_title, f.feed_type, f.url AS feed_url,
                 f.group_id, fg.name AS group_name,
                 ist.is_read, ist.is_saved, ist.is_hidden,
-                COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags
+                COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
+                COALESCE(MAX(at.confidence), 0.0) AS signal
          FROM feed_items_fts
          JOIN feed_items fi ON fi.rowid = feed_items_fts.rowid
          JOIN feeds f ON fi.feed_id = f.id
@@ -447,6 +458,52 @@ pub async fn count_pending_enrichment(
                AND json_extract(source_meta, '$.enriched_at') IS NULL"
         ).fetch_one(pool).await.map_err(StorageError::Sqlite)
     }
+}
+
+/// Return total (non-hidden) item count per feed_id.
+pub async fn get_total_counts_by_feed(pool: &SqlitePool) -> Result<std::collections::HashMap<String, i64>, StorageError> {
+    use sqlx::Row;
+    let rows = sqlx::query(
+        "SELECT fi.feed_id, COUNT(*) AS total
+         FROM feed_items fi
+         JOIN item_states ist ON ist.item_id = fi.id
+         WHERE ist.is_hidden = 0
+         GROUP BY fi.feed_id"
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(StorageError::Sqlite)?;
+
+    let mut map = std::collections::HashMap::new();
+    for row in &rows {
+        let feed_id: String = row.try_get("feed_id").map_err(StorageError::Sqlite)?;
+        let total: i64 = row.try_get("total").map_err(StorageError::Sqlite)?;
+        map.insert(feed_id, total);
+    }
+    Ok(map)
+}
+
+/// Return unread item count per feed_id (only non-hidden items)
+pub async fn get_unread_counts_by_feed(pool: &SqlitePool) -> Result<std::collections::HashMap<String, i64>, StorageError> {
+    use sqlx::Row;
+    let rows = sqlx::query(
+        "SELECT fi.feed_id, COUNT(*) AS unread
+         FROM feed_items fi
+         JOIN item_states ist ON ist.item_id = fi.id
+         WHERE ist.is_read = 0 AND ist.is_hidden = 0
+         GROUP BY fi.feed_id"
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(StorageError::Sqlite)?;
+
+    let mut map = std::collections::HashMap::new();
+    for row in &rows {
+        let feed_id: String = row.try_get("feed_id").map_err(StorageError::Sqlite)?;
+        let unread: i64 = row.try_get("unread").map_err(StorageError::Sqlite)?;
+        map.insert(feed_id, unread);
+    }
+    Ok(map)
 }
 
 /// Get database statistics

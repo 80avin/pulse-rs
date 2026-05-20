@@ -30,8 +30,8 @@ uuid = { version = "1", features = ["v4", "v5"] }
 # Time
 chrono = { version = "0.4", features = ["serde"] }
 
-# HTTP
-reqwest = { version = "0.12", features = ["json", "native-tls"], default-features = false }
+# HTTP — rustls-tls required for Android (no system OpenSSL); stream for incremental download progress
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
 
 # Feed parsing
 feed-rs = "1"
@@ -48,7 +48,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 clap = { version = "4", features = ["derive", "env"] }
 
 # ONNX Runtime — enabled via ai-onnx feature flag in pulse-core
-ort = { version = "2.0.0-rc.11", features = ["download-binaries"] }
+# rc.12 upgrades Android binary from ORT 1.23.2 → 1.26.0 (fixes libstdc++ ABI mismatch)
+ort = { version = "2.0.0-rc.12", features = ["download-binaries"] }
 
 # HuggingFace tokenizers — for BERT/MiniLM tokenization
 tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"] }

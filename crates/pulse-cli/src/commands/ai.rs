@@ -56,14 +56,42 @@ const KNOWN_MODELS: &[ModelSpec] = &[
 
 const KNOWN_VISION_MODELS: &[VisionModelSpec] = &[
     VisionModelSpec {
+        name: "mobileclip-s2",
+        description: "Apple MobileCLIP-S2 — 37 MB int8 vision encoder, better zero-shot than CLIP ViT-B/32 (recommended)",
+        hf_owner: "Xenova",
+        hf_repo: "mobileclip_s2",
+        files: &[
+            ("onnx/vision_model_quantized.onnx", "vision_model_quantized.onnx"),
+            ("onnx/text_model_quantized.onnx",   "text_model_quantized.onnx"),
+            ("tokenizer.json",                   "tokenizer.json"),
+            ("preprocessor_config.json",         "preprocessor_config.json"),
+        ],
+        size_mb_approx: 103,
+    },
+    VisionModelSpec {
+        name: "mobileclip-s1",
+        description: "Apple MobileCLIP-S1 — 22 MB int8 vision encoder, fastest option for Android",
+        hf_owner: "Xenova",
+        hf_repo: "mobileclip_s1",
+        files: &[
+            ("onnx/vision_model_quantized.onnx", "vision_model_quantized.onnx"),
+            ("onnx/text_model_quantized.onnx",   "text_model_quantized.onnx"),
+            ("tokenizer.json",                   "tokenizer.json"),
+            ("preprocessor_config.json",         "preprocessor_config.json"),
+        ],
+        size_mb_approx: 89,
+    },
+    VisionModelSpec {
         name: "clip-vit-b32",
-        description: "CLIP ViT-B/32 vision encoder — zero-shot image classification (~53 MB q4f16)",
+        description: "CLIP ViT-B/32 vision encoder — legacy, 53 MB q4f16 (use mobileclip-s2 instead)",
         hf_owner: "Xenova",
         hf_repo: "clip-vit-base-patch32",
         files: &[
             ("onnx/vision_model_q4f16.onnx", "vision_model_q4f16.onnx"),
+            ("onnx/text_model_quantized.onnx", "text_model_quantized.onnx"),
+            ("tokenizer.json",               "tokenizer.json"),
         ],
-        size_mb_approx: 53,
+        size_mb_approx: 78,
     },
 ];
 
@@ -87,6 +115,10 @@ pub enum AiCommand {
     Download(AiDownloadArgs),
     /// Download a CLIP vision model from HuggingFace and make it active
     VisionDownload(AiVisionDownloadArgs),
+    /// Label items interactively for supervised training
+    Label(AiLabelArgs),
+    /// Manage training data
+    Train(AiTrainArgs),
     /// Manage the ONNX inference model
     Model(AiModelArgs),
     /// Manage tag rules (rule-based fallback)
@@ -98,6 +130,10 @@ pub struct AiRunArgs {
     /// Limit to a specific feed
     #[arg(long)]
     pub feed: Option<String>,
+
+    /// Re-tag ALL items, clearing existing tags first (use after vocabulary changes)
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Debug, Args)]
@@ -105,6 +141,46 @@ pub struct AiStatusArgs {
     /// Output as JSON
     #[arg(long)]
     pub json: bool,
+}
+
+// ── Label subcommand ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Args)]
+pub struct AiLabelArgs {
+    /// Limit to items from a specific feed (substring match on feed title/URL)
+    #[arg(long)]
+    pub feed: Option<String>,
+    /// Stop after labeling N items
+    #[arg(long)]
+    pub limit: Option<usize>,
+    /// Show already-labeled items for review/correction
+    #[arg(long)]
+    pub review: bool,
+}
+
+// ── Train subcommand ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Args)]
+pub struct AiTrainArgs {
+    #[command(subcommand)]
+    pub command: AiTrainCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AiTrainCommand {
+    /// Show labeling statistics
+    Stats,
+    /// Export labels in FastText supervised format
+    ExportFasttext(AiTrainExportArgs),
+    /// Export labels as JSONL for MiniLM fine-tuning
+    ExportJsonl(AiTrainExportArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct AiTrainExportArgs {
+    /// Output file path (default: {data_dir}/training/train.txt or train.jsonl)
+    #[arg(short, long)]
+    pub output: Option<std::path::PathBuf>,
 }
 
 // ── Model subcommands ──────────────────────────────────────────────────────────
@@ -139,6 +215,12 @@ pub struct AiModelListArgs {
 pub struct AiModelSetArgs {
     /// Model name (must match a directory under the models path)
     pub name: String,
+    /// Set as the active FastText text model (instead of the NLI model)
+    #[arg(long)]
+    pub fasttext: bool,
+    /// Set as the active MiniLM text model (instead of the NLI model)
+    #[arg(long)]
+    pub miniml: bool,
 }
 
 #[derive(Debug, Args)]
@@ -217,6 +299,8 @@ pub async fn run(args: AiArgs, core: &PulseCore, global_json: bool) -> anyhow::R
         AiCommand::VisionDebug(a) => cmd_vision_debug(a, core).await,
         AiCommand::Download(a) => cmd_model_download(a, core).await,
         AiCommand::VisionDownload(a) => cmd_vision_download(a, core).await,
+        AiCommand::Label(a) => cmd_label(a, core).await,
+        AiCommand::Train(a) => cmd_train(a, core).await,
         AiCommand::Model(a) => cmd_model(a, core, global_json).await,
         AiCommand::Rules(a) => cmd_rules(a, global_json).await,
     }
@@ -236,15 +320,184 @@ async fn cmd_run(args: AiRunArgs, core: &PulseCore) -> anyhow::Result<()> {
         None
     };
 
-    let mode = match (core.onnx_tagger.is_some(), core.vision_tagger.is_some()) {
-        (true, true)  => "onnx+vision+rules",
-        (true, false) => "onnx+rules",
-        (false, true) => "vision+rules",
-        (false, false) => "rule-engine",
+    let mode = match (core.fasttext_loaded(), core.miniml_loaded(), core.onnx_loaded(), core.vision_loaded()) {
+        (true,  true,  _,    true)  => "fasttext+miniml+vision",
+        (true,  true,  _,    false) => "fasttext+miniml",
+        (true,  false, _,    true)  => "fasttext+vision",
+        (true,  false, _,    false) => "fasttext",
+        (false, _,     true, true)  => "onnx+vision",
+        (false, _,     true, false) => "onnx",
+        (false, _,     false, true) => "vision",
+        (false, _,     false, false) => "rule-engine",
     };
-    eprintln!("running tagger ({}) on untagged items...", mode);
-    let (items, tags) = core.run_tagger_direct(feed_id.as_deref()).await?;
+    if args.force {
+        eprintln!("running tagger ({}) — force-retagging ALL items...", mode);
+    } else {
+        eprintln!("running tagger ({}) on untagged items...", mode);
+    }
+    let (items, tags) = core.run_tagger_direct(feed_id.as_deref(), args.force, None).await?;
     eprintln!("tagged {} items, {} tags created", items, tags);
+    Ok(())
+}
+
+pub async fn cmd_label(args: AiLabelArgs, core: &PulseCore) -> anyhow::Result<()> {
+    use std::io::{BufRead, Write};
+    use pulse_core::training::{LabelStore, LabeledItem, build_input_text};
+
+    let label_store = LabelStore::new(&core.config.training_dir())?;
+    let already_labeled = label_store.labeled_ids()?;
+
+    // Load items from timeline
+    let filter = pulse_core::types::TimelineFilter {
+        feed_id: None,
+        ..Default::default()
+    };
+    let page = core.get_timeline_page(filter, None, 2000).await?;
+
+    let items: Vec<_> = if args.review {
+        // Show already-labeled items
+        page.items.into_iter()
+            .filter(|i| already_labeled.contains(i.id.as_str()))
+            .collect()
+    } else {
+        // Show unlabeled items
+        page.items.into_iter()
+            .filter(|i| !already_labeled.contains(i.id.as_str()))
+            .collect()
+    };
+
+    // Apply feed filter if given
+    let items: Vec<_> = if let Some(ref feed_filter) = args.feed {
+        let ff = feed_filter.to_lowercase();
+        items.into_iter()
+            .filter(|i| {
+                i.feed_title.as_deref().map(|t| t.to_lowercase().contains(&ff)).unwrap_or(false)
+                || i.url.as_deref().map(|u| u.to_lowercase().contains(&ff)).unwrap_or(false)
+            })
+            .collect()
+    } else {
+        items
+    };
+
+    let total = items.len().min(args.limit.unwrap_or(usize::MAX));
+    if total == 0 {
+        eprintln!("No items to label (try syncing first with `pulse sync run`).");
+        return Ok(());
+    }
+
+    // Known tags for reference
+    let known_tags = [
+        "technical", "tutorial", "research", "news", "discussion",
+        "security", "ai-ml", "privacy", "policy", "science",
+        "clickbait", "show-hn", "ask-hn", "job-posting", "paywall",
+        "video", "low-effort",
+    ];
+
+    let stdin = std::io::stdin();
+    let mut labeled = 0usize;
+
+    eprintln!("Known tags: {}", known_tags.join(", "));
+    eprintln!("Commands: Enter=skip, q=quit, tags=comma-separated");
+    eprintln!();
+
+    for (i, item) in items.iter().take(total).enumerate() {
+        let domain = item.url.as_deref()
+            .and_then(|u| u.split("://").nth(1))
+            .and_then(|s| s.split('/').next())
+            .map(|h| h.trim_start_matches("www."))
+            .unwrap_or("unknown");
+
+        let source = item.feed_title.as_deref().unwrap_or("?");
+        eprintln!("[{}/{}] {} — {}", i + 1, total, domain, source);
+        eprintln!("  {}", item.title);
+
+        // Show existing labels if in review mode
+        if args.review && !item.ai_tags.is_empty() {
+            eprintln!("  Current: {}", item.ai_tags.join(", "));
+        }
+
+        print!("  Tags> ");
+        std::io::stdout().flush()?;
+
+        let mut line = String::new();
+        stdin.lock().read_line(&mut line)?;
+        let line = line.trim();
+
+        if line == "q" || line == "quit" {
+            eprintln!("Quit. Labeled {} items.", labeled);
+            break;
+        }
+        if line.is_empty() {
+            continue;
+        }
+
+        let tags: Vec<String> = line.split(',')
+            .map(|t| t.trim().to_lowercase())
+            .filter(|t| !t.is_empty())
+            .collect();
+
+        let text = build_input_text(&item.title, item.url.as_deref());
+        let now = chrono::Utc::now().timestamp();
+
+        label_store.upsert(LabeledItem {
+            item_id: item.id.to_string(),
+            text,
+            tags,
+            labeled_at: now,
+        })?;
+
+        labeled += 1;
+
+        let stats = label_store.stats()?;
+        eprintln!("  Saved. ({} total labeled)", stats.total);
+    }
+
+    eprintln!();
+    eprintln!("Session complete: {} items labeled.", labeled);
+    let stats = label_store.stats()?;
+    eprintln!("Total in store: {}", stats.total);
+    for (tag, count) in stats.tag_counts.iter() {
+        eprintln!("  {}: {}", tag, count);
+    }
+
+    Ok(())
+}
+
+pub async fn cmd_train(args: AiTrainArgs, core: &PulseCore) -> anyhow::Result<()> {
+    use pulse_core::training::LabelStore;
+
+    let label_store = LabelStore::new(&core.config.training_dir())?;
+
+    match args.command {
+        AiTrainCommand::Stats => {
+            let stats = label_store.stats()?;
+            println!("Label store: {}", core.config.training_dir().join("labels.jsonl").display());
+            println!("Total examples: {}", stats.total);
+            if !stats.tag_counts.is_empty() {
+                println!("Tag distribution:");
+                let mut counts: Vec<_> = stats.tag_counts.iter().collect();
+                counts.sort_by(|a, b| b.1.cmp(a.1));
+                for (tag, count) in counts {
+                    println!("  {:20} {}", tag, count);
+                }
+            }
+        }
+        AiTrainCommand::ExportFasttext(export_args) => {
+            let dest = export_args.output.unwrap_or_else(|| core.config.training_dir().join("train.txt"));
+            let n = label_store.export_fasttext(&dest)?;
+            println!("Wrote {} examples to {}", n, dest.display());
+            println!();
+            println!("Next: python scripts/train_fasttext.py --input {} --output ~/.local/share/pulse/models/fasttext-v1/", dest.display());
+        }
+        AiTrainCommand::ExportJsonl(export_args) => {
+            let dest = export_args.output.unwrap_or_else(|| core.config.training_dir().join("train.jsonl"));
+            let n = label_store.export_jsonl(&dest)?;
+            println!("Wrote {} examples to {}", n, dest.display());
+            println!();
+            println!("Next: python scripts/train_miniml.py --input {} --model-dir ~/.local/share/pulse/models/miniml-v1/", dest.display());
+        }
+    }
+
     Ok(())
 }
 
@@ -252,36 +505,56 @@ async fn cmd_run(args: AiRunArgs, core: &PulseCore) -> anyhow::Result<()> {
 struct AiStatus {
     active_model: String,
     active_vision_model: String,
+    active_fasttext_model: String,
+    active_miniml_model: String,
     tagging_mode: String,
     rule_count: usize,
     onnx_loaded: bool,
     vision_loaded: bool,
+    fasttext_loaded: bool,
+    miniml_loaded: bool,
 }
 
 async fn cmd_status(args: AiStatusArgs, core: &PulseCore, global_json: bool) -> anyhow::Result<()> {
     let use_json = args.json || global_json;
     let rules = default_rules();
     let enabled = rules.iter().filter(|r| r.enabled).count();
-    let onnx_loaded = core.onnx_tagger.is_some();
-    let vision_loaded = core.vision_tagger.is_some();
+    let onnx_loaded = core.onnx_loaded();
+    let vision_loaded = core.vision_loaded();
+    let fasttext_loaded = core.fasttext_loaded();
+    let miniml_loaded = core.miniml_loaded();
     let active_model = core.active_model_name()
         .unwrap_or_else(|| "none".to_string());
     let active_vision_model = core.active_vision_model_name()
         .unwrap_or_else(|| "none".to_string());
-    let tagging_mode = match (onnx_loaded, vision_loaded) {
-        (true, true)  => "onnx+vision+rules",
-        (true, false) => "onnx+rules",
-        (false, true) => "vision+rules",
-        (false, false) => "rule-based",
+    let active_fasttext_model = core.active_fasttext_model_name()
+        .unwrap_or_else(|| "none".to_string());
+    let active_miniml_model = core.active_miniml_model_name()
+        .unwrap_or_else(|| "none".to_string());
+    let ft = core.fasttext_loaded();
+    let ml = core.miniml_loaded();
+    let tagging_mode = match (ft, ml, onnx_loaded, vision_loaded) {
+        (true,  true,  _,    true)  => "fasttext+miniml+vision",
+        (true,  true,  _,    false) => "fasttext+miniml",
+        (true,  false, _,    true)  => "fasttext+vision",
+        (true,  false, _,    false) => "fasttext",
+        (false, _,     true, true)  => "onnx+vision",
+        (false, _,     true, false) => "onnx",
+        (false, _,     false, true) => "vision",
+        _                           => "rule-based",
     }.to_string();
 
     let status = AiStatus {
         active_model: active_model.clone(),
         active_vision_model: active_vision_model.clone(),
+        active_fasttext_model: active_fasttext_model.clone(),
+        active_miniml_model: active_miniml_model.clone(),
         tagging_mode: tagging_mode.clone(),
         rule_count: enabled,
         onnx_loaded,
         vision_loaded,
+        fasttext_loaded,
+        miniml_loaded,
     };
 
     if use_json {
@@ -292,6 +565,16 @@ async fn cmd_status(args: AiStatusArgs, core: &PulseCore, global_json: bool) -> 
     let stats = core.get_db_stats().await?;
     println!("Text model:    {}", active_model);
     println!("Vision model:  {}", active_vision_model);
+    println!("FastText:      {}", if fasttext_loaded {
+        format!("loaded ({})", active_fasttext_model)
+    } else {
+        format!("not loaded ({})", active_fasttext_model)
+    });
+    println!("MiniLM:        {}", if miniml_loaded {
+        format!("loaded ({})", active_miniml_model)
+    } else {
+        format!("not loaded ({})", active_miniml_model)
+    });
     println!("Tagging mode:  {}", tagging_mode);
     println!("ONNX loaded:   {}", onnx_loaded);
     println!("Vision loaded: {}", vision_loaded);
@@ -301,23 +584,67 @@ async fn cmd_status(args: AiStatusArgs, core: &PulseCore, global_json: bool) -> 
 }
 
 async fn cmd_debug(args: AiDebugArgs, core: &PulseCore) -> anyhow::Result<()> {
-    let Some(ref tagger) = core.onnx_tagger else {
-        print_error("no ONNX model loaded — run 'pulse ai model set <name>' first");
-        return Ok(());
-    };
+    let mut showed = false;
 
-    let sims = tagger.similarities(&args.text)?;
-    println!("{:<20}  {}", "TAG", "ENTAILMENT");
-    println!("{}", "-".repeat(35));
-    for (tag, prob) in &sims {
-        let marker = if *prob >= 0.50 { " ✓" } else { "" };
-        println!("{:<20}  {:.4}{}", tag, prob, marker);
+    // FastText scores
+    let ft = core.fasttext_tagger.read().unwrap().clone();
+    if let Some(ref ft) = ft {
+        match ft.scores(&args.text) {
+            Ok(scores) => {
+                println!("=== FastText ===");
+                println!("{:<20}  {}", "TAG", "SCORE");
+                println!("{}", "-".repeat(32));
+                for (tag, score) in &scores {
+                    let marker = if *score >= 0.5 { " ✓" } else { "" };
+                    println!("{:<20}  {:.4}{}", tag, score, marker);
+                }
+            }
+            Err(e) => eprintln!("FastText error: {}", e),
+        }
+        showed = true;
+    }
+
+    // MiniLM scores
+    let ml = core.miniml_tagger.read().unwrap().clone();
+    if let Some(ref ml) = ml {
+        match ml.scores(&args.text) {
+            Ok(scores) => {
+                println!("=== MiniLM ===");
+                println!("{:<20}  {}", "TAG", "SCORE");
+                println!("{}", "-".repeat(32));
+                for (tag, score) in &scores {
+                    let marker = if *score >= 0.5 { " ✓" } else { "" };
+                    println!("{:<20}  {:.4}{}", tag, score, marker);
+                }
+            }
+            Err(e) => eprintln!("MiniLM error: {}", e),
+        }
+        showed = true;
+    }
+
+    // Legacy NLI ONNX scores
+    let tagger = core.onnx_tagger.read().unwrap().clone();
+    if let Some(ref tagger) = tagger {
+        let sims = tagger.similarities(&args.text)?;
+        println!("=== NLI ONNX ===");
+        println!("{:<20}  {}", "TAG", "SCORE (geom-mean)");
+        println!("{}", "-".repeat(38));
+        for (tag, prob) in &sims {
+            let marker = if *prob >= 0.10 { " ✓" } else { "" };
+            println!("{:<20}  {:.4}{}", tag, prob, marker);
+        }
+        showed = true;
+    }
+
+    if !showed {
+        print_error("no model loaded — run 'pulse ai model set --fasttext <name>' first");
     }
     Ok(())
 }
 
 async fn cmd_vision_debug(args: AiVisionDebugArgs, core: &PulseCore) -> anyhow::Result<()> {
-    let Some(ref vision) = core.vision_tagger else {
+    let vision = core.vision_tagger.read().unwrap().clone();
+    let Some(ref vision) = vision else {
         print_error("no vision model loaded — run 'pulse ai vision-download' first");
         return Ok(());
     };
@@ -331,7 +658,8 @@ async fn cmd_vision_debug(args: AiVisionDebugArgs, core: &PulseCore) -> anyhow::
             println!("{:<20}  {}", "TAG", "COSINE SIM");
             println!("{}", "-".repeat(35));
             for (tag, score) in &sims {
-                let marker = if *score >= 0.22 { " ✓" } else { "" };
+                // ✓ marks scores above the minimum semantic threshold (0.20)
+                let marker = if *score >= 0.20 { " ✓" } else { "" };
                 println!("{:<20}  {:.4}{}", tag, score, marker);
             }
         }
@@ -417,7 +745,7 @@ async fn cmd_vision_download(args: AiVisionDownloadArgs, core: &PulseCore) -> an
         return Ok(());
     }
 
-    let model_name = args.name.as_deref().unwrap_or("clip-vit-b32");
+    let model_name = args.name.as_deref().unwrap_or("mobileclip-s2");
     let spec = match KNOWN_VISION_MODELS.iter().find(|m| m.name == model_name) {
         Some(s) => s,
         None => {
@@ -439,7 +767,7 @@ async fn cmd_vision_download(args: AiVisionDownloadArgs, core: &PulseCore) -> an
 
     let client = Client::builder()
         .user_agent("Pulse/0.1 model-downloader")
-        .timeout(std::time::Duration::from_secs(300))
+        .timeout(std::time::Duration::from_secs(600))
         .build()?;
 
     for (hf_path, local_name) in spec.files {
@@ -467,21 +795,28 @@ async fn cmd_vision_download(args: AiVisionDownloadArgs, core: &PulseCore) -> an
     }
 
     eprintln!("Download complete → {}", model_dir.display());
-    eprintln!();
-    eprintln!("Next: generate label embeddings (required before use):");
-    eprintln!("  python3 scripts/compute_clip_labels.py --model-dir {}", model_dir.display());
-    eprintln!();
-    eprintln!("Then activate:");
-    eprintln!("  pulse ai model set {} --vision", spec.name);
-    eprintln!("  (or run 'pulse ai vision-download' again after generating embeddings)");
 
     if !args.no_activate {
-        let embeddings_exist = model_dir.join("label_embeddings.bin").exists();
-        if embeddings_exist {
-            core.set_active_vision_model(spec.name)?;
-            eprintln!("Active vision model set to '{}'. Restart pulse to load it.", spec.name);
-        } else {
-            eprintln!("(skipping auto-activate: label_embeddings.bin not yet generated)");
+        // Delete stale label_embeddings.bin so reload regenerates it with the current label set.
+        // This is required when the model or label set changes.
+        let embeddings_path = model_dir.join("label_embeddings.bin");
+        if embeddings_path.exists() {
+            eprintln!("Removing stale label_embeddings.bin (will regenerate for current labels)...");
+            std::fs::remove_file(&embeddings_path)?;
+        }
+
+        core.set_active_vision_model(spec.name)?;
+
+        eprintln!("Generating label embeddings via {} text encoder...", spec.name);
+        match core.reload_vision_tagger() {
+            Ok(()) => {
+                eprintln!("Vision model '{}' loaded and ready.", spec.name);
+                eprintln!("Calibrate thresholds: pulse ai vision-debug <image_url>");
+            }
+            Err(e) => {
+                eprintln!("Warning: vision model loaded but tagger init failed: {e}");
+                eprintln!("Try: pulse ai model set {} --vision", spec.name);
+            }
         }
     }
 
@@ -527,8 +862,16 @@ async fn cmd_model_list(args: AiModelListArgs, core: &PulseCore, global_json: bo
 }
 
 async fn cmd_model_set(args: AiModelSetArgs, core: &PulseCore) -> anyhow::Result<()> {
-    core.set_active_model(&args.name)?;
-    eprintln!("active model set to '{}' (restart pulse to apply)", args.name);
+    if args.fasttext {
+        core.set_active_fasttext_model(&args.name)?;
+        eprintln!("FastText model set to '{}' (restart pulse to apply)", args.name);
+    } else if args.miniml {
+        core.set_active_miniml_model(&args.name)?;
+        eprintln!("MiniLM model set to '{}' (restart pulse to apply)", args.name);
+    } else {
+        core.set_active_model(&args.name)?;
+        eprintln!("active model set to '{}' (restart pulse to apply)", args.name);
+    }
     Ok(())
 }
 

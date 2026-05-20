@@ -81,6 +81,35 @@ pub enum DbCommand {
         source_meta_patch: serde_json::Value,
         reply: oneshot::Sender<DbResult<()>>,
     },
+
+    /// Delete a feed group (NULLs group_id on member feeds, then deletes group)
+    DeleteFeedGroup {
+        id: String,
+        reply: oneshot::Sender<DbResult<()>>,
+    },
+
+    /// Delete all AI tags for a specific item (used by force-retag).
+    DeleteItemTags {
+        item_id: ItemId,
+        reply: oneshot::Sender<DbResult<()>>,
+    },
+
+    /// Delete all feed items (item_states and ai_tags cascade automatically)
+    ClearAllItems {
+        reply: oneshot::Sender<DbResult<()>>,
+    },
+
+    /// Mark all items in a feed as read
+    MarkFeedRead {
+        feed_id: FeedId,
+        reply: oneshot::Sender<DbResult<()>>,
+    },
+
+    /// Delete all AI tags with confidence below the given threshold (global post-filter).
+    DeleteTagsBelowConfidence {
+        threshold: f32,
+        reply: oneshot::Sender<DbResult<()>>,
+    },
 }
 
 /// The DB writer actor task. Uses a single-connection pool to serialize writes.
@@ -144,6 +173,42 @@ pub async fn db_writer_task(
             DbCommand::EnrichItem { item_id, body_text, source_meta_patch, reply } => {
                 let result = enrich_item(&pool, &item_id, body_text.as_deref(), &source_meta_patch).await;
                 let _ = reply.send(result);
+            }
+
+            DbCommand::DeleteFeedGroup { id, reply } => {
+                let result = delete_feed_group(&pool, &id).await;
+                let _ = reply.send(result);
+            }
+
+            DbCommand::DeleteItemTags { item_id, reply } => {
+                let result = sqlx::query("DELETE FROM ai_tags WHERE item_id = ?")
+                    .bind(&item_id)
+                    .execute(&pool)
+                    .await
+                    .map(|_| ())
+                    .map_err(StorageError::Sqlite);
+                let _ = reply.send(result);
+            }
+
+            DbCommand::ClearAllItems { reply } => {
+                let result = clear_all_items(&pool).await;
+                let _ = reply.send(result);
+            }
+
+            DbCommand::MarkFeedRead { feed_id, reply } => {
+                let result = mark_feed_read(&pool, &feed_id).await;
+                let _ = reply.send(result);
+            }
+
+            DbCommand::DeleteTagsBelowConfidence { threshold, reply } => {
+                let r = sqlx::query("DELETE FROM ai_tags WHERE confidence < ?")
+                    .bind(threshold as f64)
+                    .execute(&pool)
+                    .await;
+                if let Err(ref e) = r {
+                    tracing::warn!("delete_tags_below_confidence failed: {}", e);
+                }
+                let _ = reply.send(r.map(|_| ()).map_err(StorageError::Sqlite));
             }
         }
     }
@@ -602,6 +667,47 @@ async fn enrich_item(
     Ok(())
 }
 
+async fn delete_feed_group(pool: &SqlitePool, id: &str) -> DbResult<()> {
+    let now = chrono::Utc::now().timestamp();
+    sqlx::query("UPDATE feeds SET group_id = NULL, updated_at = ? WHERE group_id = ?")
+        .bind(now)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
+    sqlx::query("DELETE FROM feed_groups WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
+    Ok(())
+}
+
+async fn clear_all_items(pool: &SqlitePool) -> DbResult<()> {
+    // Trigger handles FTS cleanup via feed_items_fts_delete
+    sqlx::query("DELETE FROM feed_items")
+        .execute(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
+    Ok(())
+}
+
+async fn mark_feed_read(pool: &SqlitePool, feed_id: &str) -> DbResult<()> {
+    let now = chrono::Utc::now().timestamp();
+    sqlx::query(
+        "UPDATE item_states SET is_read = 1, read_at = ?, updated_at = ?
+         WHERE item_id IN (SELECT id FROM feed_items WHERE feed_id = ?)
+           AND is_read = 0"
+    )
+    .bind(now)
+    .bind(now)
+    .bind(feed_id)
+    .execute(pool)
+    .await
+    .map_err(StorageError::Sqlite)?;
+    Ok(())
+}
+
 // ─── DbHandle ───────────────────────────────────────────────────────────────
 
 /// A cloneable handle to the DB writer actor and a read pool.
@@ -666,6 +772,11 @@ impl DbHandle {
         self.send(|reply| DbCommand::InsertAiTags { item_id, tags, reply }).await
     }
 
+    /// Delete all AI tags for an item (used before force-retag).
+    pub async fn delete_item_tags(&self, item_id: ItemId) -> DbResult<()> {
+        self.send(|reply| DbCommand::DeleteItemTags { item_id, reply }).await
+    }
+
     /// Update the source_config for a feed (e.g., last_seen_id for HN)
     pub async fn update_feed_source_config(
         &self,
@@ -693,6 +804,26 @@ impl DbHandle {
         source_meta_patch: serde_json::Value,
     ) -> DbResult<()> {
         self.send(|reply| DbCommand::EnrichItem { item_id, body_text, source_meta_patch, reply }).await
+    }
+
+    /// Delete a feed group and null-out group_id on member feeds
+    pub async fn delete_feed_group(&self, id: String) -> DbResult<()> {
+        self.send(|reply| DbCommand::DeleteFeedGroup { id, reply }).await
+    }
+
+    /// Delete all feed items (cascades to item_states, ai_tags)
+    pub async fn clear_all_items(&self) -> DbResult<()> {
+        self.send(|reply| DbCommand::ClearAllItems { reply }).await
+    }
+
+    /// Mark all items in a feed as read
+    pub async fn mark_feed_read(&self, feed_id: FeedId) -> DbResult<()> {
+        self.send(|reply| DbCommand::MarkFeedRead { feed_id, reply }).await
+    }
+
+    /// Delete all AI tags with confidence below the given threshold.
+    pub async fn delete_tags_below_confidence(&self, threshold: f32) -> DbResult<()> {
+        self.send(|reply| DbCommand::DeleteTagsBelowConfidence { threshold, reply }).await
     }
 
     /// Get reference to reader pool for read-only queries

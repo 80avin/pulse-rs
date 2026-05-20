@@ -196,6 +196,9 @@ pub struct FeedItemView {
     pub score: Option<i64>,
     pub comment_count: Option<i64>,
     pub comment_url: Option<String>,
+    pub body_text: Option<String>,
+    pub body_html: Option<String>,
+    pub external_url: Option<String>,
 
     // Feed fields
     pub feed_id: FeedId,
@@ -212,8 +215,12 @@ pub struct FeedItemView {
     pub is_saved: bool,
     pub is_hidden: bool,
 
-    // AI tags (JSON array of tag names)
+    // Enrichment fields
+    pub og_image: Option<String>,
+
+    // AI tags (tag names) and aggregate signal score
     pub ai_tags: Vec<String>,
+    pub signal: f64,
 }
 
 /// Cursor for timeline pagination (published_at, id) tuple

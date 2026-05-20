@@ -164,7 +164,11 @@ fn normalize_reddit_post(post: RedditPost, feed_id: &str, ns_uuid: Uuid, fetched
     let is_self = post.is_self.unwrap_or(false);
     let post_hint = post.post_hint.as_deref().unwrap_or(if is_self { "self" } else { "link" });
 
-    let url = if is_self { Some(comment_url.clone()) } else { post.url.clone() };
+    // Always use the Reddit permalink as the primary URL so the Open button
+    // navigates to the Reddit post page. For link posts, the external target
+    // is stored in source_meta["external_url"] and shown as a secondary link.
+    let external_url = if !is_self { post.url.clone() } else { None };
+    let url = Some(comment_url.clone());
     let published_at = post.created_utc as i64;
 
     // ── Body text assembly ────────────────────────────────────────────────────
@@ -240,6 +244,7 @@ fn normalize_reddit_post(post: RedditPost, feed_id: &str, ns_uuid: Uuid, fetched
         "is_self": is_self,
         "post_hint": post_hint,
         "og_image": best_image,
+        "external_url": external_url,
     });
 
     if let Some(cp_meta) = crosspost_meta {

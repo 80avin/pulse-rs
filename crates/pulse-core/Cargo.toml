@@ -12,12 +12,14 @@ edition = "2024"
 name = "pulse_core"
 
 [features]
-default = ["sync", "search", "ai-rules"]
+default = ["sync", "search"]
 sync = []
 search = []
 ai-rules = []
 ai-onnx = ["dep:ort", "dep:tokenizers"]
-ai-vision = ["dep:ort", "dep:image"]
+ai-vision = ["dep:ort", "dep:image", "dep:tokenizers"]
+ai-fasttext = []
+ai-miniml = ["dep:ort", "dep:tokenizers"]
 
 [dependencies]
 tokio = { workspace = true }

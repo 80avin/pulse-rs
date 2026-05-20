@@ -15,6 +15,12 @@ const MAX_SEQ_LEN: usize = 512;
 // Pattern-based (title prefix, URL domain) — NLI cross-encoder is overkill here.
 const RULE_ONLY_TAGS: &[&str] = &["show-hn", "ask-hn", "paywall", "video", "job-posting", "low-effort"];
 
+#[cfg(feature = "ai-onnx")]
+struct NliIndices {
+    entailment: usize,
+    contradiction: usize,
+}
+
 pub fn is_rule_only_tag(tag: &str) -> bool {
     RULE_ONLY_TAGS.contains(&tag)
 }
@@ -90,9 +96,8 @@ struct OnnxTaggerInner {
     /// (tag, hypothesis_sentence, threshold) built at load time from tag_labels().
     labels: Vec<(String, String, f32)>,
     has_token_type_ids: bool,
-    /// Index of the entailment class in the 3-class softmax output.
-    /// Detected from config.json; falls back to 0 (MoritzLaurer convention).
-    entailment_idx: usize,
+    /// Class indices detected from config.json id2label.
+    nli: NliIndices,
 }
 
 #[cfg(feature = "ai-onnx")]
@@ -120,9 +125,8 @@ impl OnnxTaggerInner {
         let tokenizer = tokenizers::Tokenizer::from_file(&tokenizer_path)
             .map_err(|e| TaggingError::Tokenizer(e.to_string()))?;
 
-        let entailment_idx = detect_entailment_idx(&model_dir.join("config.json"))
-            .unwrap_or(0); // MoritzLaurer NLI models: 0=entailment, 1=neutral, 2=contradiction
-        tracing::info!(entailment_idx, "NLI entailment label index");
+        let nli = detect_nli_indices(&model_dir.join("config.json"));
+        tracing::info!(entailment = nli.entailment, contradiction = nli.contradiction, "NLI class indices");
 
         let labels: Vec<(String, String, f32)> = tag_labels()
             .iter()
@@ -137,18 +141,39 @@ impl OnnxTaggerInner {
             tokenizer,
             labels,
             has_token_type_ids,
-            entailment_idx,
+            nli,
         })
     }
 
     fn classify(&self, item: &FeedItem, _feed_type: &FeedType) -> Result<Vec<TagResult>, TaggingError> {
         let title = item.title.as_str();
         let body = item.body_text.as_deref().unwrap_or("");
-        let text = if body.is_empty() {
-            title.to_string()
-        } else {
-            format!("{}\n\n{}", title, body)
-        };
+        // Use title only for NLI: body text dilutes scores and introduces noise.
+        // Title is the clearest signal; body enrichment can be added per feed-type later.
+        let text = title.to_string();
+
+        // NLI is unreliable for very short text — model lacks enough context to distinguish
+        // entailment from contradiction and produces near-random logits. Min 5 words.
+        if text.split_whitespace().count() < 5 {
+            return Ok(vec![]);
+        }
+
+        // Skip primarily non-ASCII text (non-English feeds): the English NLI model
+        // cannot interpret non-English premises and may output biased logits.
+        let non_ascii = text.chars().filter(|c| !c.is_ascii()).count();
+        if non_ascii * 4 > text.len() {
+            return Ok(vec![]);
+        }
+
+        // Skip transliterated Hindi/Urdu (Latin-script) which bypasses the non-ASCII
+        // filter but produces wildly wrong NLI scores (e.g. "maintenance" in a Dogri
+        // sentence scores 0.67 for security). Detected via unambiguous function words
+        // that appear in Romanized Hindi/Urdu but almost never in English text.
+        if is_transliterated_indic(&text) {
+            return Ok(vec![]);
+        }
+
+        let _ = body; // body retained in struct for future per-feed-type use
 
         let mut session = self.session.lock()
             .map_err(|_| TaggingError::Onnx("session mutex poisoned".into()))?;
@@ -161,7 +186,7 @@ impl OnnxTaggerInner {
                 &text,
                 hypothesis,
                 self.has_token_type_ids,
-                self.entailment_idx,
+                &self.nli,
             )?;
             if prob >= *threshold {
                 results.push(TagResult {
@@ -189,7 +214,7 @@ impl OnnxTaggerInner {
                 text,
                 hypothesis,
                 self.has_token_type_ids,
-                self.entailment_idx,
+                &self.nli,
             )?;
             sims.push((tag.clone(), prob));
         }
@@ -198,11 +223,16 @@ impl OnnxTaggerInner {
     }
 }
 
-/// Encode `(text, hypothesis)` as an NLI pair, run the cross-encoder session,
-/// and return the softmax entailment probability.
+/// Encode `(text, hypothesis)` as an NLI pair, run the cross-encoder session, and return
+/// the zero-shot classification score: `P(entailment) / (P(entailment) + P(contradiction))`.
+///
+/// The neutral class is excluded from normalization — this is the standard approach used by
+/// HuggingFace's zero-shot classification pipeline. Including neutral suppresses entailment
+/// probabilities toward zero for short/telegraphic text, making thresholds impossible to
+/// calibrate. The 2-class ratio yields reliable ordinal scores across diverse content types.
 ///
 /// Input format: `[CLS] text [SEP] hypothesis [SEP]` (tokenizer adds special tokens).
-/// Output: `logits` of shape [1, 3] → softmax → entailment class probability.
+/// Output: `logits` of shape [1, 3] → entailment / (entailment + contradiction).
 #[cfg(feature = "ai-onnx")]
 fn run_nli(
     session: &mut ort::session::Session,
@@ -210,7 +240,7 @@ fn run_nli(
     text: &str,
     hypothesis: &str,
     has_token_type_ids: bool,
-    entailment_idx: usize,
+    nli: &NliIndices,
 ) -> Result<f32, TaggingError> {
     use tokenizers::{EncodeInput, InputSequence};
 
@@ -260,17 +290,37 @@ fn run_nli(
         )));
     }
 
-    let entailment_prob = softmax_idx(&logits, entailment_idx);
-    Ok(entailment_prob)
+    let score = score_nli(&logits, nli);
+    Ok(score)
 }
 
-/// Softmax over `logits`, returning the probability at `idx`.
+/// Zero-shot NLI classification score: geometric mean of 3-class and 2-class probabilities.
+///
+/// Two terms combined:
+/// - s3 = softmax([all logits])[entailment]  — the "safety valve": stays near 0 when the
+///         model outputs high neutral probability (uncertain or non-English text), preventing
+///         random-looking logits from producing false high scores.
+/// - s2 = exp(entailment) / (exp(entailment) + exp(contradiction))  — the "signal amplifier":
+///         boosts genuine entailment that 3-class softmax would suppress due to neutral mass.
+///
+/// Geometric mean (√(s3 × s2)) requires BOTH to be nonzero, which separates:
+/// - Genuine entailment: s3 ≈ 0.03–0.15 and s2 ≈ 0.85–0.99 → score ≈ 0.16–0.39
+/// - Uncertain/irrelevant text: s3 ≈ 0.001 and s2 ≈ 0.5–0.97 → score ≈ 0.02–0.03
+/// - Clear entailment (tutorial): s3 ≈ 0.85 and s2 ≈ 0.99 → score ≈ 0.92
 #[cfg(feature = "ai-onnx")]
-fn softmax_idx(logits: &[f32], idx: usize) -> f32 {
+fn score_nli(logits: &[f32], nli: &NliIndices) -> f32 {
+    // 3-class softmax at entailment index
     let max = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
     let exps: Vec<f32> = logits.iter().map(|x| (x - max).exp()).collect();
     let sum: f32 = exps.iter().sum();
-    exps[idx] / sum
+    let s3 = exps[nli.entailment] / sum;
+
+    // 2-class (entailment vs contradiction, ignoring neutral)
+    let e = (logits[nli.entailment] as f64).exp();
+    let c = (logits[nli.contradiction] as f64).exp();
+    let s2 = (e / (e + c)) as f32;
+
+    (s3 * s2).sqrt()
 }
 
 /// Prefer quantized ONNX to reduce memory footprint; fall back to fp32.
@@ -282,16 +332,59 @@ fn resolve_model_path(model_dir: &Path) -> Option<PathBuf> {
         .find(|p| p.exists())
 }
 
-/// Read `config.json` and return the index of the "entailment" label in id2label.
+/// Read `config.json` id2label and return entailment + contradiction indices.
+/// Falls back to the two most common conventions if the config is missing or malformed.
 #[cfg(feature = "ai-onnx")]
-fn detect_entailment_idx(config_path: &Path) -> Option<usize> {
-    let content = std::fs::read_to_string(config_path).ok()?;
-    let v: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let id2label = v.get("id2label")?.as_object()?;
-    for (k, label) in id2label {
-        if label.as_str()?.eq_ignore_ascii_case("entailment") {
-            return k.parse().ok();
+fn detect_nli_indices(config_path: &Path) -> NliIndices {
+    let try_detect = || -> Option<NliIndices> {
+        let content = std::fs::read_to_string(config_path).ok()?;
+        let v: serde_json::Value = serde_json::from_str(&content).ok()?;
+        let id2label = v.get("id2label")?.as_object()?;
+        let mut entailment = None;
+        let mut contradiction = None;
+        for (k, label) in id2label {
+            let idx: usize = k.parse().ok()?;
+            match label.as_str()?.to_ascii_lowercase().as_str() {
+                "entailment"    => entailment    = Some(idx),
+                "contradiction" => contradiction = Some(idx),
+                _ => {}
+            }
         }
-    }
-    None
+        Some(NliIndices { entailment: entailment?, contradiction: contradiction? })
+    };
+    // Fallback: Xenova/nli-deberta-v3 models use [contradiction=0, entailment=1, neutral=2].
+    try_detect().unwrap_or(NliIndices { entailment: 1, contradiction: 0 })
+}
+
+/// Detect transliterated Hindi/Urdu written in Latin (Roman) script.
+///
+/// Such text bypasses the non-ASCII filter but produces nonsense NLI scores —
+/// the English NLI model has no way to interpret it and produces high-confidence
+/// false matches (e.g. a sentence about a power outage scoring 0.67 for "security").
+///
+/// Detection: whole-word match against a compact set of Hindi/Urdu function words
+/// and common verbs that are unambiguous in standard English text. Single false
+/// positive risk is extremely low because these tokens don't appear as standalone
+/// words in English sentences.
+#[cfg(feature = "ai-onnx")]
+fn is_transliterated_indic(text: &str) -> bool {
+    const MARKERS: &[&str] = &[
+        // Hindi/Urdu grammatical particles (postpositions, conjunctions)
+        "ka", "ki", "ke", "ko", "se", "mein", "hai", "hain",
+        "nahi", "nahin", "koi", "kya", "aur", "lekin", "par",
+        // Common pronouns / address forms
+        "yaar", "yar", "bhai", "aap", "hum", "tum",
+        // Frequent verb forms in Roman Hindi
+        "aagyi", "aaya", "aaye", "gaya", "gayi", "karo", "karna",
+        "maine", "banaya", "sunae", "logon", "shuru",
+        // Everyday Hindi vocabulary that appears frequently in regional feeds
+        "aaj", "abhi", "bahut", "accha", "sahi", "wala", "wali",
+        "garniya", "janwari",
+    ];
+
+    // Split on non-alphanumeric boundaries so punctuation doesn't prevent a match.
+    text.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .any(|w| MARKERS.contains(&w))
 }

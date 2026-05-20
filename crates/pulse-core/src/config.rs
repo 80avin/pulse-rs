@@ -1,5 +1,22 @@
 use std::path::PathBuf;
 
+/// Which text classification backend is active
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TextBackend {
+    /// DeBERTa NLI cross-encoder (legacy)
+    Nli,
+    /// FastText supervised classifier (2-10MB, <1ms/item)
+    FastText,
+    /// MiniLM ONNX embedding + MLP classifier head (24MB)
+    MiniMl,
+    /// FastText primary; MiniLM for semantic categories (default)
+    HybridFastTextMiniMl,
+}
+
+impl Default for TextBackend {
+    fn default() -> Self { Self::HybridFastTextMiniMl }
+}
+
 /// Application configuration
 #[derive(Debug, Clone)]
 pub struct PulseConfig {
@@ -19,6 +36,10 @@ pub struct PulseConfig {
     pub reddit_client_id: Option<String>,
     /// Reddit OAuth2 script-app client secret
     pub reddit_client_secret: Option<String>,
+    /// Which text classification backend to use for tagging
+    pub text_backend: TextBackend,
+    /// Whether to supplement model tags with rule engine (always false in new stack)
+    pub use_rules: bool,
 }
 
 impl PulseConfig {
@@ -36,6 +57,8 @@ impl PulseConfig {
             is_android: cfg!(target_os = "android"),
             reddit_client_id: None,
             reddit_client_secret: None,
+            text_backend: TextBackend::HybridFastTextMiniMl,
+            use_rules: false,
         }
     }
 
@@ -62,6 +85,11 @@ impl PulseConfig {
     /// Path to the models directory
     pub fn models_dir(&self) -> PathBuf {
         self.data_dir.join("models")
+    }
+
+    /// Path to the training data directory (labels, exports)
+    pub fn training_dir(&self) -> PathBuf {
+        self.data_dir.join("training")
     }
 }
 

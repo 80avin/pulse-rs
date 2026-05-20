@@ -1,10 +1,14 @@
+pub mod fasttext;
 pub mod labels;
+pub mod miniml;
 pub mod onnx;
 pub mod rules;
 pub mod tagger;
 pub mod vision;
 pub mod vision_labels;
 
+pub use fasttext::FastTextTagger;
+pub use miniml::MiniMlTagger;
 pub use tagger::{TaggerHandle, TagRequest, tagger_task, TAGGER_QUEUE_SIZE};
 pub use rules::{RuleEngine, TagRule, RulePattern, RuleScope, default_rules};
 pub use onnx::OnnxTagger;
