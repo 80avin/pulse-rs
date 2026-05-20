@@ -13,8 +13,9 @@ Pulse aggregates Hacker News, Reddit, and RSS feeds, then uses a hybrid on-devic
 
 ## Screenshots
 
-<!-- TODO: add screenshots -->
-*Main feed · Reader · Settings*
+| Feed | Reader | Sources | Manage AI |
+|---|---|---| --- |
+| [![](./docs/screenshots/01-feeds.png)](./docs/screenshots/01-feeds.png) | [![](./docs/screenshots/02-reader.png)](./docs/screenshots/02-reader.png) | [![](./docs/screenshots/03-sources.png)](./docs/screenshots/03-sources.png) | [![](./docs/screenshots/04-ai.png)](./docs/screenshots/04-ai.png) |
 
 ---
 
