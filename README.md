@@ -27,7 +27,7 @@ Pulse aggregates Hacker News, Reddit, and RSS feeds, then uses a hybrid on-devic
 - Full-text search across the entire database (SQLite FTS5)
 - og_image thumbnails, crosspost detection, score/comment metadata
 
-**AI filtering**
+**AI filtering** *(experimental)*
 - On-device only — nothing leaves your device
 - Hybrid pipeline: deterministic rules → FastText (9.6 MB, <1 ms/item) → MiniLM semantic classifier → CLIP vision tagger for image posts
 - Tags are *filters*, not categories — designed to let you exclude noise, not just label subjects
@@ -90,6 +90,8 @@ cargo build -p pulse-cli
 ---
 
 ## AI tagging
+
+> **Experimental.** The tagger is functional but accuracy varies by feed type and content. Tags may fire incorrectly, miss posts, or shift behaviour after model updates. If results look wrong, raise the confidence threshold in Settings or disable AI tagging entirely — the app works fine without it.
 
 The goal of the tagging system is **spam filtering**, not subject classification. Tags exist to answer the question: *"Is this the kind of post I want to see?"* — not *"What is this post about?"*
 

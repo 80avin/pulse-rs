@@ -116,7 +116,11 @@
 
 <!-- AI -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">ai tagging</div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+    <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">ai tagging</div>
+    <div style="font:8px/1 {T.mono};color:{T.amber};letter-spacing:0.5px;text-transform:uppercase;padding:2px 5px;border:1px solid {T.amber};border-radius:2px;opacity:0.8;">experimental</div>
+  </div>
+  <div style="margin-bottom:10px;font:9px/1.5 {T.mono};color:{T.ink3};">Tags may be inaccurate. Raise the confidence threshold or disable tagging if results look wrong.</div>
   <div style="display:flex;flex-direction:column;gap:10px;">
     <div style="display:flex;align-items:center;gap:8px;">
       <span style="flex:1;font:11px/1 {T.mono};color:{T.ink1};">AI tagging</span>

@@ -91,6 +91,12 @@
 </script>
 
 <div style="display:flex;flex-direction:column;gap:{gap};">
+  <!-- Experimental notice -->
+  <div style="padding:10px 12px;background:transparent;border:1px solid {T.amber};border-radius:4px;display:flex;align-items:flex-start;gap:8px;">
+    <span style="font:9px/1 {T.mono};color:{T.amber};letter-spacing:0.5px;text-transform:uppercase;padding:2px 5px;border:1px solid {T.amber};border-radius:2px;flex-shrink:0;margin-top:1px;">experimental</span>
+    <span style="font:10px/1.5 {T.mono};color:{T.ink2};">Tags may be inaccurate. Raise the confidence threshold in Settings or disable AI tagging if results look wrong.</span>
+  </div>
+
   <!-- Model status card -->
   <div style="padding:{sectionPad};background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
     <div style="font:{titleSize}/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">model status</div>
