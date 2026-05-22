@@ -273,14 +273,14 @@ fn detect_well_known(host: &str, path: &str, query: &str) -> Option<FeedCandidat
     }
 
     // ── Substack ───────────────────────────────────────────────────────────────
-    if let Some(subdomain) = host.strip_suffix(".substack.com") {
-        if !subdomain.is_empty() {
-            return Some(make(
-                format!("https://{host}/feed"),
-                format!("{subdomain} (Substack)"),
-                vec![],
-            ));
-        }
+    if let Some(subdomain) = host.strip_suffix(".substack.com")
+        && !subdomain.is_empty()
+    {
+        return Some(make(
+            format!("https://{host}/feed"),
+            format!("{subdomain} (Substack)"),
+            vec![],
+        ));
     }
 
     // ── Medium ─────────────────────────────────────────────────────────────────
@@ -300,14 +300,14 @@ fn detect_well_known(host: &str, path: &str, query: &str) -> Option<FeedCandidat
             .split('/')
             .filter(|s| !s.is_empty())
             .collect();
-        if let [pub_name] = parts.as_slice() {
-            if !pub_name.starts_with('@') {
-                return Some(make(
-                    format!("https://medium.com/feed/{pub_name}"),
-                    format!("{pub_name} (Medium)"),
-                    vec![],
-                ));
-            }
+        if let [pub_name] = parts.as_slice()
+            && !pub_name.starts_with('@')
+        {
+            return Some(make(
+                format!("https://medium.com/feed/{pub_name}"),
+                format!("{pub_name} (Medium)"),
+                vec![],
+            ));
         }
     }
 

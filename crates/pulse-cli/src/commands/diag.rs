@@ -34,7 +34,7 @@ pub async fn run(args: DiagArgs, core: &PulseCore, global_json: bool) -> anyhow:
                 return false;
             }
             let rate = (f.total_fetches - f.total_failures) as f64 / f.total_fetches as f64;
-            rate >= 0.5 && rate < 0.9
+            (0.5..0.9).contains(&rate)
         })
         .count();
     let failing_feeds = feeds
@@ -119,7 +119,7 @@ pub async fn run(args: DiagArgs, core: &PulseCore, global_json: bool) -> anyhow:
             let title = f.title.as_deref().unwrap_or(&f.url);
             let last = f
                 .last_fetched_at
-                .map(|ts| relative_time(ts))
+                .map(relative_time)
                 .unwrap_or_else(|| "never".to_string());
             println!(
                 "  {} ({}): {} failures — last attempt {} ago",

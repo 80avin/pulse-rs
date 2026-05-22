@@ -74,10 +74,10 @@ async fn cmd_run(args: SyncRunArgs, core: &PulseCore) -> anyhow::Result<()> {
     let mut total = 0usize;
     for feed in &targets {
         let title = feed.title.as_deref().unwrap_or(&feed.url);
-        if args.force {
-            if let Err(e) = core.clear_feed_cache(&feed.id).await {
-                eprintln!("warn: could not clear cache for '{}': {}", title, e);
-            }
+        if args.force
+            && let Err(e) = core.clear_feed_cache(&feed.id).await
+        {
+            eprintln!("warn: could not clear cache for '{}': {}", title, e);
         }
         eprint!("syncing '{}'...", title);
         match core.sync_feed(&feed.id).await {
@@ -155,7 +155,7 @@ async fn cmd_status(
             .unwrap_or_else(|| "-".to_string());
         let last = s
             .last_success_at
-            .map(|ts| relative_time(ts))
+            .map(relative_time)
             .unwrap_or_else(|| "never".to_string());
         println!(
             "{:<8}  {:<28}  {:<12}  {:<12}  {:<4}  {}",

@@ -326,7 +326,7 @@ async fn cmd_list(args: FeedListArgs, core: &PulseCore, global_json: bool) -> an
 
         let last_sync = f
             .last_success_at
-            .map(|ts| relative_time(ts))
+            .map(relative_time)
             .unwrap_or_else(|| "never".to_string());
 
         println!(
@@ -339,9 +339,8 @@ async fn cmd_list(args: FeedListArgs, core: &PulseCore, global_json: bool) -> an
 
 async fn cmd_show(args: FeedShowArgs, core: &PulseCore, global_json: bool) -> anyhow::Result<()> {
     let use_json = args.json || global_json;
-    let feed = core.get_feed(&args.id).await.map_err(|e| {
+    let feed = core.get_feed(&args.id).await.inspect_err(|_e| {
         print_error(&format!("feed not found: {}", args.id));
-        e
     })?;
 
     if use_json {
@@ -403,9 +402,8 @@ async fn cmd_remove(args: FeedRemoveArgs, core: &PulseCore) -> anyhow::Result<()
 }
 
 async fn cmd_enable(args: FeedIdArgs, core: &PulseCore, enabled: bool) -> anyhow::Result<()> {
-    let mut feed = core.get_feed(&args.id).await.map_err(|e| {
+    let mut feed = core.get_feed(&args.id).await.inspect_err(|_e| {
         print_error(&format!("feed not found: {}", args.id));
-        e
     })?;
     feed.is_enabled = enabled;
     feed.updated_at = chrono::Utc::now().timestamp();
@@ -419,9 +417,8 @@ async fn cmd_enable(args: FeedIdArgs, core: &PulseCore, enabled: bool) -> anyhow
 }
 
 async fn cmd_edit(args: FeedEditArgs, core: &PulseCore) -> anyhow::Result<()> {
-    let mut feed = core.get_feed(&args.id).await.map_err(|e| {
+    let mut feed = core.get_feed(&args.id).await.inspect_err(|_e| {
         print_error(&format!("feed not found: {}", args.id));
-        e
     })?;
 
     if let Some(url) = args.url {
@@ -461,9 +458,8 @@ async fn cmd_health(
     let use_json = args.json || global_json;
 
     let feeds = if let Some(ref id) = args.id {
-        vec![core.get_feed(id).await.map_err(|e| {
+        vec![core.get_feed(id).await.inspect_err(|_e| {
             print_error(&format!("feed not found: {id}"));
-            e
         })?]
     } else {
         core.get_feeds().await?
@@ -514,7 +510,7 @@ async fn cmd_health(
             .unwrap_or_else(|| "-".to_string());
         let last = h
             .last_success_at
-            .map(|ts| relative_time(ts))
+            .map(relative_time)
             .unwrap_or_else(|| "never".to_string());
         println!(
             "{:<8}  {:<28}  {:<10}  {:<12}  {:<14}  {}",

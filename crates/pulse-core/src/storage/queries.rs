@@ -71,7 +71,7 @@ pub async fn get_feeds(pool: &SqlitePool) -> Result<Vec<Feed>, StorageError> {
     .await
     .map_err(StorageError::Sqlite)?;
 
-    rows.iter().map(|row| row_to_feed(row)).collect()
+    rows.iter().map(row_to_feed).collect()
 }
 
 /// Fetch a single feed by ID
@@ -377,7 +377,7 @@ pub async fn search_items(
     .await
     .map_err(StorageError::Sqlite)?;
 
-    rows.iter().map(|row| row_to_feed_item_view(row)).collect()
+    rows.iter().map(row_to_feed_item_view).collect()
 }
 
 /// Get all AI tags for an item

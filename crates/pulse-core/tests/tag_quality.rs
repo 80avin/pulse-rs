@@ -50,10 +50,10 @@ fn run_rules(engine: &RuleEngine, item: &FeedItem, feed_type: &FeedType) -> Vec<
         .into_iter()
         .map(|t| t.tag)
         .collect();
-    if let Some(low) = evaluate_low_effort(item, feed_type) {
-        if !tags.contains(&low.tag) {
-            tags.push(low.tag);
-        }
+    if let Some(low) = evaluate_low_effort(item, feed_type)
+        && !tags.contains(&low.tag)
+    {
+        tags.push(low.tag);
     }
     tags
 }

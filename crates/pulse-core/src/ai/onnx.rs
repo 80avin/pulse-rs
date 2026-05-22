@@ -325,7 +325,7 @@ fn run_nli(
         .try_extract_tensor::<f32>()
         .map_err(|e| TaggingError::Onnx(e.to_string()))?;
 
-    let logits: Vec<f32> = logits.iter().copied().collect();
+    let logits: Vec<f32> = logits.to_vec();
     if logits.len() < 3 {
         return Err(TaggingError::Onnx(format!(
             "expected 3 NLI logits, got {}; check model is an NLI cross-encoder",
@@ -341,10 +341,10 @@ fn run_nli(
 ///
 /// Two terms combined:
 /// - s3 = softmax([all logits])[entailment]  — the "safety valve": stays near 0 when the
-///         model outputs high neutral probability (uncertain or non-English text), preventing
-///         random-looking logits from producing false high scores.
+///   model outputs high neutral probability (uncertain or non-English text), preventing
+///   random-looking logits from producing false high scores.
 /// - s2 = exp(entailment) / (exp(entailment) + exp(contradiction))  — the "signal amplifier":
-///         boosts genuine entailment that 3-class softmax would suppress due to neutral mass.
+///   boosts genuine entailment that 3-class softmax would suppress due to neutral mass.
 ///
 /// Geometric mean (√(s3 × s2)) requires BOTH to be nonzero, which separates:
 /// - Genuine entailment: s3 ≈ 0.03–0.15 and s2 ≈ 0.85–0.99 → score ≈ 0.16–0.39

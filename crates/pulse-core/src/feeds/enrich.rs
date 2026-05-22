@@ -123,10 +123,8 @@ fn parse_meta(html: &str) -> EnrichmentResult {
             match prop {
                 "og:title" => r.og_title = Some(content.to_string()),
                 "og:description" => r.og_description = Some(content.to_string()),
-                "og:image" => {
-                    if r.og_image.is_none() {
-                        r.og_image = Some(content.to_string());
-                    }
+                "og:image" if r.og_image.is_none() => {
+                    r.og_image = Some(content.to_string());
                 }
                 "og:image:url" => r.og_image = Some(content.to_string()), // overrides og:image if more specific
                 "og:site_name" => r.og_site_name = Some(content.to_string()),
@@ -146,25 +144,17 @@ fn parse_meta(html: &str) -> EnrichmentResult {
                 continue;
             }
             match name {
-                "twitter:title" => {
-                    if r.og_title.is_none() {
-                        r.og_title = Some(content.to_string());
-                    }
+                "twitter:title" if r.og_title.is_none() => {
+                    r.og_title = Some(content.to_string());
                 }
-                "twitter:description" => {
-                    if r.og_description.is_none() {
-                        r.og_description = Some(content.to_string());
-                    }
+                "twitter:description" if r.og_description.is_none() => {
+                    r.og_description = Some(content.to_string());
                 }
-                "twitter:image" | "twitter:image:src" => {
-                    if r.og_image.is_none() {
-                        r.og_image = Some(content.to_string());
-                    }
+                "twitter:image" | "twitter:image:src" if r.og_image.is_none() => {
+                    r.og_image = Some(content.to_string());
                 }
-                "description" => {
-                    if r.og_description.is_none() {
-                        r.og_description = Some(content.to_string());
-                    }
+                "description" if r.og_description.is_none() => {
+                    r.og_description = Some(content.to_string());
                 }
                 _ => {}
             }
@@ -172,16 +162,14 @@ fn parse_meta(html: &str) -> EnrichmentResult {
     }
 
     // <link rel="canonical" href="...">
-    if r.canonical_url.is_none() {
-        if let Ok(sel) = Selector::parse(r#"link[rel="canonical"]"#) {
-            if let Some(el) = doc.select(&sel).next() {
-                if let Some(href) = el.value().attr("href") {
-                    let href = href.trim();
-                    if !href.is_empty() {
-                        r.canonical_url = Some(href.to_string());
-                    }
-                }
-            }
+    if r.canonical_url.is_none()
+        && let Ok(sel) = Selector::parse(r#"link[rel="canonical"]"#)
+        && let Some(el) = doc.select(&sel).next()
+        && let Some(href) = el.value().attr("href")
+    {
+        let href = href.trim();
+        if !href.is_empty() {
+            r.canonical_url = Some(href.to_string());
         }
     }
 

@@ -40,15 +40,15 @@ fn extract_bundled_models(data_dir: &std::path::Path) {
     let ft_dir = data_dir.join("models").join("fasttext-v2");
     let version_file = ft_dir.join("version");
     let installed_version = std::fs::read_to_string(&version_file).unwrap_or_default();
-    if installed_version.trim() != BUNDLED_FASTTEXT_VERSION {
-        if std::fs::create_dir_all(&ft_dir).is_ok() {
-            let _ = std::fs::write(ft_dir.join("fasttext.pftm"), BUNDLED_FASTTEXT_PFTM);
-            let _ = std::fs::write(
-                ft_dir.join("fasttext_thresholds.json"),
-                BUNDLED_FASTTEXT_THRESHOLDS,
-            );
-            let _ = std::fs::write(&version_file, BUNDLED_FASTTEXT_VERSION);
-        }
+    if installed_version.trim() != BUNDLED_FASTTEXT_VERSION
+        && std::fs::create_dir_all(&ft_dir).is_ok()
+    {
+        let _ = std::fs::write(ft_dir.join("fasttext.pftm"), BUNDLED_FASTTEXT_PFTM);
+        let _ = std::fs::write(
+            ft_dir.join("fasttext_thresholds.json"),
+            BUNDLED_FASTTEXT_THRESHOLDS,
+        );
+        let _ = std::fs::write(&version_file, BUNDLED_FASTTEXT_VERSION);
     }
     // Write the active-model pointer if not already configured.
     let ft_ptr = data_dir.join("active_fasttext_model");

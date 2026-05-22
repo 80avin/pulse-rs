@@ -41,15 +41,15 @@ struct VisionPreprocessing {
 impl VisionPreprocessing {
     fn from_model_dir(model_dir: &Path) -> Self {
         let config_path = model_dir.join("preprocessor_config.json");
-        if let Ok(data) = std::fs::read_to_string(&config_path) {
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&data) {
-                let size = v["crop_size"]["height"].as_u64().unwrap_or(224) as usize;
-                let normalize = v["do_normalize"].as_bool().unwrap_or(true);
-                return Self {
-                    image_size: size,
-                    normalize,
-                };
-            }
+        if let Ok(data) = std::fs::read_to_string(&config_path)
+            && let Ok(v) = serde_json::from_str::<serde_json::Value>(&data)
+        {
+            let size = v["crop_size"]["height"].as_u64().unwrap_or(224) as usize;
+            let normalize = v["do_normalize"].as_bool().unwrap_or(true);
+            return Self {
+                image_size: size,
+                normalize,
+            };
         }
         // No preprocessor_config.json → assume CLIP ViT-B/32 defaults
         Self {

@@ -218,7 +218,7 @@ fn normalize_reddit_post(
         .selftext
         .as_deref()
         .filter(|s| !s.is_empty() && *s != "null")
-        .map(|s| collapse_whitespace(s))
+        .map(collapse_whitespace)
         .or_else(|| own_body_html.as_deref().map(strip_html));
 
     // Resolve crosspost chain (take first parent)
@@ -237,7 +237,7 @@ fn normalize_reddit_post(
             .selftext
             .as_deref()
             .filter(|s| !s.is_empty() && *s != "null")
-            .map(|s| collapse_whitespace(s))
+            .map(collapse_whitespace)
             .or_else(|| cp_body_html.as_deref().map(strip_html));
 
         // Merge own + parent body

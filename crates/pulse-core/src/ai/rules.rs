@@ -134,10 +134,7 @@ impl TagRule {
                 }
             });
 
-            match first_match {
-                Some(m) => m,
-                None => return None,
-            }
+            first_match?
         };
 
         let explanation = self

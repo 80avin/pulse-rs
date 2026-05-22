@@ -158,11 +158,11 @@ fn normalize_rss_entry(
         .content
         .as_ref()
         .and_then(|c| c.body.as_ref())
-        .map(|s| s.clone())
+        .cloned()
         .or_else(|| entry.summary.as_ref().map(|s| s.content.clone()));
 
     // body_text: strip HTML from body_html or summary
-    let body_text = body_html.as_deref().map(|h| strip_html(h));
+    let body_text = body_html.as_deref().map(strip_html);
 
     let word_count = body_text.as_deref().map(|t| count_words(t) as i64);
 

@@ -35,10 +35,10 @@ impl RedditAuth {
     pub async fn token(&self, http: &Client) -> Result<String, FeedError> {
         let mut guard = self.cached.lock().await;
 
-        if let Some((ref token, fetched_at)) = *guard {
-            if fetched_at.elapsed() < TOKEN_LIFETIME {
-                return Ok(token.clone());
-            }
+        if let Some((ref token, fetched_at)) = *guard
+            && fetched_at.elapsed() < TOKEN_LIFETIME
+        {
+            return Ok(token.clone());
         }
 
         let resp = http

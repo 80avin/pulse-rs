@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 /// Which text classification backend is active
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum TextBackend {
     /// DeBERTa NLI cross-encoder (legacy)
     Nli,
@@ -10,13 +10,8 @@ pub enum TextBackend {
     /// MiniLM ONNX embedding + MLP classifier head (24MB)
     MiniMl,
     /// FastText primary; MiniLM for semantic categories (default)
+    #[default]
     HybridFastTextMiniMl,
-}
-
-impl Default for TextBackend {
-    fn default() -> Self {
-        Self::HybridFastTextMiniMl
-    }
 }
 
 /// Application configuration
@@ -126,10 +121,10 @@ pub fn platform_data_dir() -> PathBuf {
     #[cfg(not(any(target_os = "android", target_os = "windows")))]
     {
         // Linux / macOS: XDG_DATA_HOME or ~/.local/share
-        if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
-            if !xdg.is_empty() {
-                return PathBuf::from(xdg).join("pulse");
-            }
+        if let Ok(xdg) = std::env::var("XDG_DATA_HOME")
+            && !xdg.is_empty()
+        {
+            return PathBuf::from(xdg).join("pulse");
         }
 
         let home = std::env::var("HOME")

@@ -255,15 +255,11 @@ impl MiniMlTaggerInner {
         let (_, tensor_data) = outputs["last_hidden_state"]
             .try_extract_tensor::<f32>()
             .map_err(|e| TaggingError::Onnx(e.to_string()))?;
-        let hidden: Vec<f32> = tensor_data.iter().copied().collect();
+        let hidden: Vec<f32> = tensor_data.to_vec();
 
         // hidden has seq_len * embed_dim elements.
         // Infer embed_dim from the total size.
-        let embed_dim = if seq_len > 0 {
-            hidden.len() / seq_len
-        } else {
-            0
-        };
+        let embed_dim = hidden.len().checked_div(seq_len).unwrap_or(0);
         if embed_dim == 0 {
             return Err(TaggingError::Onnx(
                 "last_hidden_state has zero elements".into(),
@@ -273,8 +269,8 @@ impl MiniMlTaggerInner {
         // Mean pooling over attended positions (mask[i] == 1).
         let mut embedding = vec![0.0f32; embed_dim];
         let mut count = 0u32;
-        for i in 0..seq_len {
-            if mask[i] == 1 {
+        for (i, &m) in mask.iter().take(seq_len).enumerate() {
+            if m == 1 {
                 let offset = i * embed_dim;
                 for j in 0..embed_dim {
                     embedding[j] += hidden[offset + j];

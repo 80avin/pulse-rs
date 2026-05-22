@@ -178,9 +178,8 @@ async fn cmd_add_feed(args: GroupAddFeedArgs, core: &PulseCore) -> anyhow::Resul
         }
     };
 
-    let mut feed = core.get_feed(&args.feed_id).await.map_err(|e| {
+    let mut feed = core.get_feed(&args.feed_id).await.inspect_err(|_e| {
         print_error(&format!("feed not found: {}", args.feed_id));
-        e
     })?;
 
     feed.group_id = Some(group.id.clone());

@@ -187,7 +187,7 @@ async fn fetch_hn_item(
     let published_at = hn_item.time.unwrap_or(fetched_at);
 
     let body_html = hn_item.text.as_deref().map(|t| t.to_string());
-    let body_text = body_html.as_deref().map(|h| strip_html(h));
+    let body_text = body_html.as_deref().map(strip_html);
     let word_count = body_text.as_deref().map(|t| count_words(t) as i64);
 
     let item_type = hn_item.item_type.unwrap_or_else(|| "story".to_string());

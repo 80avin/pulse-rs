@@ -411,12 +411,12 @@ impl PulseCore {
 
             // Re-queue for tagging if og_image was acquired — the vision tagger
             // needs the image URL which wasn't available at initial sync time.
-            if let Some(ref img) = result.og_image {
-                if !img.is_empty() {
-                    self.tagger
-                        .tag_item(result.item_id.clone(), FeedType::Rss)
-                        .await;
-                }
+            if let Some(ref img) = result.og_image
+                && !img.is_empty()
+            {
+                self.tagger
+                    .tag_item(result.item_id.clone(), FeedType::Rss)
+                    .await;
             }
         }
 
