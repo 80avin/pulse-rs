@@ -58,7 +58,10 @@ async fn cmd_run(args: SyncRunArgs, core: &PulseCore) -> anyhow::Result<()> {
 
     let feeds = core.get_feeds().await?;
     let targets: Vec<_> = if let Some(ref fid) = args.feed {
-        feeds.iter().filter(|f| f.id == *fid || f.id.starts_with(fid.as_str())).collect()
+        feeds
+            .iter()
+            .filter(|f| f.id == *fid || f.id.starts_with(fid.as_str()))
+            .collect()
     } else {
         feeds.iter().filter(|f| f.is_enabled).collect()
     };
@@ -102,18 +105,25 @@ struct SyncStatus {
     is_enabled: bool,
 }
 
-async fn cmd_status(args: SyncStatusArgs, core: &PulseCore, global_json: bool) -> anyhow::Result<()> {
+async fn cmd_status(
+    args: SyncStatusArgs,
+    core: &PulseCore,
+    global_json: bool,
+) -> anyhow::Result<()> {
     let use_json = args.json || global_json;
     let feeds = core.get_feeds().await?;
 
-    let statuses: Vec<SyncStatus> = feeds.iter().map(|f| SyncStatus {
-        id: f.id[..f.id.len().min(8)].to_string(),
-        title: f.title.clone(),
-        next_fetch_at: f.next_fetch_at,
-        last_success_at: f.last_success_at,
-        failure_streak: f.failure_streak,
-        is_enabled: f.is_enabled,
-    }).collect();
+    let statuses: Vec<SyncStatus> = feeds
+        .iter()
+        .map(|f| SyncStatus {
+            id: f.id[..f.id.len().min(8)].to_string(),
+            title: f.title.clone(),
+            next_fetch_at: f.next_fetch_at,
+            last_success_at: f.last_success_at,
+            failure_streak: f.failure_streak,
+            is_enabled: f.is_enabled,
+        })
+        .collect();
 
     if use_json {
         print_json(&statuses);
@@ -121,19 +131,41 @@ async fn cmd_status(args: SyncStatusArgs, core: &PulseCore, global_json: bool) -
     }
 
     let now = chrono::Utc::now().timestamp();
-    println!("{:<8}  {:<28}  {:<12}  {:<12}  {:<4}  {}",
-        "ID", "TITLE", "NEXT_SYNC", "LAST_SUCCESS", "FAIL", "ENABLED");
+    println!(
+        "{:<8}  {:<28}  {:<12}  {:<12}  {:<4}  {}",
+        "ID", "TITLE", "NEXT_SYNC", "LAST_SUCCESS", "FAIL", "ENABLED"
+    );
     for s in &statuses {
         let title = s.title.as_deref().unwrap_or("-");
-        let title_trunc = if title.len() > 28 { &title[..28] } else { title };
-        let next = s.next_fetch_at.map(|ts| {
-            let secs = ts - now;
-            if secs <= 0 { "now".to_string() } else { format!("in {}s", secs) }
-        }).unwrap_or_else(|| "-".to_string());
-        let last = s.last_success_at.map(|ts| relative_time(ts)).unwrap_or_else(|| "never".to_string());
-        println!("{:<8}  {:<28}  {:<12}  {:<12}  {:<4}  {}",
-            s.id, title_trunc, next, last, s.failure_streak,
-            if s.is_enabled { "yes" } else { "no" });
+        let title_trunc = if title.len() > 28 {
+            &title[..28]
+        } else {
+            title
+        };
+        let next = s
+            .next_fetch_at
+            .map(|ts| {
+                let secs = ts - now;
+                if secs <= 0 {
+                    "now".to_string()
+                } else {
+                    format!("in {}s", secs)
+                }
+            })
+            .unwrap_or_else(|| "-".to_string());
+        let last = s
+            .last_success_at
+            .map(|ts| relative_time(ts))
+            .unwrap_or_else(|| "never".to_string());
+        println!(
+            "{:<8}  {:<28}  {:<12}  {:<12}  {:<4}  {}",
+            s.id,
+            title_trunc,
+            next,
+            last,
+            s.failure_streak,
+            if s.is_enabled { "yes" } else { "no" }
+        );
     }
     Ok(())
 }

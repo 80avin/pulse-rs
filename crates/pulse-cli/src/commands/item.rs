@@ -1,7 +1,10 @@
 use clap::{Args, Subcommand};
-use pulse_core::{PulseCore, types::{ItemStatePatch, TimelineFilter, TimelineCursor}};
+use pulse_core::{
+    PulseCore,
+    types::{ItemStatePatch, TimelineCursor, TimelineFilter},
+};
 
-use crate::output::{print_json, print_error, relative_time};
+use crate::output::{print_error, print_json, relative_time};
 
 #[derive(Debug, Args)]
 pub struct ItemArgs {
@@ -70,12 +73,78 @@ pub struct ItemTagsShowArgs {
 pub async fn run(args: ItemArgs, core: &PulseCore, global_json: bool) -> anyhow::Result<()> {
     match args.command {
         ItemCommand::Show(a) => cmd_show(a, core, global_json).await,
-        ItemCommand::Read(a) => cmd_set_state(a.id, core, ItemStatePatch { is_read: Some(true), ..Default::default() }, "marked read").await,
-        ItemCommand::Unread(a) => cmd_set_state(a.id, core, ItemStatePatch { is_read: Some(false), ..Default::default() }, "marked unread").await,
-        ItemCommand::Save(a) => cmd_set_state(a.id, core, ItemStatePatch { is_saved: Some(true), ..Default::default() }, "saved").await,
-        ItemCommand::Unsave(a) => cmd_set_state(a.id, core, ItemStatePatch { is_saved: Some(false), ..Default::default() }, "unsaved").await,
-        ItemCommand::Hide(a) => cmd_set_state(a.id, core, ItemStatePatch { is_hidden: Some(true), ..Default::default() }, "hidden").await,
-        ItemCommand::Unhide(a) => cmd_set_state(a.id, core, ItemStatePatch { is_hidden: Some(false), ..Default::default() }, "unhidden").await,
+        ItemCommand::Read(a) => {
+            cmd_set_state(
+                a.id,
+                core,
+                ItemStatePatch {
+                    is_read: Some(true),
+                    ..Default::default()
+                },
+                "marked read",
+            )
+            .await
+        }
+        ItemCommand::Unread(a) => {
+            cmd_set_state(
+                a.id,
+                core,
+                ItemStatePatch {
+                    is_read: Some(false),
+                    ..Default::default()
+                },
+                "marked unread",
+            )
+            .await
+        }
+        ItemCommand::Save(a) => {
+            cmd_set_state(
+                a.id,
+                core,
+                ItemStatePatch {
+                    is_saved: Some(true),
+                    ..Default::default()
+                },
+                "saved",
+            )
+            .await
+        }
+        ItemCommand::Unsave(a) => {
+            cmd_set_state(
+                a.id,
+                core,
+                ItemStatePatch {
+                    is_saved: Some(false),
+                    ..Default::default()
+                },
+                "unsaved",
+            )
+            .await
+        }
+        ItemCommand::Hide(a) => {
+            cmd_set_state(
+                a.id,
+                core,
+                ItemStatePatch {
+                    is_hidden: Some(true),
+                    ..Default::default()
+                },
+                "hidden",
+            )
+            .await
+        }
+        ItemCommand::Unhide(a) => {
+            cmd_set_state(
+                a.id,
+                core,
+                ItemStatePatch {
+                    is_hidden: Some(false),
+                    ..Default::default()
+                },
+                "unhidden",
+            )
+            .await
+        }
         ItemCommand::Tags(a) => cmd_tags(a, core, global_json).await,
         ItemCommand::Open(a) => cmd_open(a).await,
     }
@@ -87,21 +156,26 @@ async fn cmd_show(args: ItemShowArgs, core: &PulseCore, global_json: bool) -> an
     // Fetch via timeline with a filter by looking up item by ID
     // Since PulseCore doesn't expose a direct get_item_view, we search via timeline
     // and match by ID prefix/full match
-    let page = core.get_timeline_page(
-        TimelineFilter {
-            is_read: None,
-            is_saved: None,
-            ..Default::default()
-        },
-        Some(TimelineCursor {
-            published_at: i64::MAX,
-            id: "\u{FFFF}".repeat(40),
-        }),
-        1000,
-    ).await?;
+    let page = core
+        .get_timeline_page(
+            TimelineFilter {
+                is_read: None,
+                is_saved: None,
+                ..Default::default()
+            },
+            Some(TimelineCursor {
+                published_at: i64::MAX,
+                id: "\u{FFFF}".repeat(40),
+            }),
+            1000,
+        )
+        .await?;
 
     // Try exact match first, then prefix match
-    let item = page.items.iter().find(|i| i.id == args.id)
+    let item = page
+        .items
+        .iter()
+        .find(|i| i.id == args.id)
         .or_else(|| page.items.iter().find(|i| i.id.starts_with(&args.id)));
 
     let item = match item {
@@ -122,12 +196,20 @@ async fn cmd_show(args: ItemShowArgs, core: &PulseCore, global_json: bool) -> an
 
     // Human display
     println!("Title:      {}", item.title);
-    println!("Feed:       {} ({})", item.feed_title.as_deref().unwrap_or("-"), item.feed_type);
+    println!(
+        "Feed:       {} ({})",
+        item.feed_title.as_deref().unwrap_or("-"),
+        item.feed_type
+    );
     println!("URL:        {}", item.url.as_deref().unwrap_or("-"));
     let published_fmt = chrono::DateTime::from_timestamp(item.published_at, 0)
         .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
         .unwrap_or_else(|| "-".to_string());
-    println!("Published:  {} ({} ago)", published_fmt, relative_time(item.published_at));
+    println!(
+        "Published:  {} ({} ago)",
+        published_fmt,
+        relative_time(item.published_at)
+    );
     if let Some(score) = item.score {
         println!("Score:      {}", score);
     } else {
@@ -142,13 +224,24 @@ async fn cmd_show(args: ItemShowArgs, core: &PulseCore, global_json: bool) -> an
         let read_min = (wc as f64 / 200.0).ceil() as i64;
         println!("Word count: ~{} words (~{} min read)", wc, read_min);
     }
-    let state = if item.is_saved { "saved" } else if item.is_hidden { "hidden" } else if item.is_read { "read" } else { "unread" };
+    let state = if item.is_saved {
+        "saved"
+    } else if item.is_hidden {
+        "hidden"
+    } else if item.is_read {
+        "read"
+    } else {
+        "unread"
+    };
     println!("State:      {}", state);
 
     if !tags.is_empty() {
         println!("\nAI Tags:");
         for tag in &tags {
-            println!("  {:<12}  ({:.2})  \"{}\"", tag.tag, tag.confidence, tag.explanation);
+            println!(
+                "  {:<12}  ({:.2})  \"{}\"",
+                tag.tag, tag.confidence, tag.explanation
+            );
         }
     } else {
         println!("\nAI Tags:    (none)");
@@ -199,8 +292,13 @@ async fn cmd_tags(args: ItemTagsArgs, core: &PulseCore, global_json: bool) -> an
                 return Ok(());
             }
             for tag in &tags {
-                println!("{:<12}  {:.2}  {}  \"{}\"",
-                    tag.tag, tag.confidence, tag.tagger_source.as_str(), tag.explanation);
+                println!(
+                    "{:<12}  {:.2}  {}  \"{}\"",
+                    tag.tag,
+                    tag.confidence,
+                    tag.tagger_source.as_str(),
+                    tag.explanation
+                );
             }
         }
     }

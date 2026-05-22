@@ -1,19 +1,26 @@
+#[cfg(feature = "ai-onnx")]
+use super::labels::tag_labels;
+use crate::error::TaggingError;
+#[cfg(feature = "ai-onnx")]
+use crate::types::TaggerSource;
+use crate::types::{FeedItem, FeedType, TagResult};
 use std::path::Path;
 #[cfg(feature = "ai-onnx")]
 use std::path::PathBuf;
-use crate::error::TaggingError;
-use crate::types::{FeedItem, FeedType, TagResult};
-#[cfg(feature = "ai-onnx")]
-use crate::types::TaggerSource;
-#[cfg(feature = "ai-onnx")]
-use super::labels::tag_labels;
 
 #[cfg(feature = "ai-onnx")]
 const MAX_SEQ_LEN: usize = 512;
 
 // ── Structural tags handled by rules regardless of model ──────────────────────
 // Pattern-based (title prefix, URL domain) — NLI cross-encoder is overkill here.
-const RULE_ONLY_TAGS: &[&str] = &["show-hn", "ask-hn", "paywall", "video", "job-posting", "low-effort"];
+const RULE_ONLY_TAGS: &[&str] = &[
+    "show-hn",
+    "ask-hn",
+    "paywall",
+    "video",
+    "job-posting",
+    "low-effort",
+];
 
 #[cfg(feature = "ai-onnx")]
 struct NliIndices {
@@ -60,7 +67,11 @@ impl OnnxTagger {
 
     /// Classify an item via NLI. Returns semantic tags only; structural tags
     /// (show-hn, paywall, etc.) are handled by the rule engine separately.
-    pub fn classify(&self, item: &FeedItem, feed_type: &FeedType) -> Result<Vec<TagResult>, TaggingError> {
+    pub fn classify(
+        &self,
+        item: &FeedItem,
+        feed_type: &FeedType,
+    ) -> Result<Vec<TagResult>, TaggingError> {
         #[cfg(feature = "ai-onnx")]
         {
             self.inner.classify(item, feed_type)
@@ -103,8 +114,7 @@ struct OnnxTaggerInner {
 #[cfg(feature = "ai-onnx")]
 impl OnnxTaggerInner {
     fn load(model_dir: &Path) -> Result<Self, TaggingError> {
-        let model_path = resolve_model_path(model_dir)
-            .ok_or(TaggingError::ModelNotLoaded)?;
+        let model_path = resolve_model_path(model_dir).ok_or(TaggingError::ModelNotLoaded)?;
         let tokenizer_path = model_dir.join("tokenizer.json");
 
         tracing::info!(path = %model_path.display(), "Loading NLI cross-encoder");
@@ -116,7 +126,9 @@ impl OnnxTaggerInner {
             .commit_from_file(&model_path)
             .map_err(|e| TaggingError::Onnx(e.to_string()))?;
 
-        let has_token_type_ids = session.inputs().iter()
+        let has_token_type_ids = session
+            .inputs()
+            .iter()
             .any(|i| i.name() == "token_type_ids");
 
         let output_names: Vec<&str> = session.outputs().iter().map(|o| o.name()).collect();
@@ -126,7 +138,11 @@ impl OnnxTaggerInner {
             .map_err(|e| TaggingError::Tokenizer(e.to_string()))?;
 
         let nli = detect_nli_indices(&model_dir.join("config.json"));
-        tracing::info!(entailment = nli.entailment, contradiction = nli.contradiction, "NLI class indices");
+        tracing::info!(
+            entailment = nli.entailment,
+            contradiction = nli.contradiction,
+            "NLI class indices"
+        );
 
         let labels: Vec<(String, String, f32)> = tag_labels()
             .iter()
@@ -145,7 +161,11 @@ impl OnnxTaggerInner {
         })
     }
 
-    fn classify(&self, item: &FeedItem, _feed_type: &FeedType) -> Result<Vec<TagResult>, TaggingError> {
+    fn classify(
+        &self,
+        item: &FeedItem,
+        _feed_type: &FeedType,
+    ) -> Result<Vec<TagResult>, TaggingError> {
         let title = item.title.as_str();
         let body = item.body_text.as_deref().unwrap_or("");
         // Use title only for NLI: body text dilutes scores and introduces noise.
@@ -175,7 +195,9 @@ impl OnnxTaggerInner {
 
         let _ = body; // body retained in struct for future per-feed-type use
 
-        let mut session = self.session.lock()
+        let mut session = self
+            .session
+            .lock()
             .map_err(|_| TaggingError::Onnx("session mutex poisoned".into()))?;
 
         let mut results = Vec::new();
@@ -203,7 +225,9 @@ impl OnnxTaggerInner {
     }
 
     fn similarities(&self, text: &str) -> Result<Vec<(String, f32)>, TaggingError> {
-        let mut session = self.session.lock()
+        let mut session = self
+            .session
+            .lock()
             .map_err(|_| TaggingError::Onnx("session mutex poisoned".into()))?;
 
         let mut sims: Vec<(String, f32)> = Vec::with_capacity(self.labels.len());
@@ -244,16 +268,25 @@ fn run_nli(
 ) -> Result<f32, TaggingError> {
     use tokenizers::{EncodeInput, InputSequence};
 
-    let encoding = tokenizer.encode(
-        EncodeInput::Dual(
-            InputSequence::from(text),
-            InputSequence::from(hypothesis),
-        ),
-        true,
-    ).map_err(|e| TaggingError::Tokenizer(e.to_string()))?;
+    let encoding = tokenizer
+        .encode(
+            EncodeInput::Dual(InputSequence::from(text), InputSequence::from(hypothesis)),
+            true,
+        )
+        .map_err(|e| TaggingError::Tokenizer(e.to_string()))?;
 
-    let ids: Vec<i64> = encoding.get_ids().iter().take(MAX_SEQ_LEN).map(|&x| x as i64).collect();
-    let mask: Vec<i64> = encoding.get_attention_mask().iter().take(MAX_SEQ_LEN).map(|&x| x as i64).collect();
+    let ids: Vec<i64> = encoding
+        .get_ids()
+        .iter()
+        .take(MAX_SEQ_LEN)
+        .map(|&x| x as i64)
+        .collect();
+    let mask: Vec<i64> = encoding
+        .get_attention_mask()
+        .iter()
+        .take(MAX_SEQ_LEN)
+        .map(|&x| x as i64)
+        .collect();
     let seq_len = ids.len();
 
     let id_tensor = ort::value::TensorRef::from_array_view(([1usize, seq_len], &ids[..]))
@@ -263,19 +296,29 @@ fn run_nli(
 
     let outputs = if has_token_type_ids {
         // Use actual segment ids from the tokenizer (0=premise, 1=hypothesis)
-        let type_ids: Vec<i64> = encoding.get_type_ids().iter().take(MAX_SEQ_LEN).map(|&x| x as i64).collect();
-        let type_tensor = ort::value::TensorRef::from_array_view(([1usize, seq_len], &type_ids[..]))
-            .map_err(|e| TaggingError::Onnx(e.to_string()))?;
-        session.run(ort::inputs![
-            "input_ids" => id_tensor,
-            "attention_mask" => mask_tensor,
-            "token_type_ids" => type_tensor,
-        ]).map_err(|e| TaggingError::Onnx(e.to_string()))?
+        let type_ids: Vec<i64> = encoding
+            .get_type_ids()
+            .iter()
+            .take(MAX_SEQ_LEN)
+            .map(|&x| x as i64)
+            .collect();
+        let type_tensor =
+            ort::value::TensorRef::from_array_view(([1usize, seq_len], &type_ids[..]))
+                .map_err(|e| TaggingError::Onnx(e.to_string()))?;
+        session
+            .run(ort::inputs![
+                "input_ids" => id_tensor,
+                "attention_mask" => mask_tensor,
+                "token_type_ids" => type_tensor,
+            ])
+            .map_err(|e| TaggingError::Onnx(e.to_string()))?
     } else {
-        session.run(ort::inputs![
-            "input_ids" => id_tensor,
-            "attention_mask" => mask_tensor,
-        ]).map_err(|e| TaggingError::Onnx(e.to_string()))?
+        session
+            .run(ort::inputs![
+                "input_ids" => id_tensor,
+                "attention_mask" => mask_tensor,
+            ])
+            .map_err(|e| TaggingError::Onnx(e.to_string()))?
     };
 
     let (_, logits) = outputs["logits"]
@@ -345,15 +388,21 @@ fn detect_nli_indices(config_path: &Path) -> NliIndices {
         for (k, label) in id2label {
             let idx: usize = k.parse().ok()?;
             match label.as_str()?.to_ascii_lowercase().as_str() {
-                "entailment"    => entailment    = Some(idx),
+                "entailment" => entailment = Some(idx),
                 "contradiction" => contradiction = Some(idx),
                 _ => {}
             }
         }
-        Some(NliIndices { entailment: entailment?, contradiction: contradiction? })
+        Some(NliIndices {
+            entailment: entailment?,
+            contradiction: contradiction?,
+        })
     };
     // Fallback: Xenova/nli-deberta-v3 models use [contradiction=0, entailment=1, neutral=2].
-    try_detect().unwrap_or(NliIndices { entailment: 1, contradiction: 0 })
+    try_detect().unwrap_or(NliIndices {
+        entailment: 1,
+        contradiction: 0,
+    })
 }
 
 /// Detect transliterated Hindi/Urdu written in Latin (Roman) script.
@@ -370,16 +419,14 @@ fn detect_nli_indices(config_path: &Path) -> NliIndices {
 fn is_transliterated_indic(text: &str) -> bool {
     const MARKERS: &[&str] = &[
         // Hindi/Urdu grammatical particles (postpositions, conjunctions)
-        "ka", "ki", "ke", "ko", "se", "mein", "hai", "hain",
-        "nahi", "nahin", "koi", "kya", "aur", "lekin", "par",
-        // Common pronouns / address forms
+        "ka", "ki", "ke", "ko", "se", "mein", "hai", "hain", "nahi", "nahin", "koi", "kya", "aur",
+        "lekin", "par", // Common pronouns / address forms
         "yaar", "yar", "bhai", "aap", "hum", "tum",
         // Frequent verb forms in Roman Hindi
-        "aagyi", "aaya", "aaye", "gaya", "gayi", "karo", "karna",
-        "maine", "banaya", "sunae", "logon", "shuru",
+        "aagyi", "aaya", "aaye", "gaya", "gayi", "karo", "karna", "maine", "banaya", "sunae",
+        "logon", "shuru",
         // Everyday Hindi vocabulary that appears frequently in regional feeds
-        "aaj", "abhi", "bahut", "accha", "sahi", "wala", "wali",
-        "garniya", "janwari",
+        "aaj", "abhi", "bahut", "accha", "sahi", "wala", "wali", "garniya", "janwari",
     ];
 
     // Split on non-alphanumeric boundaries so punctuation doesn't prevent a match.

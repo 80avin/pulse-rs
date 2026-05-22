@@ -1,8 +1,8 @@
-use std::path::Path;
 use crate::error::TaggingError;
 use crate::types::TagResult;
 #[cfg(feature = "ai-vision")]
 use crate::types::TaggerSource;
+use std::path::Path;
 
 #[cfg(feature = "ai-vision")]
 const IMAGE_DOWNLOAD_TIMEOUT_SECS: u64 = 10;
@@ -16,7 +16,7 @@ const IMAGE_MAX_BYTES: usize = 8 * 1024 * 1024; // 8 MB
 const CLIP_MEAN: [f32; 3] = [0.48145466, 0.4578275, 0.40821073];
 #[cfg(feature = "ai-vision")]
 #[allow(clippy::excessive_precision)]
-const CLIP_STD: [f32; 3]  = [0.26862954, 0.26130258, 0.27577711];
+const CLIP_STD: [f32; 3] = [0.26862954, 0.26130258, 0.27577711];
 
 // ONNX filenames tried in order for both vision and text encoders
 #[cfg(feature = "ai-vision")]
@@ -26,10 +26,7 @@ const VISION_MODEL_FILENAMES: &[&str] = &[
     "vision_model.onnx",           // unquantized fallback
 ];
 #[cfg(feature = "ai-vision")]
-const TEXT_MODEL_FILENAMES: &[&str] = &[
-    "text_model_quantized.onnx",
-    "text_model.onnx",
-];
+const TEXT_MODEL_FILENAMES: &[&str] = &["text_model_quantized.onnx", "text_model.onnx"];
 
 /// Preprocessing parameters loaded from `preprocessor_config.json` in the model directory.
 /// MobileCLIP: 256×256, no normalization. CLIP ViT-B/32: 224×224, CLIP mean/std normalization.
@@ -48,11 +45,17 @@ impl VisionPreprocessing {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&data) {
                 let size = v["crop_size"]["height"].as_u64().unwrap_or(224) as usize;
                 let normalize = v["do_normalize"].as_bool().unwrap_or(true);
-                return Self { image_size: size, normalize };
+                return Self {
+                    image_size: size,
+                    normalize,
+                };
             }
         }
         // No preprocessor_config.json → assume CLIP ViT-B/32 defaults
-        Self { image_size: 224, normalize: true }
+        Self {
+            image_size: 224,
+            normalize: true,
+        }
     }
 }
 
@@ -117,26 +120,28 @@ impl VisionTagger {
 /// Called automatically by `reload_vision_tagger` if the bin file is missing.
 #[cfg(feature = "ai-vision")]
 pub fn compute_clip_label_embeddings(model_dir: &Path) -> Result<(), TaggingError> {
-    use tokenizers::Tokenizer;
     use super::vision_labels::vision_labels;
+    use tokenizers::Tokenizer;
 
     const CLIP_MAX_LEN: usize = 77;
 
     let tokenizer_path = model_dir.join("tokenizer.json");
     if !tokenizer_path.exists() {
         return Err(TaggingError::Onnx(
-            "tokenizer.json not found — re-download the vision model".into()
+            "tokenizer.json not found — re-download the vision model".into(),
         ));
     }
 
     // Try text model filenames in priority order
-    let text_model_path = TEXT_MODEL_FILENAMES.iter()
+    let text_model_path = TEXT_MODEL_FILENAMES
+        .iter()
         .map(|name| model_dir.join(name))
         .find(|p| p.exists())
         .ok_or_else(|| {
             let tried = TEXT_MODEL_FILENAMES.join(", ");
             TaggingError::Onnx(format!(
-                "No text model ONNX found in {} (tried: {tried})", model_dir.display()
+                "No text model ONNX found in {} (tried: {tried})",
+                model_dir.display()
             ))
         })?;
 
@@ -153,10 +158,20 @@ pub fn compute_clip_label_embeddings(model_dir: &Path) -> Result<(), TaggingErro
     // Detect model schema — MobileCLIP and CLIP ViT-B/32 differ in input/output names.
     // MobileCLIP text encoder: input_ids only, output varies.
     // CLIP ViT-B/32: input_ids + attention_mask → text_embeds.
-    let input_names: Vec<String> = session.inputs().iter().map(|i| i.name().to_string()).collect();
-    let output_names: Vec<String> = session.outputs().iter().map(|o| o.name().to_string()).collect();
+    let input_names: Vec<String> = session
+        .inputs()
+        .iter()
+        .map(|i| i.name().to_string())
+        .collect();
+    let output_names: Vec<String> = session
+        .outputs()
+        .iter()
+        .map(|o| o.name().to_string())
+        .collect();
     let has_attention_mask = input_names.iter().any(|n| n == "attention_mask");
-    let text_output_name = output_names.into_iter().next()
+    let text_output_name = output_names
+        .into_iter()
+        .next()
         .unwrap_or_else(|| "text_embeds".to_string());
 
     tracing::info!(
@@ -172,7 +187,8 @@ pub fn compute_clip_label_embeddings(model_dir: &Path) -> Result<(), TaggingErro
     let mut emb_dim: usize = 512;
 
     for label in labels {
-        let encoding = tokenizer.encode(label.description, true)
+        let encoding = tokenizer
+            .encode(label.description, true)
             .map_err(|e| TaggingError::Tokenizer(e.to_string()))?;
 
         let raw_ids = encoding.get_ids();
@@ -183,9 +199,8 @@ pub fn compute_clip_label_embeddings(model_dir: &Path) -> Result<(), TaggingErro
             ids[i] = raw_ids[i] as i64;
         }
 
-        let id_tensor = ort::value::TensorRef::from_array_view(
-            ([1usize, CLIP_MAX_LEN], &ids[..])
-        ).map_err(|e| TaggingError::Onnx(e.to_string()))?;
+        let id_tensor = ort::value::TensorRef::from_array_view(([1usize, CLIP_MAX_LEN], &ids[..]))
+            .map_err(|e| TaggingError::Onnx(e.to_string()))?;
 
         let outputs = if has_attention_mask {
             let raw_mask = encoding.get_attention_mask();
@@ -193,17 +208,21 @@ pub fn compute_clip_label_embeddings(model_dir: &Path) -> Result<(), TaggingErro
             for (i, &m) in raw_mask.iter().take(CLIP_MAX_LEN).enumerate() {
                 mask[i] = m as i64;
             }
-            let mask_tensor = ort::value::TensorRef::from_array_view(
-                ([1usize, CLIP_MAX_LEN], &mask[..])
-            ).map_err(|e| TaggingError::Onnx(e.to_string()))?;
-            session.run(ort::inputs![
-                "input_ids"      => id_tensor,
-                "attention_mask" => mask_tensor,
-            ]).map_err(|e| TaggingError::Onnx(e.to_string()))?
+            let mask_tensor =
+                ort::value::TensorRef::from_array_view(([1usize, CLIP_MAX_LEN], &mask[..]))
+                    .map_err(|e| TaggingError::Onnx(e.to_string()))?;
+            session
+                .run(ort::inputs![
+                    "input_ids"      => id_tensor,
+                    "attention_mask" => mask_tensor,
+                ])
+                .map_err(|e| TaggingError::Onnx(e.to_string()))?
         } else {
-            session.run(ort::inputs![
-                "input_ids" => id_tensor,
-            ]).map_err(|e| TaggingError::Onnx(e.to_string()))?
+            session
+                .run(ort::inputs![
+                    "input_ids" => id_tensor,
+                ])
+                .map_err(|e| TaggingError::Onnx(e.to_string()))?
         };
 
         let (_, embeds) = outputs[text_output_name.as_str()]
@@ -258,7 +277,8 @@ impl VisionTaggerInner {
     fn load(model_dir: &Path) -> Result<Self, TaggingError> {
         let preprocessing = VisionPreprocessing::from_model_dir(model_dir);
 
-        let onnx_path = VISION_MODEL_FILENAMES.iter()
+        let onnx_path = VISION_MODEL_FILENAMES
+            .iter()
             .map(|name| model_dir.join(name))
             .find(|p| p.exists())
             .ok_or_else(|| {
@@ -302,38 +322,53 @@ impl VisionTaggerInner {
             .build()
             .map_err(|e| TaggingError::ImageNetwork(e.to_string()))?;
 
-        Ok(Self { session: std::sync::Mutex::new(session), labels, http, preprocessing })
+        Ok(Self {
+            session: std::sync::Mutex::new(session),
+            labels,
+            http,
+            preprocessing,
+        })
     }
 
     async fn fetch_image(&self, url: &str) -> Result<Vec<u8>, TaggingError> {
-        let resp = self.http.get(url).send().await
+        let resp = self
+            .http
+            .get(url)
+            .send()
+            .await
             .map_err(|e| TaggingError::ImageNetwork(format!("fetch {url}: {e}")))?;
 
         if !resp.status().is_success() {
-            return Err(TaggingError::ImageNetwork(
-                format!("HTTP {} for {url}", resp.status())
-            ));
+            return Err(TaggingError::ImageNetwork(format!(
+                "HTTP {} for {url}",
+                resp.status()
+            )));
         }
 
-        let content_type = resp.headers()
+        let content_type = resp
+            .headers()
             .get(reqwest::header::CONTENT_TYPE)
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_lowercase();
 
         if !content_type.starts_with("image/") && !content_type.is_empty() {
-            return Err(TaggingError::ImageDecode(
-                format!("not an image content-type: {content_type}")
-            ));
+            return Err(TaggingError::ImageDecode(format!(
+                "not an image content-type: {content_type}"
+            )));
         }
 
-        let bytes = resp.bytes().await
+        let bytes = resp
+            .bytes()
+            .await
             .map_err(|e| TaggingError::ImageNetwork(format!("read {url}: {e}")))?;
 
         if bytes.len() > IMAGE_MAX_BYTES {
-            return Err(TaggingError::ImageDecode(
-                format!("image too large ({} bytes > {} limit)", bytes.len(), IMAGE_MAX_BYTES)
-            ));
+            return Err(TaggingError::ImageDecode(format!(
+                "image too large ({} bytes > {} limit)",
+                bytes.len(),
+                IMAGE_MAX_BYTES
+            )));
         }
 
         Ok(bytes.to_vec())
@@ -343,14 +378,17 @@ impl VisionTaggerInner {
         let pixel_values = preprocess_image(image_bytes, &self.preprocessing)?;
         let size = self.preprocessing.image_size;
 
-        let mut session = self.session.lock()
+        let mut session = self
+            .session
+            .lock()
             .map_err(|_| TaggingError::Onnx("vision session mutex poisoned".into()))?;
 
-        let tensor = ort::value::TensorRef::from_array_view(
-            ([1usize, 3, size, size], &pixel_values[..])
-        ).map_err(|e| TaggingError::Onnx(e.to_string()))?;
+        let tensor =
+            ort::value::TensorRef::from_array_view(([1usize, 3, size, size], &pixel_values[..]))
+                .map_err(|e| TaggingError::Onnx(e.to_string()))?;
 
-        let outputs = session.run(ort::inputs!["pixel_values" => tensor])
+        let outputs = session
+            .run(ort::inputs!["pixel_values" => tensor])
             .map_err(|e| TaggingError::Onnx(e.to_string()))?;
 
         let (_, embeds) = outputs["image_embeds"]
@@ -385,7 +423,9 @@ impl VisionTaggerInner {
         let bytes = self.fetch_image(url).await?;
         let image_embed = self.embed_image(&bytes)?;
 
-        let mut sims: Vec<(String, f32)> = self.labels.iter()
+        let mut sims: Vec<(String, f32)> = self
+            .labels
+            .iter()
             .map(|(tag, label_embed, _)| (tag.clone(), cosine_sim(&image_embed, label_embed)))
             .collect();
 
@@ -404,8 +444,8 @@ impl VisionTaggerInner {
 fn preprocess_image(bytes: &[u8], p: &VisionPreprocessing) -> Result<Vec<f32>, TaggingError> {
     use image::imageops::FilterType;
 
-    let img = image::load_from_memory(bytes)
-        .map_err(|e| TaggingError::ImageDecode(e.to_string()))?;
+    let img =
+        image::load_from_memory(bytes).map_err(|e| TaggingError::ImageDecode(e.to_string()))?;
 
     let size = p.image_size as u32;
 
@@ -415,7 +455,11 @@ fn preprocess_image(bytes: &[u8], p: &VisionPreprocessing) -> Result<Vec<f32>, T
     } else {
         // MobileCLIP path: resize shortest edge to `size`, then center crop
         let (w, h) = (img.width(), img.height());
-        let scale = if w <= h { size as f32 / w as f32 } else { size as f32 / h as f32 };
+        let scale = if w <= h {
+            size as f32 / w as f32
+        } else {
+            size as f32 / h as f32
+        };
         let new_w = ((w as f32 * scale).ceil() as u32).max(size);
         let new_h = ((h as f32 * scale).ceil() as u32).max(size);
         let resized = img.resize(new_w, new_h, FilterType::Triangle);
@@ -435,13 +479,13 @@ fn preprocess_image(bytes: &[u8], p: &VisionPreprocessing) -> Result<Vec<f32>, T
             let b = pixel[2] as f32 / 255.0;
             let base = y * s + x;
             if p.normalize {
-                tensor[base]          = (r - CLIP_MEAN[0]) / CLIP_STD[0];
-                tensor[s * s + base]  = (g - CLIP_MEAN[1]) / CLIP_STD[1];
+                tensor[base] = (r - CLIP_MEAN[0]) / CLIP_STD[0];
+                tensor[s * s + base] = (g - CLIP_MEAN[1]) / CLIP_STD[1];
                 tensor[2 * s * s + base] = (b - CLIP_MEAN[2]) / CLIP_STD[2];
             } else {
                 // MobileCLIP: just rescale to [0, 1]
-                tensor[base]          = r;
-                tensor[s * s + base]  = g;
+                tensor[base] = r;
+                tensor[s * s + base] = g;
                 tensor[2 * s * s + base] = b;
             }
         }
@@ -466,11 +510,13 @@ fn load_label_embeddings(path: &Path) -> Result<Vec<(String, Vec<f32>, f32)>, Ta
         return Err(TaggingError::Onnx("label_embeddings.bin too short".into()));
     }
     if &data[0..4] != b"VLAB" {
-        return Err(TaggingError::Onnx("label_embeddings.bin has invalid magic bytes".into()));
+        return Err(TaggingError::Onnx(
+            "label_embeddings.bin has invalid magic bytes".into(),
+        ));
     }
 
     let num_labels = u32::from_le_bytes(data[4..8].try_into().unwrap()) as usize;
-    let emb_dim    = u32::from_le_bytes(data[8..12].try_into().unwrap()) as usize;
+    let emb_dim = u32::from_le_bytes(data[8..12].try_into().unwrap()) as usize;
     let expected_bytes = 12 + num_labels * emb_dim * 4;
 
     if data.len() != expected_bytes {
@@ -497,7 +543,8 @@ fn load_label_embeddings(path: &Path) -> Result<Vec<(String, Vec<f32>, f32)>, Ta
         let mut embedding = vec![0f32; emb_dim];
         for v in embedding.iter_mut() {
             let mut buf = [0u8; 4];
-            cursor.read_exact(&mut buf)
+            cursor
+                .read_exact(&mut buf)
                 .map_err(|e| TaggingError::Onnx(format!("read embedding value: {e}")))?;
             *v = f32::from_le_bytes(buf);
         }
@@ -513,7 +560,9 @@ fn load_label_embeddings(path: &Path) -> Result<Vec<(String, Vec<f32>, f32)>, Ta
 fn l2_normalize(mut v: Vec<f32>) -> Vec<f32> {
     let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm > 1e-8 {
-        for x in v.iter_mut() { *x /= norm; }
+        for x in v.iter_mut() {
+            *x /= norm;
+        }
     }
     v
 }

@@ -1,5 +1,5 @@
-use regex::Regex;
 use crate::types::{FeedItem, FeedType, TagResult, TaggerSource};
+use regex::Regex;
 
 /// Scope of text to match against
 #[derive(Debug, Clone)]
@@ -32,23 +32,20 @@ pub enum RulePattern {
 impl RulePattern {
     fn matches(&self, item: &FeedItem, text: &str, feed_type: &FeedType) -> bool {
         match self {
-            RulePattern::Keyword(kw) => {
-                text.to_lowercase().contains(kw.as_str())
-            }
+            RulePattern::Keyword(kw) => text.to_lowercase().contains(kw.as_str()),
             RulePattern::Regex(re) => re.is_match(text),
             RulePattern::DomainMatch(domain) => {
-                item.url.as_deref()
+                item.url
+                    .as_deref()
                     .map(|u| {
                         let lower = u.to_lowercase();
                         // Check ://domain (bare) or .domain (subdomain), avoiding substring false positives
-                        lower.contains(&format!("://{}", domain)) ||
-                        lower.contains(&format!(".{}", domain))
+                        lower.contains(&format!("://{}", domain))
+                            || lower.contains(&format!(".{}", domain))
                     })
                     .unwrap_or(false)
             }
-            RulePattern::HasScore { min } => {
-                item.score.map(|s| s >= *min).unwrap_or(false)
-            }
+            RulePattern::HasScore { min } => item.score.map(|s| s >= *min).unwrap_or(false),
             RulePattern::HasComments { min } => {
                 item.comment_count.map(|c| c >= *min).unwrap_or(false)
             }
@@ -65,9 +62,7 @@ impl RulePattern {
                     None
                 }
             }
-            RulePattern::Regex(re) => {
-                re.find(text).map(|m| m.as_str())
-            }
+            RulePattern::Regex(re) => re.find(text).map(|m| m.as_str()),
             _ => None,
         }
     }
@@ -112,9 +107,14 @@ impl TagRule {
 
         let matched_pattern = if self.require_all {
             // AND: all patterns must match
-            let all_match = self.patterns.iter().all(|p| p.matches(item, &text_for_matching, feed_type));
+            let all_match = self
+                .patterns
+                .iter()
+                .all(|p| p.matches(item, &text_for_matching, feed_type));
             if all_match {
-                self.patterns.first().and_then(|p| p.matched_text(&text_for_matching))
+                self.patterns
+                    .first()
+                    .and_then(|p| p.matched_text(&text_for_matching))
                     .unwrap_or("all conditions")
                     .to_string()
             } else {
@@ -124,9 +124,11 @@ impl TagRule {
             // OR: find first matching pattern
             let first_match = self.patterns.iter().find_map(|p| {
                 if p.matches(item, &text_for_matching, feed_type) {
-                    Some(p.matched_text(&text_for_matching)
-                        .unwrap_or("condition")
-                        .to_string())
+                    Some(
+                        p.matched_text(&text_for_matching)
+                            .unwrap_or("condition")
+                            .to_string(),
+                    )
                 } else {
                     None
                 }
@@ -138,7 +140,8 @@ impl TagRule {
             }
         };
 
-        let explanation = self.explanation_template
+        let explanation = self
+            .explanation_template
             .replace("{matched_text}", &matched_pattern)
             .replace("{tag}", &self.tag);
 
@@ -1026,7 +1029,9 @@ pub fn evaluate_low_effort(item: &FeedItem, feed_type: &FeedType) -> Option<TagR
     }
 
     let has_low_score = item.score.map(|s| s <= -5).unwrap_or(false);
-    let has_short_body = item.body_text.as_deref()
+    let has_short_body = item
+        .body_text
+        .as_deref()
         .map(|b| b.len() < 50)
         .unwrap_or(true); // no body = short
 
@@ -1122,7 +1127,11 @@ mod tests {
     fn test_security_rule() {
         let rules = default_rules();
         let engine = RuleEngine::new(rules);
-        let item = make_item("Critical vulnerability in OpenSSL allows remote code execution", None, None);
+        let item = make_item(
+            "Critical vulnerability in OpenSSL allows remote code execution",
+            None,
+            None,
+        );
         let results = engine.evaluate(&item, &FeedType::Rss);
         assert!(results.iter().any(|r| r.tag == "security"));
     }

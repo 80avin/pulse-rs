@@ -9,16 +9,8 @@ use pulse_core::{PulseCore, config::PulseConfig};
 use tracing_subscriber::EnvFilter;
 
 use commands::{
-    ai::AiArgs,
-    db::DbArgs,
-    diag::DiagArgs,
-    enrich::EnrichArgs,
-    feed::FeedArgs,
-    group::GroupArgs,
-    item::ItemArgs,
-    search::SearchArgs,
-    sync::SyncArgs,
-    timeline::TimelineArgs,
+    ai::AiArgs, db::DbArgs, diag::DiagArgs, enrich::EnrichArgs, feed::FeedArgs, group::GroupArgs,
+    item::ItemArgs, search::SearchArgs, sync::SyncArgs, timeline::TimelineArgs,
 };
 
 /// Pulse — a local-first feed reader

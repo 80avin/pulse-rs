@@ -1,8 +1,8 @@
-use std::path::Path;
 use crate::error::TaggingError;
 use crate::types::TagResult;
 #[cfg(feature = "ai-miniml")]
 use crate::types::TaggerSource;
+use std::path::Path;
 
 /// MiniLM sentence embedding (ONNX) + custom MLP classifier head (PMLP binary format).
 ///
@@ -108,8 +108,7 @@ const MAX_SEQ_LEN: usize = 128;
 impl MiniMlTaggerInner {
     fn load(model_dir: &Path) -> Result<Self, TaggingError> {
         // 1. Resolve ONNX model path: prefer model.onnx, fall back to quantized.
-        let model_path = resolve_model_path(model_dir)
-            .ok_or(TaggingError::ModelNotLoaded)?;
+        let model_path = resolve_model_path(model_dir).ok_or(TaggingError::ModelNotLoaded)?;
         let tokenizer_path = model_dir.join("tokenizer.json");
         let pmlp_path = model_dir.join("mlp_head.pmlp");
         let thresholds_path = model_dir.join("miniml_thresholds.json");
@@ -125,7 +124,9 @@ impl MiniMlTaggerInner {
             .map_err(|e| TaggingError::Onnx(e.to_string()))?;
 
         // 3. Detect optional `token_type_ids` input.
-        let has_token_type_ids = session.inputs().iter()
+        let has_token_type_ids = session
+            .inputs()
+            .iter()
             .any(|i| i.name() == "token_type_ids");
 
         let output_names: Vec<&str> = session.outputs().iter().map(|o| o.name()).collect();
@@ -191,10 +192,7 @@ impl MiniMlTaggerInner {
         let embedding = self.embed(text)?;
         let probs = self.mlp_forward(&embedding);
 
-        let mut pairs: Vec<(String, f32)> = self.labels.iter()
-            .cloned()
-            .zip(probs)
-            .collect();
+        let mut pairs: Vec<(String, f32)> = self.labels.iter().cloned().zip(probs).collect();
         pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         Ok(pairs)
     }
@@ -203,15 +201,19 @@ impl MiniMlTaggerInner {
     /// mean-pooled sentence embedding.
     fn embed(&self, text: &str) -> Result<Vec<f32>, TaggingError> {
         // Tokenize as a single sequence (no pair).
-        let encoding = self.tokenizer.encode(text, true)
+        let encoding = self
+            .tokenizer
+            .encode(text, true)
             .map_err(|e| TaggingError::Tokenizer(e.to_string()))?;
 
-        let ids: Vec<i64> = encoding.get_ids()
+        let ids: Vec<i64> = encoding
+            .get_ids()
             .iter()
             .take(MAX_SEQ_LEN)
             .map(|&x| x as i64)
             .collect();
-        let mask: Vec<i64> = encoding.get_attention_mask()
+        let mask: Vec<i64> = encoding
+            .get_attention_mask()
             .iter()
             .take(MAX_SEQ_LEN)
             .map(|&x| x as i64)
@@ -223,23 +225,30 @@ impl MiniMlTaggerInner {
         let mask_tensor = ort::value::TensorRef::from_array_view(([1usize, seq_len], &mask[..]))
             .map_err(|e| TaggingError::Onnx(e.to_string()))?;
 
-        let mut session = self.session.lock()
+        let mut session = self
+            .session
+            .lock()
             .map_err(|_| TaggingError::Onnx("session mutex poisoned".into()))?;
 
         let outputs = if self.has_token_type_ids {
             let type_ids: Vec<i64> = vec![0i64; seq_len];
-            let type_tensor = ort::value::TensorRef::from_array_view(([1usize, seq_len], &type_ids[..]))
-                .map_err(|e| TaggingError::Onnx(e.to_string()))?;
-            session.run(ort::inputs![
-                "input_ids"      => id_tensor,
-                "attention_mask" => mask_tensor,
-                "token_type_ids" => type_tensor,
-            ]).map_err(|e| TaggingError::Onnx(e.to_string()))?
+            let type_tensor =
+                ort::value::TensorRef::from_array_view(([1usize, seq_len], &type_ids[..]))
+                    .map_err(|e| TaggingError::Onnx(e.to_string()))?;
+            session
+                .run(ort::inputs![
+                    "input_ids"      => id_tensor,
+                    "attention_mask" => mask_tensor,
+                    "token_type_ids" => type_tensor,
+                ])
+                .map_err(|e| TaggingError::Onnx(e.to_string()))?
         } else {
-            session.run(ort::inputs![
-                "input_ids"      => id_tensor,
-                "attention_mask" => mask_tensor,
-            ]).map_err(|e| TaggingError::Onnx(e.to_string()))?
+            session
+                .run(ort::inputs![
+                    "input_ids"      => id_tensor,
+                    "attention_mask" => mask_tensor,
+                ])
+                .map_err(|e| TaggingError::Onnx(e.to_string()))?
         };
 
         // Extract last_hidden_state: shape [1, seq_len, 384].
@@ -250,7 +259,11 @@ impl MiniMlTaggerInner {
 
         // hidden has seq_len * embed_dim elements.
         // Infer embed_dim from the total size.
-        let embed_dim = if seq_len > 0 { hidden.len() / seq_len } else { 0 };
+        let embed_dim = if seq_len > 0 {
+            hidden.len() / seq_len
+        } else {
+            0
+        };
         if embed_dim == 0 {
             return Err(TaggingError::Onnx(
                 "last_hidden_state has zero elements".into(),
@@ -336,7 +349,18 @@ impl MiniMlTaggerInner {
 #[cfg(feature = "ai-miniml")]
 fn load_pmlp(
     path: &Path,
-) -> Result<(Vec<String>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, usize, usize), TaggingError> {
+) -> Result<
+    (
+        Vec<String>,
+        Vec<f32>,
+        Vec<f32>,
+        Vec<f32>,
+        Vec<f32>,
+        usize,
+        usize,
+    ),
+    TaggingError,
+> {
     use std::io::Read;
 
     let mut f = std::fs::File::open(path)

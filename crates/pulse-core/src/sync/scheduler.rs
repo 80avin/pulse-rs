@@ -1,16 +1,16 @@
-use std::sync::Arc;
-use std::collections::HashMap;
-use tokio::sync::{broadcast, Mutex};
-use tokio::task::JoinHandle;
 use reqwest::Client;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{Mutex, broadcast};
+use tokio::task::JoinHandle;
 
+use crate::ai::TaggerHandle;
 use crate::error::SyncError;
-use crate::types::{FeedId, FeedType};
+use crate::feeds::RedditAuth;
 use crate::storage::DbHandle;
 use crate::storage::queries::{get_feed, get_feeds};
-use crate::ai::TaggerHandle;
-use crate::feeds::RedditAuth;
 use crate::sync::health::compute_next_fetch;
+use crate::types::{FeedId, FeedType};
 
 const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)";
 
@@ -56,9 +56,11 @@ impl SyncScheduler {
 
     /// Start sync tasks for all enabled feeds
     pub async fn start_all(&self) {
-        let feeds = self.db.with_reader(|pool| async move {
-            get_feeds(&pool).await
-        }).await.unwrap_or_default();
+        let feeds = self
+            .db
+            .with_reader(|pool| async move { get_feeds(&pool).await })
+            .await
+            .unwrap_or_default();
 
         for feed in feeds.into_iter().filter(|f| f.is_enabled) {
             self.spawn_feed_task(feed.id).await;
@@ -121,7 +123,14 @@ impl SyncScheduler {
     /// Run a sync for a single feed directly (blocking) and return the new item count.
     /// Does not go through the scheduler task; safe to call from CLI for testing.
     pub async fn sync_feed_blocking(&self, feed_id: &FeedId) -> Result<usize, SyncError> {
-        perform_sync(feed_id, &self.db, &self.tagger, &self.http, self.reddit_auth.as_deref()).await
+        perform_sync(
+            feed_id,
+            &self.db,
+            &self.tagger,
+            &self.http,
+            self.reddit_auth.as_deref(),
+        )
+        .await
     }
 }
 
@@ -137,7 +146,10 @@ async fn feed_sync_task(
 
     loop {
         let fid = feed_id.clone();
-        let feed = match db.with_reader(|pool| async move { get_feed(&pool, &fid).await }).await {
+        let feed = match db
+            .with_reader(|pool| async move { get_feed(&pool, &fid).await })
+            .await
+        {
             Ok(f) => f,
             Err(e) => {
                 tracing::error!(feed_id = %feed_id, "Failed to load feed: {}", e);
@@ -151,7 +163,8 @@ async fn feed_sync_task(
         }
 
         let now = chrono::Utc::now().timestamp();
-        let delay_secs = feed.next_fetch_at
+        let delay_secs = feed
+            .next_fetch_at
             .map(|next| (next - now).max(0) as u64)
             .unwrap_or(0);
 
@@ -197,7 +210,8 @@ pub(crate) async fn perform_sync(
     let start = std::time::Instant::now();
 
     let fid = feed_id.clone();
-    let feed = db.with_reader(|pool| async move { get_feed(&pool, &fid).await })
+    let feed = db
+        .with_reader(|pool| async move { get_feed(&pool, &fid).await })
         .await
         .map_err(SyncError::Storage)?;
 
@@ -214,19 +228,31 @@ pub(crate) async fn perform_sync(
     match result {
         Ok((new_items, was_cached, etag, last_modified, last_item_at, source_config_update)) => {
             if let Some(new_config) = source_config_update {
-                let _ = db.update_feed_source_config(feed_id.clone(), new_config).await;
+                let _ = db
+                    .update_feed_source_config(feed_id.clone(), new_config)
+                    .await;
             }
 
-            let _ = db.update_feed_health(
-                feed_id.clone(), true, Some(elapsed_ms), new_items,
-                etag, last_modified, last_item_at,
-            ).await;
+            let _ = db
+                .update_feed_health(
+                    feed_id.clone(),
+                    true,
+                    Some(elapsed_ms),
+                    new_items,
+                    etag,
+                    last_modified,
+                    last_item_at,
+                )
+                .await;
 
             tracing::info!(feed_id = %feed_id, new_items, was_cached, elapsed_ms, "Sync complete");
 
             // Update next_fetch_at
             let fid2 = feed_id.clone();
-            if let Ok(updated_feed) = db.with_reader(|pool| async move { get_feed(&pool, &fid2).await }).await {
+            if let Ok(updated_feed) = db
+                .with_reader(|pool| async move { get_feed(&pool, &fid2).await })
+                .await
+            {
                 let next_fetch = compute_next_fetch(&updated_feed);
                 let mut feed_update = updated_feed;
                 feed_update.next_fetch_at = Some(next_fetch);
@@ -238,9 +264,9 @@ pub(crate) async fn perform_sync(
         }
         Err(e) => {
             tracing::warn!(feed_id = %feed_id, error = %e, "Sync failed");
-            let _ = db.update_feed_health(
-                feed_id.clone(), false, None, 0, None, None, None,
-            ).await;
+            let _ = db
+                .update_feed_health(feed_id.clone(), false, None, 0, None, None, None)
+                .await;
             Err(e)
         }
     }
@@ -261,7 +287,8 @@ async fn sync_rss(
     http: &Client,
     feed: &crate::types::Feed,
 ) -> Result<SyncSuccess, SyncError> {
-    let result = crate::feeds::fetch_rss(http, feed).await
+    let result = crate::feeds::fetch_rss(http, feed)
+        .await
         .map_err(SyncError::Feed)?;
 
     if result.was_cached {
@@ -272,13 +299,23 @@ async fn sync_rss(
     let feed_type = feed.feed_type.clone();
     let items = result.items.clone();
 
-    let new_items = db.upsert_items(result.items).await.map_err(SyncError::Storage)?;
+    let new_items = db
+        .upsert_items(result.items)
+        .await
+        .map_err(SyncError::Storage)?;
 
     for item in &items {
         tagger.tag_item(item.id.clone(), feed_type.clone()).await;
     }
 
-    Ok((new_items, false, result.etag, result.last_modified, last_item_at, None))
+    Ok((
+        new_items,
+        false,
+        result.etag,
+        result.last_modified,
+        last_item_at,
+        None,
+    ))
 }
 
 async fn sync_hn(
@@ -287,7 +324,8 @@ async fn sync_hn(
     http: &Client,
     feed: &crate::types::Feed,
 ) -> Result<SyncSuccess, SyncError> {
-    let result = crate::feeds::fetch_hn(http, feed).await
+    let result = crate::feeds::fetch_hn(http, feed)
+        .await
         .map_err(SyncError::Feed)?;
 
     if result.was_cached {
@@ -297,7 +335,10 @@ async fn sync_hn(
     let last_item_at = result.items.iter().map(|i| i.published_at).max();
     let items = result.items.clone();
 
-    let new_items = db.upsert_items(result.items).await.map_err(SyncError::Storage)?;
+    let new_items = db
+        .upsert_items(result.items)
+        .await
+        .map_err(SyncError::Storage)?;
 
     for item in &items {
         tagger.tag_item(item.id.clone(), FeedType::Hn).await;
@@ -313,7 +354,14 @@ async fn sync_hn(
         None
     };
 
-    Ok((new_items, false, None, None, last_item_at, source_config_update))
+    Ok((
+        new_items,
+        false,
+        None,
+        None,
+        last_item_at,
+        source_config_update,
+    ))
 }
 
 async fn sync_reddit(
@@ -323,7 +371,8 @@ async fn sync_reddit(
     feed: &crate::types::Feed,
     auth: Option<&RedditAuth>,
 ) -> Result<SyncSuccess, SyncError> {
-    let result = crate::feeds::fetch_reddit(http, feed, auth).await
+    let result = crate::feeds::fetch_reddit(http, feed, auth)
+        .await
         .map_err(SyncError::Feed)?;
 
     if result.was_cached {
@@ -333,11 +382,21 @@ async fn sync_reddit(
     let last_item_at = result.items.iter().map(|i| i.published_at).max();
     let items = result.items.clone();
 
-    let new_items = db.upsert_items(result.items).await.map_err(SyncError::Storage)?;
+    let new_items = db
+        .upsert_items(result.items)
+        .await
+        .map_err(SyncError::Storage)?;
 
     for item in &items {
         tagger.tag_item(item.id.clone(), FeedType::Reddit).await;
     }
 
-    Ok((new_items, false, result.etag, result.last_modified, last_item_at, None))
+    Ok((
+        new_items,
+        false,
+        result.etag,
+        result.last_modified,
+        last_item_at,
+        None,
+    ))
 }

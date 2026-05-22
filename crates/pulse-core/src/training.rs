@@ -92,8 +92,10 @@ impl LabelStore {
 
     pub fn upsert_batch(&self, new_items: Vec<LabeledItem>) -> anyhow::Result<usize> {
         let existing = self.load_all()?;
-        let mut map: HashMap<String, LabeledItem> =
-            existing.into_iter().map(|i| (i.item_id.clone(), i)).collect();
+        let mut map: HashMap<String, LabeledItem> = existing
+            .into_iter()
+            .map(|i| (i.item_id.clone(), i))
+            .collect();
 
         for item in new_items {
             map.insert(item.item_id.clone(), item);

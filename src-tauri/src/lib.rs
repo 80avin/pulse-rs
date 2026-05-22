@@ -1,9 +1,9 @@
 use std::sync::{Arc, Mutex, OnceLock};
 
-use tauri::Manager;
 use pulse_core::{PulseCore, config::PulseConfig};
 #[cfg(target_os = "android")]
 use tauri::Emitter;
+use tauri::Manager;
 
 mod commands;
 mod models;
@@ -18,8 +18,7 @@ pub struct AppState {
 
 // FastText model embedded at compile time (9.6 MB + tiny thresholds file).
 // Extracted to data_dir on first run; re-extracted on version bump.
-const BUNDLED_FASTTEXT_PFTM: &[u8] =
-    include_bytes!("../bundled/fasttext-v2/fasttext.pftm");
+const BUNDLED_FASTTEXT_PFTM: &[u8] = include_bytes!("../bundled/fasttext-v2/fasttext.pftm");
 const BUNDLED_FASTTEXT_THRESHOLDS: &[u8] =
     include_bytes!("../bundled/fasttext-v2/fasttext_thresholds.json");
 // Bump this string whenever the bundled fasttext model or thresholds change.
@@ -28,10 +27,8 @@ const BUNDLED_FASTTEXT_VERSION: &str = "v2-20250519b";
 
 // MiniLM MLP head embedded (~208 KB). The ONNX backbone (87 MB) is downloaded
 // separately from HuggingFace; these small files accompany it.
-const BUNDLED_MINIML_MLP: &[u8] =
-    include_bytes!("../bundled/minilm/mlp_head.pmlp");
-const BUNDLED_MINIML_THRESHOLDS: &[u8] =
-    include_bytes!("../bundled/minilm/miniml_thresholds.json");
+const BUNDLED_MINIML_MLP: &[u8] = include_bytes!("../bundled/minilm/mlp_head.pmlp");
+const BUNDLED_MINIML_THRESHOLDS: &[u8] = include_bytes!("../bundled/minilm/miniml_thresholds.json");
 
 /// Extract bundled model bytes to data_dir.
 /// FastText is re-extracted whenever BUNDLED_FASTTEXT_VERSION changes so that
@@ -42,12 +39,14 @@ fn extract_bundled_models(data_dir: &std::path::Path) {
     // FastText — fully bundled, always available without any download.
     let ft_dir = data_dir.join("models").join("fasttext-v2");
     let version_file = ft_dir.join("version");
-    let installed_version = std::fs::read_to_string(&version_file)
-        .unwrap_or_default();
+    let installed_version = std::fs::read_to_string(&version_file).unwrap_or_default();
     if installed_version.trim() != BUNDLED_FASTTEXT_VERSION {
         if std::fs::create_dir_all(&ft_dir).is_ok() {
             let _ = std::fs::write(ft_dir.join("fasttext.pftm"), BUNDLED_FASTTEXT_PFTM);
-            let _ = std::fs::write(ft_dir.join("fasttext_thresholds.json"), BUNDLED_FASTTEXT_THRESHOLDS);
+            let _ = std::fs::write(
+                ft_dir.join("fasttext_thresholds.json"),
+                BUNDLED_FASTTEXT_THRESHOLDS,
+            );
             let _ = std::fs::write(&version_file, BUNDLED_FASTTEXT_VERSION);
         }
     }
@@ -63,7 +62,10 @@ fn extract_bundled_models(data_dir: &std::path::Path) {
     let ml_dir = data_dir.join("models").join("minilm");
     if std::fs::create_dir_all(&ml_dir).is_ok() {
         let _ = std::fs::write(ml_dir.join("mlp_head.pmlp"), BUNDLED_MINIML_MLP);
-        let _ = std::fs::write(ml_dir.join("miniml_thresholds.json"), BUNDLED_MINIML_THRESHOLDS);
+        let _ = std::fs::write(
+            ml_dir.join("miniml_thresholds.json"),
+            BUNDLED_MINIML_THRESHOLDS,
+        );
     }
 }
 
@@ -81,7 +83,9 @@ pub fn run() {
             // package ID and survives updates. On desktop keep platform_data_dir()
             // so the Tauri app and the CLI share the same database.
             #[cfg(target_os = "android")]
-            let data_dir = app.path().app_data_dir()
+            let data_dir = app
+                .path()
+                .app_data_dir()
                 .unwrap_or_else(|_| pulse_core::config::platform_data_dir());
             #[cfg(not(target_os = "android"))]
             let data_dir = pulse_core::config::platform_data_dir();
@@ -101,7 +105,10 @@ pub fn run() {
             tauri::async_runtime::spawn(async move { core_bg.start_sync().await });
 
             let pending_share = Arc::new(Mutex::new(None));
-            app.manage(AppState { core, pending_share });
+            app.manage(AppState {
+                core,
+                pending_share,
+            });
 
             // Drain any share URL that arrived before the WebView was ready (cold-start)
             #[cfg(target_os = "android")]

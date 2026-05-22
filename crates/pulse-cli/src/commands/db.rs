@@ -1,7 +1,7 @@
 use clap::{Args, Subcommand};
 use pulse_core::PulseCore;
 
-use crate::output::{print_json, format_bytes};
+use crate::output::{format_bytes, print_json};
 
 #[derive(Debug, Args)]
 pub struct DbArgs {
@@ -43,7 +43,9 @@ pub async fn run(args: DbArgs, core: &PulseCore, global_json: bool) -> anyhow::R
 
 async fn cmd_migrate(args: DbMigrateArgs, _core: &PulseCore) -> anyhow::Result<()> {
     if args.dry_run {
-        println!("--dry-run: migrations would run on next startup (run_migrations is called at init)");
+        println!(
+            "--dry-run: migrations would run on next startup (run_migrations is called at init)"
+        );
         return Ok(());
     }
     // Migrations run automatically at PulseCore::init. Since we're already initialized, report.

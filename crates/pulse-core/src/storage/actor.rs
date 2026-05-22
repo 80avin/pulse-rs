@@ -1,8 +1,8 @@
+use crate::error::StorageError;
+use crate::types::{Feed, FeedGroup, FeedId, FeedItem, ItemId, ItemStatePatch, TagResult};
 use sqlx::SqlitePool;
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
-use crate::error::StorageError;
-use crate::types::{FeedItem, FeedId, ItemId, ItemStatePatch, Feed, FeedGroup, TagResult};
 
 type DbResult<T> = Result<T, StorageError>;
 
@@ -113,10 +113,7 @@ pub enum DbCommand {
 }
 
 /// The DB writer actor task. Uses a single-connection pool to serialize writes.
-pub async fn db_writer_task(
-    mut rx: mpsc::Receiver<DbCommand>,
-    pool: SqlitePool,
-) {
+pub async fn db_writer_task(mut rx: mpsc::Receiver<DbCommand>, pool: SqlitePool) {
     while let Some(cmd) = rx.recv().await {
         match cmd {
             DbCommand::UpsertItems { items, reply } => {
@@ -124,7 +121,11 @@ pub async fn db_writer_task(
                 let _ = reply.send(result);
             }
 
-            DbCommand::UpdateItemState { item_id, patch, reply } => {
+            DbCommand::UpdateItemState {
+                item_id,
+                patch,
+                reply,
+            } => {
                 let result = update_item_state(&pool, &item_id, &patch).await;
                 let _ = reply.send(result);
             }
@@ -140,22 +141,43 @@ pub async fn db_writer_task(
             }
 
             DbCommand::UpdateFeedHealth {
-                feed_id, success, latency_ms, new_item_count,
-                etag, last_modified, last_item_at, reply,
+                feed_id,
+                success,
+                latency_ms,
+                new_item_count,
+                etag,
+                last_modified,
+                last_item_at,
+                reply,
             } => {
                 let result = update_feed_health(
-                    &pool, &feed_id, success, latency_ms,
-                    new_item_count, etag, last_modified, last_item_at
-                ).await;
+                    &pool,
+                    &feed_id,
+                    success,
+                    latency_ms,
+                    new_item_count,
+                    etag,
+                    last_modified,
+                    last_item_at,
+                )
+                .await;
                 let _ = reply.send(result);
             }
 
-            DbCommand::InsertAiTags { item_id, tags, reply } => {
+            DbCommand::InsertAiTags {
+                item_id,
+                tags,
+                reply,
+            } => {
                 let result = insert_ai_tags(&pool, &item_id, &tags).await;
                 let _ = reply.send(result);
             }
 
-            DbCommand::UpdateFeedSourceConfig { feed_id, source_config, reply } => {
+            DbCommand::UpdateFeedSourceConfig {
+                feed_id,
+                source_config,
+                reply,
+            } => {
                 let result = update_feed_source_config(&pool, &feed_id, &source_config).await;
                 let _ = reply.send(result);
             }
@@ -170,8 +192,14 @@ pub async fn db_writer_task(
                 let _ = reply.send(result);
             }
 
-            DbCommand::EnrichItem { item_id, body_text, source_meta_patch, reply } => {
-                let result = enrich_item(&pool, &item_id, body_text.as_deref(), &source_meta_patch).await;
+            DbCommand::EnrichItem {
+                item_id,
+                body_text,
+                source_meta_patch,
+                reply,
+            } => {
+                let result =
+                    enrich_item(&pool, &item_id, body_text.as_deref(), &source_meta_patch).await;
                 let _ = reply.send(result);
             }
 
@@ -229,7 +257,7 @@ async fn upsert_items(pool: &SqlitePool, items: &[FeedItem]) -> DbResult<usize> 
             "INSERT OR IGNORE INTO feed_items
              (id, feed_id, source_guid, title, url, author, published_at, fetched_at,
               body_text, body_html, word_count, score, comment_count, comment_url, source_meta)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&item.id)
         .bind(&item.feed_id)
@@ -267,18 +295,17 @@ async fn upsert_items(pool: &SqlitePool, items: &[FeedItem]) -> DbResult<usize> 
 
             // Insert into FTS5 index (application-managed, not trigger)
             // We need the rowid of the just-inserted feed_item
-            let rowid: Option<i64> = sqlx::query_scalar(
-                "SELECT rowid FROM feed_items WHERE id = ?"
-            )
-            .bind(&item.id)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(StorageError::Sqlite)?;
+            let rowid: Option<i64> =
+                sqlx::query_scalar("SELECT rowid FROM feed_items WHERE id = ?")
+                    .bind(&item.id)
+                    .fetch_optional(&mut *tx)
+                    .await
+                    .map_err(StorageError::Sqlite)?;
 
             if let Some(rowid) = rowid {
                 sqlx::query(
                     "INSERT INTO feed_items_fts(rowid, item_id, title, body_text, author)
-                     VALUES (?, ?, ?, ?, ?)"
+                     VALUES (?, ?, ?, ?, ?)",
                 )
                 .bind(rowid)
                 .bind(&item.id)
@@ -296,14 +323,18 @@ async fn upsert_items(pool: &SqlitePool, items: &[FeedItem]) -> DbResult<usize> 
     Ok(new_count)
 }
 
-async fn update_item_state(pool: &SqlitePool, item_id: &ItemId, patch: &ItemStatePatch) -> DbResult<()> {
+async fn update_item_state(
+    pool: &SqlitePool,
+    item_id: &ItemId,
+    patch: &ItemStatePatch,
+) -> DbResult<()> {
     let now = chrono::Utc::now().timestamp();
 
     if let Some(r) = patch.is_read {
         sqlx::query(
             "UPDATE item_states SET is_read = ?,
              read_at = CASE WHEN ? = 1 THEN ? ELSE read_at END,
-             updated_at = ? WHERE item_id = ?"
+             updated_at = ? WHERE item_id = ?",
         )
         .bind(r as i64)
         .bind(r as i64)
@@ -319,7 +350,7 @@ async fn update_item_state(pool: &SqlitePool, item_id: &ItemId, patch: &ItemStat
         sqlx::query(
             "UPDATE item_states SET is_saved = ?,
              saved_at = CASE WHEN ? = 1 THEN ? ELSE saved_at END,
-             updated_at = ? WHERE item_id = ?"
+             updated_at = ? WHERE item_id = ?",
         )
         .bind(s as i64)
         .bind(s as i64)
@@ -335,7 +366,7 @@ async fn update_item_state(pool: &SqlitePool, item_id: &ItemId, patch: &ItemStat
         sqlx::query(
             "UPDATE item_states SET is_hidden = ?,
              hidden_at = CASE WHEN ? = 1 THEN ? ELSE hidden_at END,
-             updated_at = ? WHERE item_id = ?"
+             updated_at = ? WHERE item_id = ?",
         )
         .bind(h as i64)
         .bind(h as i64)
@@ -372,7 +403,7 @@ async fn upsert_feed(pool: &SqlitePool, feed: &Feed) -> DbResult<()> {
              last_modified = excluded.last_modified,
              language = excluded.language,
              next_fetch_at = excluded.next_fetch_at,
-             updated_at = excluded.updated_at"
+             updated_at = excluded.updated_at",
     )
     .bind(&feed.id)
     .bind(&feed.url)
@@ -414,7 +445,7 @@ async fn insert_feed_group(pool: &SqlitePool, group: &FeedGroup) -> DbResult<()>
              description = excluded.description,
              color = excluded.color,
              sort_order = excluded.sort_order,
-             updated_at = excluded.updated_at"
+             updated_at = excluded.updated_at",
     )
     .bind(&group.id)
     .bind(&group.name)
@@ -506,7 +537,7 @@ async fn update_feed_health(
              total_fetches = total_fetches + 1,
              total_failures = total_failures + 1,
              updated_at = ?
-             WHERE id = ?"
+             WHERE id = ?",
         )
         .bind(now)
         .bind(now)
@@ -516,23 +547,19 @@ async fn update_feed_health(
         .map_err(StorageError::Sqlite)?;
 
         // Check if streak >= max and disable the feed
-        let streak: i64 = sqlx::query_scalar(
-            "SELECT failure_streak FROM feeds WHERE id = ?"
-        )
-        .bind(feed_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
+        let streak: i64 = sqlx::query_scalar("SELECT failure_streak FROM feeds WHERE id = ?")
+            .bind(feed_id)
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
 
         if streak >= 10 {
-            sqlx::query(
-                "UPDATE feeds SET is_enabled = 0, updated_at = ? WHERE id = ?"
-            )
-            .bind(now)
-            .bind(feed_id)
-            .execute(pool)
-            .await
-            .map_err(StorageError::Sqlite)?;
+            sqlx::query("UPDATE feeds SET is_enabled = 0, updated_at = ? WHERE id = ?")
+                .bind(now)
+                .bind(feed_id)
+                .execute(pool)
+                .await
+                .map_err(StorageError::Sqlite)?;
             tracing::warn!(feed_id = %feed_id, "Feed disabled after {} consecutive failures", streak);
         }
     }
@@ -551,7 +578,7 @@ async fn insert_ai_tags(pool: &SqlitePool, item_id: &ItemId, tags: &[TagResult])
              VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)
              ON CONFLICT(item_id, tag, tagger_source) DO UPDATE SET
                  confidence = excluded.confidence,
-                 explanation = excluded.explanation"
+                 explanation = excluded.explanation",
         )
         .bind(&tag_id)
         .bind(item_id)
@@ -605,7 +632,7 @@ async fn clear_feed_cache(pool: &SqlitePool, feed_id: &FeedId) -> DbResult<()> {
             last_modified = NULL,
             source_config = json_remove(source_config, '$.last_seen_id'),
             updated_at = ?
-         WHERE id = ?"
+         WHERE id = ?",
     )
     .bind(now)
     .bind(feed_id)
@@ -647,21 +674,27 @@ async fn enrich_item(
 
     // Two separate updates to avoid unnecessary FTS trigger when body_text is unchanged.
     // 1. Update source_meta always (no FTS trigger — trigger only watches body_text/title/author)
-    let meta_sql = format!("UPDATE feed_items SET source_meta = {} WHERE id = ?", set_expr);
+    let meta_sql = format!(
+        "UPDATE feed_items SET source_meta = {} WHERE id = ?",
+        set_expr
+    );
     let mut q = sqlx::query(&meta_sql);
-    for b in &bindings { q = q.bind(b); }
-    q.bind(item_id).execute(pool).await.map_err(StorageError::Sqlite)?;
-
-    // 2. Update body_text only if provided AND item currently has none (triggers FTS update)
-    if let Some(bt) = body_text {
-        sqlx::query(
-            "UPDATE feed_items SET body_text = ? WHERE id = ? AND body_text IS NULL"
-        )
-        .bind(bt)
-        .bind(item_id)
+    for b in &bindings {
+        q = q.bind(b);
+    }
+    q.bind(item_id)
         .execute(pool)
         .await
         .map_err(StorageError::Sqlite)?;
+
+    // 2. Update body_text only if provided AND item currently has none (triggers FTS update)
+    if let Some(bt) = body_text {
+        sqlx::query("UPDATE feed_items SET body_text = ? WHERE id = ? AND body_text IS NULL")
+            .bind(bt)
+            .bind(item_id)
+            .execute(pool)
+            .await
+            .map_err(StorageError::Sqlite)?;
     }
 
     Ok(())
@@ -697,7 +730,7 @@ async fn mark_feed_read(pool: &SqlitePool, feed_id: &str) -> DbResult<()> {
     sqlx::query(
         "UPDATE item_states SET is_read = 1, read_at = ?, updated_at = ?
          WHERE item_id IN (SELECT id FROM feed_items WHERE feed_id = ?)
-           AND is_read = 0"
+           AND is_read = 0",
     )
     .bind(now)
     .bind(now)
@@ -723,31 +756,46 @@ impl DbHandle {
     }
 
     /// Send a write command and await its reply
-    async fn send<T>(&self, make_cmd: impl FnOnce(oneshot::Sender<DbResult<T>>) -> DbCommand) -> DbResult<T> {
+    async fn send<T>(
+        &self,
+        make_cmd: impl FnOnce(oneshot::Sender<DbResult<T>>) -> DbCommand,
+    ) -> DbResult<T> {
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.tx.send(make_cmd(reply_tx)).await
+        self.tx
+            .send(make_cmd(reply_tx))
+            .await
             .map_err(|_| StorageError::ActorDisconnected)?;
-        reply_rx.await.map_err(|_| StorageError::ActorDisconnected)?
+        reply_rx
+            .await
+            .map_err(|_| StorageError::ActorDisconnected)?
     }
 
     /// Upsert a batch of feed items; returns count of newly inserted items
     pub async fn upsert_items(&self, items: Vec<FeedItem>) -> DbResult<usize> {
-        self.send(|reply| DbCommand::UpsertItems { items, reply }).await
+        self.send(|reply| DbCommand::UpsertItems { items, reply })
+            .await
     }
 
     /// Update item state
     pub async fn update_item_state(&self, item_id: ItemId, patch: ItemStatePatch) -> DbResult<()> {
-        self.send(|reply| DbCommand::UpdateItemState { item_id, patch, reply }).await
+        self.send(|reply| DbCommand::UpdateItemState {
+            item_id,
+            patch,
+            reply,
+        })
+        .await
     }
 
     /// Upsert a feed record
     pub async fn upsert_feed(&self, feed: Feed) -> DbResult<()> {
-        self.send(|reply| DbCommand::UpsertFeed { feed, reply }).await
+        self.send(|reply| DbCommand::UpsertFeed { feed, reply })
+            .await
     }
 
     /// Insert or update a feed group
     pub async fn insert_feed_group(&self, group: FeedGroup) -> DbResult<()> {
-        self.send(|reply| DbCommand::InsertFeedGroup { group, reply }).await
+        self.send(|reply| DbCommand::InsertFeedGroup { group, reply })
+            .await
     }
 
     /// Update feed health metrics after a sync attempt
@@ -762,19 +810,32 @@ impl DbHandle {
         last_item_at: Option<i64>,
     ) -> DbResult<()> {
         self.send(|reply| DbCommand::UpdateFeedHealth {
-            feed_id, success, latency_ms, new_item_count,
-            etag, last_modified, last_item_at, reply,
-        }).await
+            feed_id,
+            success,
+            latency_ms,
+            new_item_count,
+            etag,
+            last_modified,
+            last_item_at,
+            reply,
+        })
+        .await
     }
 
     /// Store AI tags for an item
     pub async fn insert_ai_tags(&self, item_id: ItemId, tags: Vec<TagResult>) -> DbResult<()> {
-        self.send(|reply| DbCommand::InsertAiTags { item_id, tags, reply }).await
+        self.send(|reply| DbCommand::InsertAiTags {
+            item_id,
+            tags,
+            reply,
+        })
+        .await
     }
 
     /// Delete all AI tags for an item (used before force-retag).
     pub async fn delete_item_tags(&self, item_id: ItemId) -> DbResult<()> {
-        self.send(|reply| DbCommand::DeleteItemTags { item_id, reply }).await
+        self.send(|reply| DbCommand::DeleteItemTags { item_id, reply })
+            .await
     }
 
     /// Update the source_config for a feed (e.g., last_seen_id for HN)
@@ -783,17 +844,24 @@ impl DbHandle {
         feed_id: FeedId,
         source_config: serde_json::Value,
     ) -> DbResult<()> {
-        self.send(|reply| DbCommand::UpdateFeedSourceConfig { feed_id, source_config, reply }).await
+        self.send(|reply| DbCommand::UpdateFeedSourceConfig {
+            feed_id,
+            source_config,
+            reply,
+        })
+        .await
     }
 
     /// Delete a feed and all its items
     pub async fn delete_feed(&self, feed_id: FeedId) -> DbResult<()> {
-        self.send(|reply| DbCommand::DeleteFeed { feed_id, reply }).await
+        self.send(|reply| DbCommand::DeleteFeed { feed_id, reply })
+            .await
     }
 
     /// Clear ETag, Last-Modified, and last_seen_id so the next sync does a full re-fetch.
     pub async fn clear_feed_cache(&self, feed_id: FeedId) -> DbResult<()> {
-        self.send(|reply| DbCommand::ClearFeedCache { feed_id, reply }).await
+        self.send(|reply| DbCommand::ClearFeedCache { feed_id, reply })
+            .await
     }
 
     /// Update an item's body_text (if currently null) and merge source_meta fields.
@@ -803,12 +871,19 @@ impl DbHandle {
         body_text: Option<String>,
         source_meta_patch: serde_json::Value,
     ) -> DbResult<()> {
-        self.send(|reply| DbCommand::EnrichItem { item_id, body_text, source_meta_patch, reply }).await
+        self.send(|reply| DbCommand::EnrichItem {
+            item_id,
+            body_text,
+            source_meta_patch,
+            reply,
+        })
+        .await
     }
 
     /// Delete a feed group and null-out group_id on member feeds
     pub async fn delete_feed_group(&self, id: String) -> DbResult<()> {
-        self.send(|reply| DbCommand::DeleteFeedGroup { id, reply }).await
+        self.send(|reply| DbCommand::DeleteFeedGroup { id, reply })
+            .await
     }
 
     /// Delete all feed items (cascades to item_states, ai_tags)
@@ -818,12 +893,14 @@ impl DbHandle {
 
     /// Mark all items in a feed as read
     pub async fn mark_feed_read(&self, feed_id: FeedId) -> DbResult<()> {
-        self.send(|reply| DbCommand::MarkFeedRead { feed_id, reply }).await
+        self.send(|reply| DbCommand::MarkFeedRead { feed_id, reply })
+            .await
     }
 
     /// Delete all AI tags with confidence below the given threshold.
     pub async fn delete_tags_below_confidence(&self, threshold: f32) -> DbResult<()> {
-        self.send(|reply| DbCommand::DeleteTagsBelowConfidence { threshold, reply }).await
+        self.send(|reply| DbCommand::DeleteTagsBelowConfidence { threshold, reply })
+            .await
     }
 
     /// Get reference to reader pool for read-only queries

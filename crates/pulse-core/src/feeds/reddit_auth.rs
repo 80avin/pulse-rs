@@ -1,7 +1,7 @@
-use std::time::{Duration, Instant};
-use tokio::sync::Mutex;
 use reqwest::Client;
 use serde::Deserialize;
+use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
 
 use crate::error::FeedError;
 
@@ -48,7 +48,10 @@ impl RedditAuth {
             .form(&[("grant_type", "client_credentials")])
             .send()
             .await
-            .map_err(|e| FeedError::Network { url: TOKEN_URL.to_string(), source: e })?;
+            .map_err(|e| FeedError::Network {
+                url: TOKEN_URL.to_string(),
+                source: e,
+            })?;
 
         let status = resp.status();
         if !status.is_success() {
@@ -62,8 +65,10 @@ impl RedditAuth {
             });
         }
 
-        let tr: TokenResponse = resp.json().await
-            .map_err(|e| FeedError::Network { url: TOKEN_URL.to_string(), source: e })?;
+        let tr: TokenResponse = resp.json().await.map_err(|e| FeedError::Network {
+            url: TOKEN_URL.to_string(),
+            source: e,
+        })?;
 
         *guard = Some((tr.access_token.clone(), Instant::now()));
         Ok(tr.access_token)

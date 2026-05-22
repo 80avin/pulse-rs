@@ -1,8 +1,8 @@
+use crate::error::FeedError;
+use crate::feeds::normalize::{collapse_whitespace, count_words, strip_html};
+use crate::types::{Feed, FeedItem};
 use reqwest::Client;
 use uuid::Uuid;
-use crate::error::FeedError;
-use crate::types::{Feed, FeedItem};
-use crate::feeds::normalize::{strip_html, count_words, collapse_whitespace};
 
 const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)";
 
@@ -19,16 +19,12 @@ pub struct RssFetchResult {
 
 /// Fetch and parse an RSS/Atom feed, returning normalized FeedItems.
 /// Respects conditional HTTP headers (ETag / If-Modified-Since).
-pub async fn fetch_rss(
-    client: &Client,
-    feed: &Feed,
-) -> Result<RssFetchResult, FeedError> {
+pub async fn fetch_rss(client: &Client, feed: &Feed) -> Result<RssFetchResult, FeedError> {
     let fetched_at = chrono::Utc::now().timestamp();
     let url = feed.url.clone();
 
     // Build request with conditional headers
-    let mut req = client.get(&url)
-        .header("User-Agent", USER_AGENT);
+    let mut req = client.get(&url).header("User-Agent", USER_AGENT);
 
     if let Some(ref etag) = feed.etag {
         req = req.header("If-None-Match", etag);
@@ -90,16 +86,24 @@ pub async fn fetch_rss(
         source: Box::new(e),
     })?;
 
-    let feed_title = parsed.title.as_ref().map(|t| collapse_whitespace(&t.content));
-    let feed_description = parsed.description.as_ref().map(|d| collapse_whitespace(&d.content));
+    let feed_title = parsed
+        .title
+        .as_ref()
+        .map(|t| collapse_whitespace(&t.content));
+    let feed_description = parsed
+        .description
+        .as_ref()
+        .map(|d| collapse_whitespace(&d.content));
     let feed_site_url = parsed.links.first().map(|l| l.href.clone());
 
     // Compute the namespace UUID for this feed (UUIDv5 of feed URL)
     let ns_uuid = Uuid::new_v5(&Uuid::NAMESPACE_URL, url.as_bytes());
 
-    let items = parsed.entries.into_iter().map(|entry| {
-        normalize_rss_entry(entry, &feed.id, &url, ns_uuid, fetched_at)
-    }).collect();
+    let items = parsed
+        .entries
+        .into_iter()
+        .map(|entry| normalize_rss_entry(entry, &feed.id, &url, ns_uuid, fetched_at))
+        .collect();
 
     Ok(RssFetchResult {
         items,
@@ -121,7 +125,9 @@ fn normalize_rss_entry(
 ) -> FeedItem {
     // source_guid: use entry.id, or hash the link URL
     let source_guid = if entry.id.is_empty() {
-        entry.links.first()
+        entry
+            .links
+            .first()
             .map(|l| format!("sha256:{:x}", md5_hash(&l.href)))
             .unwrap_or_else(|| format!("sha256:{:x}", md5_hash(&entry.id)))
     } else {
@@ -130,7 +136,8 @@ fn normalize_rss_entry(
 
     let item_id = Uuid::new_v5(&ns_uuid, source_guid.as_bytes()).to_string();
 
-    let title = entry.title
+    let title = entry
+        .title
         .as_ref()
         .map(|t| collapse_whitespace(&strip_html(&t.content)))
         .unwrap_or_else(|| "(no title)".to_string());
@@ -140,13 +147,15 @@ fn normalize_rss_entry(
     let author = entry.authors.first().map(|a| a.name.clone());
 
     // published_at: use published, then updated, then fetched_at
-    let published_at = entry.published
+    let published_at = entry
+        .published
         .or(entry.updated)
         .map(|dt| dt.timestamp())
         .unwrap_or(fetched_at);
 
     // body_html: prefer content, fallback to summary
-    let body_html = entry.content
+    let body_html = entry
+        .content
         .as_ref()
         .and_then(|c| c.body.as_ref())
         .map(|s| s.clone())

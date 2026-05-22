@@ -24,9 +24,9 @@ impl SearchService {
         let limit = limit.unwrap_or(DEFAULT_SEARCH_LIMIT);
         let query = query.to_string();
 
-        self.db.with_reader(|pool| async move {
-            search_items(&pool, &query, limit).await
-        }).await
+        self.db
+            .with_reader(|pool| async move { search_items(&pool, &query, limit).await })
+            .await
     }
 
     /// Search with a prefix query (appends `*` for autocomplete-style matching)

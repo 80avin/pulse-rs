@@ -2,7 +2,7 @@ use clap::{Args, Subcommand};
 use pulse_core::{PulseCore, types::FeedGroup};
 use uuid::Uuid;
 
-use crate::output::{print_json, print_error, confirm};
+use crate::output::{confirm, print_error, print_json};
 
 #[derive(Debug, Args)]
 pub struct GroupArgs {
@@ -70,7 +70,10 @@ pub async fn run(args: GroupArgs, core: &PulseCore, global_json: bool) -> anyhow
 async fn cmd_create(args: GroupCreateArgs, core: &PulseCore) -> anyhow::Result<()> {
     // Check if a group with this name already exists
     let groups = core.get_feed_groups().await?;
-    if groups.iter().any(|g| g.name.eq_ignore_ascii_case(&args.name)) {
+    if groups
+        .iter()
+        .any(|g| g.name.eq_ignore_ascii_case(&args.name))
+    {
         print_error(&format!("group '{}' already exists", args.name));
         return Ok(());
     }
@@ -105,7 +108,7 @@ async fn cmd_list(args: GroupListArgs, core: &PulseCore, global_json: bool) -> a
         return Ok(());
     }
 
-    println!("{:<8}  {:<24}  {}",  "ID", "NAME", "DESCRIPTION");
+    println!("{:<8}  {:<24}  {}", "ID", "NAME", "DESCRIPTION");
     for g in &groups {
         let id_prefix = &g.id[..g.id.len().min(8)];
         let desc = g.description.as_deref().unwrap_or("-");
@@ -116,7 +119,9 @@ async fn cmd_list(args: GroupListArgs, core: &PulseCore, global_json: bool) -> a
 
 async fn cmd_delete(args: GroupDeleteArgs, core: &PulseCore) -> anyhow::Result<()> {
     let groups = core.get_feed_groups().await?;
-    let group = groups.iter().find(|g| g.name.eq_ignore_ascii_case(&args.name));
+    let group = groups
+        .iter()
+        .find(|g| g.name.eq_ignore_ascii_case(&args.name));
 
     let group = match group {
         Some(g) => g.clone(),
@@ -126,7 +131,12 @@ async fn cmd_delete(args: GroupDeleteArgs, core: &PulseCore) -> anyhow::Result<(
         }
     };
 
-    if !args.yes && !confirm(&format!("Delete group '{}'? (feeds will be ungrouped)", args.name)) {
+    if !args.yes
+        && !confirm(&format!(
+            "Delete group '{}'? (feeds will be ungrouped)",
+            args.name
+        ))
+    {
         println!("cancelled");
         return Ok(());
     }
@@ -157,7 +167,9 @@ async fn cmd_delete(args: GroupDeleteArgs, core: &PulseCore) -> anyhow::Result<(
 
 async fn cmd_add_feed(args: GroupAddFeedArgs, core: &PulseCore) -> anyhow::Result<()> {
     let groups = core.get_feed_groups().await?;
-    let group = groups.iter().find(|g| g.name.eq_ignore_ascii_case(&args.group));
+    let group = groups
+        .iter()
+        .find(|g| g.name.eq_ignore_ascii_case(&args.group));
     let group = match group {
         Some(g) => g.clone(),
         None => {

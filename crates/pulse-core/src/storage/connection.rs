@@ -1,16 +1,21 @@
-use sqlx::sqlite::{
-    SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous,
-};
+use crate::config::PulseConfig;
+use crate::error::StorageError;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use sqlx::{SqliteConnection, SqlitePool};
 use std::path::Path;
 use std::time::Duration;
-use crate::error::StorageError;
-use crate::config::PulseConfig;
 
 /// Open a SQLite connection pool for writes (single connection to serialize writes).
 /// Applies WAL mode and all performance pragmas at connect time.
-pub async fn open_writer_pool(path: &Path, config: &PulseConfig) -> Result<SqlitePool, StorageError> {
-    let sync = if config.is_android { SqliteSynchronous::Full } else { SqliteSynchronous::Normal };
+pub async fn open_writer_pool(
+    path: &Path,
+    config: &PulseConfig,
+) -> Result<SqlitePool, StorageError> {
+    let sync = if config.is_android {
+        SqliteSynchronous::Full
+    } else {
+        SqliteSynchronous::Normal
+    };
     let mmap = if config.is_android { "0" } else { "268435456" };
 
     let opts = SqliteConnectOptions::new()
@@ -34,7 +39,10 @@ pub async fn open_writer_pool(path: &Path, config: &PulseConfig) -> Result<Sqlit
 
 /// Open a SQLite connection pool for reads (up to 4 concurrent readers via WAL).
 /// WAL mode is NOT set here — the writer pool sets it; readers inherit it.
-pub async fn open_reader_pool(path: &Path, config: &PulseConfig) -> Result<SqlitePool, StorageError> {
+pub async fn open_reader_pool(
+    path: &Path,
+    config: &PulseConfig,
+) -> Result<SqlitePool, StorageError> {
     let mmap = if config.is_android { "0" } else { "268435456" };
 
     let opts = SqliteConnectOptions::new()
@@ -54,16 +62,37 @@ pub async fn open_reader_pool(path: &Path, config: &PulseConfig) -> Result<Sqlit
 }
 
 /// Apply required PRAGMAs to a raw connection (for callers that acquire connections directly).
-pub async fn apply_pragmas(conn: &mut SqliteConnection, config: &PulseConfig) -> Result<(), StorageError> {
+pub async fn apply_pragmas(
+    conn: &mut SqliteConnection,
+    config: &PulseConfig,
+) -> Result<(), StorageError> {
     use sqlx::Executor;
-    conn.execute("PRAGMA journal_mode = WAL;").await.map_err(StorageError::Sqlite)?;
-    let sync = if config.is_android { "PRAGMA synchronous = FULL;" } else { "PRAGMA synchronous = NORMAL;" };
+    conn.execute("PRAGMA journal_mode = WAL;")
+        .await
+        .map_err(StorageError::Sqlite)?;
+    let sync = if config.is_android {
+        "PRAGMA synchronous = FULL;"
+    } else {
+        "PRAGMA synchronous = NORMAL;"
+    };
     conn.execute(sync).await.map_err(StorageError::Sqlite)?;
-    conn.execute("PRAGMA foreign_keys = ON;").await.map_err(StorageError::Sqlite)?;
-    conn.execute("PRAGMA busy_timeout = 5000;").await.map_err(StorageError::Sqlite)?;
-    conn.execute("PRAGMA cache_size = -32768;").await.map_err(StorageError::Sqlite)?;
-    conn.execute("PRAGMA temp_store = MEMORY;").await.map_err(StorageError::Sqlite)?;
-    let mmap = if config.is_android { "PRAGMA mmap_size = 0;" } else { "PRAGMA mmap_size = 268435456;" };
+    conn.execute("PRAGMA foreign_keys = ON;")
+        .await
+        .map_err(StorageError::Sqlite)?;
+    conn.execute("PRAGMA busy_timeout = 5000;")
+        .await
+        .map_err(StorageError::Sqlite)?;
+    conn.execute("PRAGMA cache_size = -32768;")
+        .await
+        .map_err(StorageError::Sqlite)?;
+    conn.execute("PRAGMA temp_store = MEMORY;")
+        .await
+        .map_err(StorageError::Sqlite)?;
+    let mmap = if config.is_android {
+        "PRAGMA mmap_size = 0;"
+    } else {
+        "PRAGMA mmap_size = 268435456;"
+    };
     conn.execute(mmap).await.map_err(StorageError::Sqlite)?;
     Ok(())
 }

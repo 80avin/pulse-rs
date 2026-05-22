@@ -1,13 +1,13 @@
-use std::sync::{Arc, RwLock};
-use std::collections::HashMap;
-use tokio::sync::mpsc;
-use crate::error::TaggingError;
-use crate::types::{ItemId, FeedType, TagResult};
-use crate::ai::vision::VisionTagger;
 use crate::ai::rules::RuleEngine;
+use crate::ai::vision::VisionTagger;
+use crate::error::TaggingError;
 use crate::feeds::enrich::is_image_url;
 use crate::storage::DbHandle;
 use crate::storage::queries::get_item;
+use crate::types::{FeedType, ItemId, TagResult};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use tokio::sync::mpsc;
 
 /// The bounded channel capacity for the tagging queue
 pub const TAGGER_QUEUE_SIZE: usize = 200;
@@ -31,7 +31,10 @@ impl TaggerHandle {
 
     /// Queue an item for tagging. If the channel is full, the item is dropped (non-fatal).
     pub async fn tag_item(&self, item_id: ItemId, feed_type: FeedType) {
-        let req = TagRequest { item_id: item_id.clone(), feed_type };
+        let req = TagRequest {
+            item_id: item_id.clone(),
+            feed_type,
+        };
         match self.tx.try_send(req) {
             Ok(()) => {}
             Err(mpsc::error::TrySendError::Full(_)) => {
@@ -67,11 +70,16 @@ pub async fn tagger_task(
         let miniml = miniml_tagger.read().unwrap().clone();
         let vision = vision_tagger.read().unwrap().clone();
         match process_tag_request(
-            &db, &text_backend,
+            &db,
+            &text_backend,
             &rule_engine,
-            fasttext.as_deref(), miniml.as_deref(), vision.as_deref(),
+            fasttext.as_deref(),
+            miniml.as_deref(),
+            vision.as_deref(),
             &req,
-        ).await {
+        )
+        .await
+        {
             Ok(tag_count) => {
                 tracing::debug!(item_id = %req.item_id, tags = tag_count, "Item tagged");
             }
@@ -87,9 +95,24 @@ pub async fn tagger_task(
 /// Tags where a substantive semantic match means `no-context` should be suppressed.
 /// If any of these fire, the post has enough content signal to not be vague.
 const SUBSTANTIVE_TAGS: &[&str] = &[
-    "technical", "tutorial", "research", "news", "security", "ai-ml",
-    "privacy", "policy", "science", "clickbait", "show-hn", "ask-hn",
-    "job-posting", "paywall", "video", "civic", "local-rec", "culture",
+    "technical",
+    "tutorial",
+    "research",
+    "news",
+    "security",
+    "ai-ml",
+    "privacy",
+    "policy",
+    "science",
+    "clickbait",
+    "show-hn",
+    "ask-hn",
+    "job-posting",
+    "paywall",
+    "video",
+    "civic",
+    "local-rec",
+    "culture",
     "marketplace",
 ];
 
@@ -104,9 +127,10 @@ pub(crate) async fn process_tag_request(
 ) -> Result<usize, TaggingError> {
     let item_id = req.item_id.clone();
 
-    let item = db.with_reader(|pool| async move {
-        get_item(&pool, &item_id).await
-    }).await.map_err(TaggingError::Storage)?;
+    let item = db
+        .with_reader(|pool| async move { get_item(&pool, &item_id).await })
+        .await
+        .map_err(TaggingError::Storage)?;
 
     let is_direct_image = item.url.as_deref().map(is_image_url).unwrap_or(false);
 
@@ -131,12 +155,12 @@ pub(crate) async fn process_tag_request(
     let ml_tags: Vec<TagResult> = if !is_direct_image && title_words >= 5 {
         let text = crate::training::build_input_text(&item.title, item.url.as_deref());
         match text_backend {
-            crate::config::TextBackend::FastText => {
-                fasttext.and_then(|ft| ft.classify(&text).ok()).unwrap_or_default()
-            }
-            crate::config::TextBackend::MiniMl => {
-                miniml.and_then(|ml| ml.classify(&text).ok()).unwrap_or_default()
-            }
+            crate::config::TextBackend::FastText => fasttext
+                .and_then(|ft| ft.classify(&text).ok())
+                .unwrap_or_default(),
+            crate::config::TextBackend::MiniMl => miniml
+                .and_then(|ml| ml.classify(&text).ok())
+                .unwrap_or_default(),
             crate::config::TextBackend::HybridFastTextMiniMl => {
                 hybrid_classify(fasttext, miniml, &text)
             }
@@ -174,7 +198,9 @@ pub(crate) async fn process_tag_request(
 
     // Suppress `no-context` when a substantive topic tag is present.
     // A specific question (local-rec, civic, etc.) is not vague even if short.
-    let has_substantive = tags.iter().any(|t| SUBSTANTIVE_TAGS.contains(&t.tag.as_str()));
+    let has_substantive = tags
+        .iter()
+        .any(|t| SUBSTANTIVE_TAGS.contains(&t.tag.as_str()));
     if has_substantive {
         tags.retain(|t| t.tag != "no-context");
     }
@@ -183,10 +209,17 @@ pub(crate) async fn process_tag_request(
     // would otherwise be false positives — a personal food post or scenery share
     // cannot simultaneously be technical/security/policy/ai-ml content.
     const NOISE_SUPPRESSED_TAGS: &[&str] = &[
-        "technical", "security", "ai-ml", "policy", "privacy", "science",
-        "research", "tutorial",
+        "technical",
+        "security",
+        "ai-ml",
+        "policy",
+        "privacy",
+        "science",
+        "research",
+        "tutorial",
     ];
-    let noise_conf = tags.iter()
+    let noise_conf = tags
+        .iter()
         .find(|t| t.tag == "noise")
         .map(|t| t.confidence)
         .unwrap_or(0.0);
@@ -196,7 +229,8 @@ pub(crate) async fn process_tag_request(
 
     let tag_count = tags.len();
     if !tags.is_empty() {
-        db.insert_ai_tags(req.item_id.clone(), tags).await
+        db.insert_ai_tags(req.item_id.clone(), tags)
+            .await
             .map_err(TaggingError::Storage)?;
     }
 
@@ -207,10 +241,8 @@ pub(crate) async fn process_tag_request(
 /// Tags present in both: keep the one with higher confidence.
 /// Tags present in only one: include as-is.
 fn merge_tags(text_tags: Vec<TagResult>, vision_tags: Vec<TagResult>) -> Vec<TagResult> {
-    let mut by_tag: HashMap<String, TagResult> = text_tags
-        .into_iter()
-        .map(|t| (t.tag.clone(), t))
-        .collect();
+    let mut by_tag: HashMap<String, TagResult> =
+        text_tags.into_iter().map(|t| (t.tag.clone(), t)).collect();
 
     for vt in vision_tags {
         let entry = by_tag.entry(vt.tag.clone()).or_insert_with(|| vt.clone());
@@ -223,8 +255,14 @@ fn merge_tags(text_tags: Vec<TagResult>, vision_tags: Vec<TagResult>) -> Vec<Tag
 }
 
 const MINIML_CATEGORIES: &[&str] = &[
-    "research", "clickbait", "technical", "civic", "culture", "local-rec",
-    "no-context", "noise",
+    "research",
+    "clickbait",
+    "technical",
+    "civic",
+    "culture",
+    "local-rec",
+    "no-context",
+    "noise",
 ];
 const HYBRID_FASTTEXT_CONFIDENCE: f32 = 0.65;
 
@@ -242,17 +280,16 @@ fn hybrid_classify(
         .unwrap_or_default();
 
     // Start with FastText results
-    let mut result: HashMap<String, TagResult> = ft_tags
-        .into_iter()
-        .map(|t| (t.tag.clone(), t))
-        .collect();
+    let mut result: HashMap<String, TagResult> =
+        ft_tags.into_iter().map(|t| (t.tag.clone(), t)).collect();
 
     // For semantic categories: MiniLM overrides FastText when FastText isn't confident
     for ml_tag in ml_tags {
         if !MINIML_CATEGORIES.contains(&ml_tag.tag.as_str()) {
             continue;
         }
-        let ft_confident = result.get(&ml_tag.tag)
+        let ft_confident = result
+            .get(&ml_tag.tag)
             .map(|t| t.confidence >= HYBRID_FASTTEXT_CONFIDENCE)
             .unwrap_or(false);
         if !ft_confident {

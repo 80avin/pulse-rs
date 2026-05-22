@@ -1,9 +1,9 @@
-use sqlx::SqlitePool;
 use crate::error::StorageError;
 use crate::types::{
-    Feed, FeedGroup, FeedId, ItemId, FeedType, FeedItemView, FeedItem,
-    TimelineCursor, TimelineFilter, TimelinePage, AiTag, TaggerSource, DbStats,
+    AiTag, DbStats, Feed, FeedGroup, FeedId, FeedItem, FeedItemView, FeedType, ItemId,
+    TaggerSource, TimelineCursor, TimelineFilter, TimelinePage,
 };
+use sqlx::SqlitePool;
 use std::str::FromStr;
 
 fn row_to_feed(row: &sqlx::sqlite::SqliteRow) -> Result<Feed, StorageError> {
@@ -25,17 +25,29 @@ fn row_to_feed(row: &sqlx::sqlite::SqliteRow) -> Result<Feed, StorageError> {
         site_url: row.try_get("site_url").map_err(StorageError::Sqlite)?,
         icon_url: row.try_get("icon_url").map_err(StorageError::Sqlite)?,
         group_id: row.try_get("group_id").map_err(StorageError::Sqlite)?,
-        poll_interval_secs: row.try_get("poll_interval_secs").map_err(StorageError::Sqlite)?,
+        poll_interval_secs: row
+            .try_get("poll_interval_secs")
+            .map_err(StorageError::Sqlite)?,
         is_enabled: is_enabled_i != 0,
         etag: row.try_get("etag").map_err(StorageError::Sqlite)?,
         last_modified: row.try_get("last_modified").map_err(StorageError::Sqlite)?,
-        last_fetched_at: row.try_get("last_fetched_at").map_err(StorageError::Sqlite)?,
-        last_success_at: row.try_get("last_success_at").map_err(StorageError::Sqlite)?,
+        last_fetched_at: row
+            .try_get("last_fetched_at")
+            .map_err(StorageError::Sqlite)?,
+        last_success_at: row
+            .try_get("last_success_at")
+            .map_err(StorageError::Sqlite)?,
         last_item_at: row.try_get("last_item_at").map_err(StorageError::Sqlite)?,
-        failure_streak: row.try_get("failure_streak").map_err(StorageError::Sqlite)?,
+        failure_streak: row
+            .try_get("failure_streak")
+            .map_err(StorageError::Sqlite)?,
         total_fetches: row.try_get("total_fetches").map_err(StorageError::Sqlite)?,
-        total_failures: row.try_get("total_failures").map_err(StorageError::Sqlite)?,
-        avg_latency_ms: row.try_get("avg_latency_ms").map_err(StorageError::Sqlite)?,
+        total_failures: row
+            .try_get("total_failures")
+            .map_err(StorageError::Sqlite)?,
+        avg_latency_ms: row
+            .try_get("avg_latency_ms")
+            .map_err(StorageError::Sqlite)?,
         next_fetch_at: row.try_get("next_fetch_at").map_err(StorageError::Sqlite)?,
         source_config,
         language: row.try_get("language").map_err(StorageError::Sqlite)?,
@@ -53,7 +65,7 @@ pub async fn get_feeds(pool: &SqlitePool) -> Result<Vec<Feed>, StorageError> {
                 total_fetches, total_failures, avg_latency_ms, next_fetch_at,
                 source_config, language, created_at, updated_at
          FROM feeds
-         ORDER BY created_at ASC"
+         ORDER BY created_at ASC",
     )
     .fetch_all(pool)
     .await
@@ -70,7 +82,7 @@ pub async fn get_feed(pool: &SqlitePool, feed_id: &FeedId) -> Result<Feed, Stora
                 last_fetched_at, last_success_at, last_item_at, failure_streak,
                 total_fetches, total_failures, avg_latency_ms, next_fetch_at,
                 source_config, language, created_at, updated_at
-         FROM feeds WHERE id = ?"
+         FROM feeds WHERE id = ?",
     )
     .bind(feed_id)
     .fetch_optional(pool)
@@ -79,7 +91,9 @@ pub async fn get_feed(pool: &SqlitePool, feed_id: &FeedId) -> Result<Feed, Stora
 
     match row {
         Some(r) => row_to_feed(&r),
-        None => Err(StorageError::NotFound { id: feed_id.clone() }),
+        None => Err(StorageError::NotFound {
+            id: feed_id.clone(),
+        }),
     }
 }
 
@@ -88,24 +102,26 @@ pub async fn get_feed_groups(pool: &SqlitePool) -> Result<Vec<FeedGroup>, Storag
     let rows = sqlx::query(
         "SELECT id, name, description, color, sort_order, created_at, updated_at
          FROM feed_groups
-         ORDER BY sort_order ASC, name ASC"
+         ORDER BY sort_order ASC, name ASC",
     )
     .fetch_all(pool)
     .await
     .map_err(StorageError::Sqlite)?;
 
-    rows.iter().map(|row| {
-        use sqlx::Row;
-        Ok(FeedGroup {
-            id: row.try_get("id").map_err(StorageError::Sqlite)?,
-            name: row.try_get("name").map_err(StorageError::Sqlite)?,
-            description: row.try_get("description").map_err(StorageError::Sqlite)?,
-            color: row.try_get("color").map_err(StorageError::Sqlite)?,
-            sort_order: row.try_get("sort_order").map_err(StorageError::Sqlite)?,
-            created_at: row.try_get("created_at").map_err(StorageError::Sqlite)?,
-            updated_at: row.try_get("updated_at").map_err(StorageError::Sqlite)?,
+    rows.iter()
+        .map(|row| {
+            use sqlx::Row;
+            Ok(FeedGroup {
+                id: row.try_get("id").map_err(StorageError::Sqlite)?,
+                name: row.try_get("name").map_err(StorageError::Sqlite)?,
+                description: row.try_get("description").map_err(StorageError::Sqlite)?,
+                color: row.try_get("color").map_err(StorageError::Sqlite)?,
+                sort_order: row.try_get("sort_order").map_err(StorageError::Sqlite)?,
+                created_at: row.try_get("created_at").map_err(StorageError::Sqlite)?,
+                updated_at: row.try_get("updated_at").map_err(StorageError::Sqlite)?,
+            })
         })
-    }).collect()
+        .collect()
 }
 
 fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, StorageError> {
@@ -159,7 +175,9 @@ pub async fn get_timeline(
     let fetch_limit = (limit + 1) as i64;
 
     let cursor_ts = cursor.map(|c| c.published_at).unwrap_or(i64::MAX);
-    let cursor_id = cursor.map(|c| c.id.clone()).unwrap_or_else(|| "\u{FFFF}".repeat(40));
+    let cursor_id = cursor
+        .map(|c| c.id.clone())
+        .unwrap_or_else(|| "\u{FFFF}".repeat(40));
 
     // Build WHERE clauses dynamically
     let mut conditions = vec![
@@ -180,7 +198,10 @@ pub async fn get_timeline(
         conditions.push("ist.is_saved = ?".to_string());
     }
     if filter.tag.is_some() {
-        conditions.push("EXISTS (SELECT 1 FROM ai_tags _tf WHERE _tf.item_id = fi.id AND _tf.tag = ?)".to_string());
+        conditions.push(
+            "EXISTS (SELECT 1 FROM ai_tags _tf WHERE _tf.item_id = fi.id AND _tf.tag = ?)"
+                .to_string(),
+        );
     }
 
     let where_clause = conditions.join(" AND ");
@@ -232,9 +253,10 @@ pub async fn get_timeline(
 
     let rows = query.fetch_all(pool).await.map_err(StorageError::Sqlite)?;
 
-    let mut items: Vec<FeedItemView> = rows.iter().filter_map(|row| {
-        row_to_feed_item_view(row).ok()
-    }).collect();
+    let mut items: Vec<FeedItemView> = rows
+        .iter()
+        .filter_map(|row| row_to_feed_item_view(row).ok())
+        .collect();
 
     let has_more = items.len() > limit;
     if has_more {
@@ -250,7 +272,11 @@ pub async fn get_timeline(
         None
     };
 
-    Ok(TimelinePage { items, next_cursor, has_more })
+    Ok(TimelinePage {
+        items,
+        next_cursor,
+        has_more,
+    })
 }
 
 /// Fetch a single feed item by ID
@@ -258,7 +284,7 @@ pub async fn get_item(pool: &SqlitePool, item_id: &ItemId) -> Result<FeedItem, S
     let row = sqlx::query(
         "SELECT id, feed_id, source_guid, title, url, author, published_at, fetched_at,
                 body_text, body_html, word_count, score, comment_count, comment_url, source_meta
-         FROM feed_items WHERE id = ?"
+         FROM feed_items WHERE id = ?",
     )
     .bind(item_id)
     .fetch_optional(pool)
@@ -288,32 +314,33 @@ pub async fn get_item(pool: &SqlitePool, item_id: &ItemId) -> Result<FeedItem, S
                 source_meta,
             })
         }
-        None => Err(StorageError::NotFound { id: item_id.clone() }),
+        None => Err(StorageError::NotFound {
+            id: item_id.clone(),
+        }),
     }
 }
 
 /// Resolve a full or prefix item ID to the canonical full UUID.
 /// Returns `None` if no item matches.
-pub async fn resolve_item_id(pool: &SqlitePool, prefix: &str) -> Result<Option<ItemId>, StorageError> {
+pub async fn resolve_item_id(
+    pool: &SqlitePool,
+    prefix: &str,
+) -> Result<Option<ItemId>, StorageError> {
     if prefix.len() == 36 {
         // Already a full UUID — verify it exists
-        let row = sqlx::query_scalar::<_, String>(
-            "SELECT id FROM feed_items WHERE id = ? LIMIT 1"
-        )
-        .bind(prefix)
-        .fetch_optional(pool)
-        .await
-        .map_err(StorageError::Sqlite)?;
+        let row = sqlx::query_scalar::<_, String>("SELECT id FROM feed_items WHERE id = ? LIMIT 1")
+            .bind(prefix)
+            .fetch_optional(pool)
+            .await
+            .map_err(StorageError::Sqlite)?;
         return Ok(row);
     }
     let pattern = format!("{}%", prefix);
-    let row = sqlx::query_scalar::<_, String>(
-        "SELECT id FROM feed_items WHERE id LIKE ? LIMIT 1"
-    )
-    .bind(&pattern)
-    .fetch_optional(pool)
-    .await
-    .map_err(StorageError::Sqlite)?;
+    let row = sqlx::query_scalar::<_, String>("SELECT id FROM feed_items WHERE id LIKE ? LIMIT 1")
+        .bind(&pattern)
+        .fetch_optional(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
     Ok(row)
 }
 
@@ -359,32 +386,34 @@ pub async fn get_ai_tags(pool: &SqlitePool, item_id: &ItemId) -> Result<Vec<AiTa
         "SELECT id, item_id, tag, confidence, tagger_source, rule_id, model_name,
                 model_version, explanation, created_at
          FROM ai_tags WHERE item_id = ?
-         ORDER BY confidence DESC"
+         ORDER BY confidence DESC",
     )
     .bind(item_id)
     .fetch_all(pool)
     .await
     .map_err(StorageError::Sqlite)?;
 
-    rows.iter().map(|row| {
-        use sqlx::Row;
-        let source_str: String = row.try_get("tagger_source").map_err(StorageError::Sqlite)?;
-        let tagger_source = TaggerSource::from_str(&source_str)
-            .map_err(|e| StorageError::Migration(format!("Invalid tagger_source: {e}")))?;
-        let confidence: f64 = row.try_get("confidence").map_err(StorageError::Sqlite)?;
-        Ok(AiTag {
-            id: row.try_get("id").map_err(StorageError::Sqlite)?,
-            item_id: row.try_get("item_id").map_err(StorageError::Sqlite)?,
-            tag: row.try_get("tag").map_err(StorageError::Sqlite)?,
-            confidence: confidence as f32,
-            tagger_source,
-            rule_id: row.try_get("rule_id").map_err(StorageError::Sqlite)?,
-            model_name: row.try_get("model_name").map_err(StorageError::Sqlite)?,
-            model_version: row.try_get("model_version").map_err(StorageError::Sqlite)?,
-            explanation: row.try_get("explanation").map_err(StorageError::Sqlite)?,
-            created_at: row.try_get("created_at").map_err(StorageError::Sqlite)?,
+    rows.iter()
+        .map(|row| {
+            use sqlx::Row;
+            let source_str: String = row.try_get("tagger_source").map_err(StorageError::Sqlite)?;
+            let tagger_source = TaggerSource::from_str(&source_str)
+                .map_err(|e| StorageError::Migration(format!("Invalid tagger_source: {e}")))?;
+            let confidence: f64 = row.try_get("confidence").map_err(StorageError::Sqlite)?;
+            Ok(AiTag {
+                id: row.try_get("id").map_err(StorageError::Sqlite)?,
+                item_id: row.try_get("item_id").map_err(StorageError::Sqlite)?,
+                tag: row.try_get("tag").map_err(StorageError::Sqlite)?,
+                confidence: confidence as f32,
+                tagger_source,
+                rule_id: row.try_get("rule_id").map_err(StorageError::Sqlite)?,
+                model_name: row.try_get("model_name").map_err(StorageError::Sqlite)?,
+                model_version: row.try_get("model_version").map_err(StorageError::Sqlite)?,
+                explanation: row.try_get("explanation").map_err(StorageError::Sqlite)?,
+                created_at: row.try_get("created_at").map_err(StorageError::Sqlite)?,
+            })
         })
-    }).collect()
+        .collect()
 }
 
 /// Minimal item record returned for enrichment candidates
@@ -409,7 +438,7 @@ pub async fn get_pending_enrichment(
                AND json_extract(source_meta, '$.enriched_at') IS NULL
                AND feed_id = ?
              ORDER BY published_at DESC
-             LIMIT ?"
+             LIMIT ?",
         )
         .bind(fid)
         .bind(limit as i64)
@@ -422,7 +451,7 @@ pub async fn get_pending_enrichment(
              WHERE url IS NOT NULL
                AND json_extract(source_meta, '$.enriched_at') IS NULL
              ORDER BY published_at DESC
-             LIMIT ?"
+             LIMIT ?",
         )
         .bind(limit as i64)
         .fetch_all(pool)
@@ -431,12 +460,16 @@ pub async fn get_pending_enrichment(
     };
 
     use sqlx::Row;
-    rows.iter().map(|r| Ok(EnrichCandidate {
-        id: r.try_get("id").map_err(StorageError::Sqlite)?,
-        url: r.try_get("url").map_err(StorageError::Sqlite)?,
-        feed_id: r.try_get("feed_id").map_err(StorageError::Sqlite)?,
-        body_text: r.try_get("body_text").map_err(StorageError::Sqlite)?,
-    })).collect()
+    rows.iter()
+        .map(|r| {
+            Ok(EnrichCandidate {
+                id: r.try_get("id").map_err(StorageError::Sqlite)?,
+                url: r.try_get("url").map_err(StorageError::Sqlite)?,
+                feed_id: r.try_get("feed_id").map_err(StorageError::Sqlite)?,
+                body_text: r.try_get("body_text").map_err(StorageError::Sqlite)?,
+            })
+        })
+        .collect()
 }
 
 /// Count items still pending enrichment
@@ -449,26 +482,35 @@ pub async fn count_pending_enrichment(
             "SELECT COUNT(*) FROM feed_items
              WHERE url IS NOT NULL
                AND json_extract(source_meta, '$.enriched_at') IS NULL
-               AND feed_id = ?"
-        ).bind(fid).fetch_one(pool).await.map_err(StorageError::Sqlite)
+               AND feed_id = ?",
+        )
+        .bind(fid)
+        .fetch_one(pool)
+        .await
+        .map_err(StorageError::Sqlite)
     } else {
         sqlx::query_scalar(
             "SELECT COUNT(*) FROM feed_items
              WHERE url IS NOT NULL
-               AND json_extract(source_meta, '$.enriched_at') IS NULL"
-        ).fetch_one(pool).await.map_err(StorageError::Sqlite)
+               AND json_extract(source_meta, '$.enriched_at') IS NULL",
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(StorageError::Sqlite)
     }
 }
 
 /// Return total (non-hidden) item count per feed_id.
-pub async fn get_total_counts_by_feed(pool: &SqlitePool) -> Result<std::collections::HashMap<String, i64>, StorageError> {
+pub async fn get_total_counts_by_feed(
+    pool: &SqlitePool,
+) -> Result<std::collections::HashMap<String, i64>, StorageError> {
     use sqlx::Row;
     let rows = sqlx::query(
         "SELECT fi.feed_id, COUNT(*) AS total
          FROM feed_items fi
          JOIN item_states ist ON ist.item_id = fi.id
          WHERE ist.is_hidden = 0
-         GROUP BY fi.feed_id"
+         GROUP BY fi.feed_id",
     )
     .fetch_all(pool)
     .await
@@ -484,14 +526,16 @@ pub async fn get_total_counts_by_feed(pool: &SqlitePool) -> Result<std::collecti
 }
 
 /// Return unread item count per feed_id (only non-hidden items)
-pub async fn get_unread_counts_by_feed(pool: &SqlitePool) -> Result<std::collections::HashMap<String, i64>, StorageError> {
+pub async fn get_unread_counts_by_feed(
+    pool: &SqlitePool,
+) -> Result<std::collections::HashMap<String, i64>, StorageError> {
     use sqlx::Row;
     let rows = sqlx::query(
         "SELECT fi.feed_id, COUNT(*) AS unread
          FROM feed_items fi
          JOIN item_states ist ON ist.item_id = fi.id
          WHERE ist.is_read = 0 AND ist.is_hidden = 0
-         GROUP BY fi.feed_id"
+         GROUP BY fi.feed_id",
     )
     .fetch_all(pool)
     .await
@@ -508,29 +552,39 @@ pub async fn get_unread_counts_by_feed(pool: &SqlitePool) -> Result<std::collect
 
 /// Get database statistics
 pub async fn get_db_stats(pool: &SqlitePool) -> Result<DbStats, StorageError> {
-    let feed_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM feeds WHERE is_enabled = 1"
-    ).fetch_one(pool).await.map_err(StorageError::Sqlite)?;
+    let feed_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM feeds WHERE is_enabled = 1")
+        .fetch_one(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
 
-    let item_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM feed_items"
-    ).fetch_one(pool).await.map_err(StorageError::Sqlite)?;
+    let item_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM feed_items")
+        .fetch_one(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
 
-    let unread_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM item_states WHERE is_read = 0 AND is_hidden = 0"
-    ).fetch_one(pool).await.map_err(StorageError::Sqlite)?;
+    let unread_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM item_states WHERE is_read = 0 AND is_hidden = 0")
+            .fetch_one(pool)
+            .await
+            .map_err(StorageError::Sqlite)?;
 
-    let saved_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM item_states WHERE is_saved = 1"
-    ).fetch_one(pool).await.map_err(StorageError::Sqlite)?;
+    let saved_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM item_states WHERE is_saved = 1")
+            .fetch_one(pool)
+            .await
+            .map_err(StorageError::Sqlite)?;
 
-    let tag_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM ai_tags"
-    ).fetch_one(pool).await.map_err(StorageError::Sqlite)?;
+    let tag_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ai_tags")
+        .fetch_one(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
 
     let db_size_bytes: i64 = sqlx::query_scalar(
-        "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()"
-    ).fetch_one(pool).await.unwrap_or(0);
+        "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
 
     Ok(DbStats {
         feed_count,

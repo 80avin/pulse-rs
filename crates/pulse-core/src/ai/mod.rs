@@ -9,7 +9,7 @@ pub mod vision_labels;
 
 pub use fasttext::FastTextTagger;
 pub use miniml::MiniMlTagger;
-pub use tagger::{TaggerHandle, TagRequest, tagger_task, TAGGER_QUEUE_SIZE};
-pub use rules::{RuleEngine, TagRule, RulePattern, RuleScope, default_rules};
 pub use onnx::OnnxTagger;
+pub use rules::{RuleEngine, RulePattern, RuleScope, TagRule, default_rules};
+pub use tagger::{TAGGER_QUEUE_SIZE, TagRequest, TaggerHandle, tagger_task};
 pub use vision::VisionTagger;

@@ -1,10 +1,10 @@
+use crate::error::FeedError;
+use crate::feeds::normalize::{collapse_whitespace, count_words, decode_html_entities, strip_html};
+use crate::feeds::reddit_auth::RedditAuth;
+use crate::types::{Feed, FeedItem};
 use reqwest::Client;
 use serde::Deserialize;
 use uuid::Uuid;
-use crate::error::FeedError;
-use crate::types::{Feed, FeedItem};
-use crate::feeds::normalize::{strip_html, count_words, collapse_whitespace, decode_html_entities};
-use crate::feeds::reddit_auth::RedditAuth;
 
 const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)";
 const REDDIT_BASE: &str = "https://www.reddit.com";
@@ -86,23 +86,35 @@ struct CrosspostParent {
     post_hint: Option<String>,
 }
 
-pub async fn fetch_reddit(client: &Client, feed: &Feed, auth: Option<&RedditAuth>) -> Result<RedditFetchResult, FeedError> {
+pub async fn fetch_reddit(
+    client: &Client,
+    feed: &Feed,
+    auth: Option<&RedditAuth>,
+) -> Result<RedditFetchResult, FeedError> {
     let fetched_at = chrono::Utc::now().timestamp();
 
     // Prefer explicit source_config; fall back to parsing from the feed URL.
     // Feed URL format: https://www.reddit.com/r/{subreddit}/{sort}.json
-    let subreddit = feed.source_config
-        .get("subreddit").and_then(|v| v.as_str())
+    let subreddit = feed
+        .source_config
+        .get("subreddit")
+        .and_then(|v| v.as_str())
         .or_else(|| subreddit_from_url(&feed.url))
         .unwrap_or("rust");
-    let sort = feed.source_config
-        .get("sort").and_then(|v| v.as_str())
+    let sort = feed
+        .source_config
+        .get("sort")
+        .and_then(|v| v.as_str())
         .or_else(|| sort_from_url(&feed.url))
         .unwrap_or("hot");
     let limit = 100u32;
 
     // Authenticated requests use oauth.reddit.com (higher rate limits, no TLS fingerprint issues).
-    let base = if auth.is_some() { REDDIT_OAUTH_BASE } else { REDDIT_BASE };
+    let base = if auth.is_some() {
+        REDDIT_OAUTH_BASE
+    } else {
+        REDDIT_BASE
+    };
     let fetch_url = format!("{}/r/{}/{}.json?limit={}", base, subreddit, sort, limit);
 
     let mut req = client.get(&fetch_url).header("User-Agent", USER_AGENT);
@@ -110,10 +122,17 @@ pub async fn fetch_reddit(client: &Client, feed: &Feed, auth: Option<&RedditAuth
         let token = reddit_auth.token(client).await?;
         req = req.header("Authorization", format!("Bearer {}", token));
     }
-    if let Some(ref etag) = feed.etag { req = req.header("If-None-Match", etag); }
-    if let Some(ref lm) = feed.last_modified { req = req.header("If-Modified-Since", lm); }
+    if let Some(ref etag) = feed.etag {
+        req = req.header("If-None-Match", etag);
+    }
+    if let Some(ref lm) = feed.last_modified {
+        req = req.header("If-Modified-Since", lm);
+    }
 
-    let response = req.send().await.map_err(|e| FeedError::Network { url: fetch_url.clone(), source: e })?;
+    let response = req.send().await.map_err(|e| FeedError::Network {
+        url: fetch_url.clone(),
+        source: e,
+    })?;
     let status = response.status();
 
     if status.as_u16() == 304 {
@@ -133,19 +152,27 @@ pub async fn fetch_reddit(client: &Client, feed: &Feed, auth: Option<&RedditAuth
         });
     }
 
-    let new_etag = response.headers()
+    let new_etag = response
+        .headers()
         .get(reqwest::header::ETAG)
-        .and_then(|v| v.to_str().ok()).map(|s| s.to_string());
-    let new_last_modified = response.headers()
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    let new_last_modified = response
+        .headers()
         .get(reqwest::header::LAST_MODIFIED)
-        .and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
 
     let listing: RedditListing = response.json().await.map_err(|e| FeedError::Network {
-        url: fetch_url.clone(), source: e,
+        url: fetch_url.clone(),
+        source: e,
     })?;
 
     let ns_uuid = Uuid::new_v5(&Uuid::NAMESPACE_URL, feed.url.as_bytes());
-    let items = listing.data.children.into_iter()
+    let items = listing
+        .data
+        .children
+        .into_iter()
         .map(|child| normalize_reddit_post(child.data, &feed.id, ns_uuid, fetched_at))
         .collect();
 
@@ -157,12 +184,20 @@ pub async fn fetch_reddit(client: &Client, feed: &Feed, auth: Option<&RedditAuth
     })
 }
 
-fn normalize_reddit_post(post: RedditPost, feed_id: &str, ns_uuid: Uuid, fetched_at: i64) -> FeedItem {
+fn normalize_reddit_post(
+    post: RedditPost,
+    feed_id: &str,
+    ns_uuid: Uuid,
+    fetched_at: i64,
+) -> FeedItem {
     let source_guid = post.id.clone();
     let item_id = Uuid::new_v5(&ns_uuid, source_guid.as_bytes()).to_string();
     let comment_url = format!("{}{}", REDDIT_BASE, post.permalink);
     let is_self = post.is_self.unwrap_or(false);
-    let post_hint = post.post_hint.as_deref().unwrap_or(if is_self { "self" } else { "link" });
+    let post_hint = post
+        .post_hint
+        .as_deref()
+        .unwrap_or(if is_self { "self" } else { "link" });
 
     // Always use the Reddit permalink as the primary URL so the Open button
     // navigates to the Reddit post page. For link posts, the external target
@@ -173,32 +208,51 @@ fn normalize_reddit_post(post: RedditPost, feed_id: &str, ns_uuid: Uuid, fetched
 
     // ── Body text assembly ────────────────────────────────────────────────────
     // Priority: self-text → crosspost self-text → (enrichment fills in link posts later)
-    let own_body_html = post.selftext_html.as_deref()
+    let own_body_html = post
+        .selftext_html
+        .as_deref()
         .filter(|s| !s.is_empty() && *s != "null")
         .map(|s| s.to_string());
 
-    let own_body_text = post.selftext.as_deref()
+    let own_body_text = post
+        .selftext
+        .as_deref()
         .filter(|s| !s.is_empty() && *s != "null")
         .map(|s| collapse_whitespace(s))
         .or_else(|| own_body_html.as_deref().map(strip_html));
 
     // Resolve crosspost chain (take first parent)
-    let crosspost = post.crosspost_parent_list.as_deref()
+    let crosspost = post
+        .crosspost_parent_list
+        .as_deref()
         .and_then(|v| v.first());
 
     let (body_text, body_html, crosspost_meta) = if let Some(cp) = crosspost {
-        let cp_body_html = cp.selftext_html.as_deref()
+        let cp_body_html = cp
+            .selftext_html
+            .as_deref()
             .filter(|s| !s.is_empty() && *s != "null")
             .map(|s| s.to_string());
-        let cp_body_text = cp.selftext.as_deref()
+        let cp_body_text = cp
+            .selftext
+            .as_deref()
             .filter(|s| !s.is_empty() && *s != "null")
             .map(|s| collapse_whitespace(s))
             .or_else(|| cp_body_html.as_deref().map(strip_html));
 
         // Merge own + parent body
         let merged_text = match (own_body_text.as_deref(), cp_body_text.as_deref()) {
-            (Some(own), Some(cp_t)) => Some(format!("{}\n\n[crosspost from r/{}]: {}", own, cp.subreddit.as_deref().unwrap_or("?"), cp_t)),
-            (None, Some(cp_t)) => Some(format!("[crosspost from r/{}]: {}", cp.subreddit.as_deref().unwrap_or("?"), cp_t)),
+            (Some(own), Some(cp_t)) => Some(format!(
+                "{}\n\n[crosspost from r/{}]: {}",
+                own,
+                cp.subreddit.as_deref().unwrap_or("?"),
+                cp_t
+            )),
+            (None, Some(cp_t)) => Some(format!(
+                "[crosspost from r/{}]: {}",
+                cp.subreddit.as_deref().unwrap_or("?"),
+                cp_t
+            )),
             (Some(own), None) => Some(own.to_string()),
             (None, None) => None,
         };
@@ -221,7 +275,9 @@ fn normalize_reddit_post(post: RedditPost, feed_id: &str, ns_uuid: Uuid, fetched
     let word_count = body_text.as_deref().map(|t| count_words(t) as i64);
 
     // ── Best thumbnail / preview image ────────────────────────────────────────
-    let preview_image_url = post.preview.as_ref()
+    let preview_image_url = post
+        .preview
+        .as_ref()
         .and_then(|p| p.images.as_deref())
         .and_then(|imgs| imgs.first())
         .and_then(|img| img.source.as_ref())
@@ -229,10 +285,19 @@ fn normalize_reddit_post(post: RedditPost, feed_id: &str, ns_uuid: Uuid, fetched
         // Reddit encodes preview URLs with HTML entities; decode &amp; → &
         .map(|u| u.replace("&amp;", "&"));
 
-    let thumbnail_url = post.thumbnail.as_deref().filter(|t| {
-        !t.is_empty() && *t != "self" && *t != "default" && *t != "nsfw"
-            && *t != "image" && *t != "spoiler" && t.starts_with("http")
-    }).map(|s| s.to_string());
+    let thumbnail_url = post
+        .thumbnail
+        .as_deref()
+        .filter(|t| {
+            !t.is_empty()
+                && *t != "self"
+                && *t != "default"
+                && *t != "nsfw"
+                && *t != "image"
+                && *t != "spoiler"
+                && t.starts_with("http")
+        })
+        .map(|s| s.to_string());
 
     // Use full preview image over thumbnail if available
     let best_image = preview_image_url.or(thumbnail_url);
@@ -248,7 +313,9 @@ fn normalize_reddit_post(post: RedditPost, feed_id: &str, ns_uuid: Uuid, fetched
     });
 
     if let Some(cp_meta) = crosspost_meta {
-        meta.as_object_mut().unwrap().insert("crosspost".to_string(), cp_meta);
+        meta.as_object_mut()
+            .unwrap()
+            .insert("crosspost".to_string(), cp_meta);
     }
 
     FeedItem {

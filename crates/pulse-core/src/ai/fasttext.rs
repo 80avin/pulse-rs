@@ -1,8 +1,8 @@
-use std::path::Path;
 use crate::error::TaggingError;
 use crate::types::TagResult;
 #[cfg(feature = "ai-fasttext")]
 use crate::types::TaggerSource;
+use std::path::Path;
 
 /// Pure-Rust FastText inference from the PFTM binary format.
 ///
@@ -117,12 +117,12 @@ impl FastTextTaggerInner {
             )));
         }
 
-        let num_labels     = read_u32_le(&mut f)? as usize;
-        let embedding_dim  = read_u32_le(&mut f)? as usize;
-        let num_buckets    = read_u32_le(&mut f)? as usize;
-        let min_ngram      = read_u32_le(&mut f)? as usize;
-        let max_ngram      = read_u32_le(&mut f)? as usize;
-        let _reserved      = read_u32_le(&mut f)?; // must skip the 4 reserved bytes
+        let num_labels = read_u32_le(&mut f)? as usize;
+        let embedding_dim = read_u32_le(&mut f)? as usize;
+        let num_buckets = read_u32_le(&mut f)? as usize;
+        let min_ngram = read_u32_le(&mut f)? as usize;
+        let max_ngram = read_u32_le(&mut f)? as usize;
+        let _reserved = read_u32_le(&mut f)?; // must skip the 4 reserved bytes
 
         // Sanity-check header values to produce readable errors instead of
         // runaway allocations on corrupt files.
@@ -224,7 +224,9 @@ impl FastTextTaggerInner {
 
         // Tokenize: split on whitespace and ASCII punctuation except '-' and '_'.
         let tokens: Vec<&str> = lowercased
-            .split(|c: char| c.is_whitespace() || (c.is_ascii_punctuation() && c != '-' && c != '_'))
+            .split(|c: char| {
+                c.is_whitespace() || (c.is_ascii_punctuation() && c != '-' && c != '_')
+            })
             .filter(|t| !t.is_empty())
             .collect();
 
@@ -233,12 +235,8 @@ impl FastTextTaggerInner {
         let mut total_ngrams: usize = 0;
 
         for token in &tokens {
-            let indices = extract_ngram_indices(
-                token,
-                self.min_ngram,
-                self.max_ngram,
-                self.num_buckets,
-            );
+            let indices =
+                extract_ngram_indices(token, self.min_ngram, self.max_ngram, self.num_buckets);
             for bucket in indices {
                 let row = &self.embeddings[bucket * dim..(bucket + 1) * dim];
                 for (s, &v) in sum.iter_mut().zip(row.iter()) {
@@ -347,9 +345,8 @@ fn read_f32_vec(
     let mut buf = [0u8; 4];
     let mut out = Vec::with_capacity(count);
     for i in 0..count {
-        r.read_exact(&mut buf).map_err(|e| {
-            TaggingError::Onnx(format!("read {label}[{i}]: {e}"))
-        })?;
+        r.read_exact(&mut buf)
+            .map_err(|e| TaggingError::Onnx(format!("read {label}[{i}]: {e}")))?;
         out.push(f32::from_le_bytes(buf));
     }
     Ok(out)
@@ -370,12 +367,10 @@ fn load_thresholds(model_dir: &Path, labels: &[String]) -> Vec<f32> {
     };
 
     match try_load() {
-        Some(map) => {
-            labels
-                .iter()
-                .map(|label| map.get(label.as_str()).copied().unwrap_or(0.5))
-                .collect()
-        }
+        Some(map) => labels
+            .iter()
+            .map(|label| map.get(label.as_str()).copied().unwrap_or(0.5))
+            .collect(),
         None => {
             if path.exists() {
                 tracing::warn!(

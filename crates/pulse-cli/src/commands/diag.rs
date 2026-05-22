@@ -1,7 +1,7 @@
 use clap::Args;
 use pulse_core::PulseCore;
 
-use crate::output::{print_json, format_bytes, relative_time};
+use crate::output::{format_bytes, print_json, relative_time};
 
 #[derive(Debug, Args)]
 pub struct DiagArgs {
@@ -18,22 +18,35 @@ pub async fn run(args: DiagArgs, core: &PulseCore, global_json: bool) -> anyhow:
 
     let total_feeds = feeds.len();
     let enabled_feeds = feeds.iter().filter(|f| f.is_enabled).count();
-    let healthy_feeds = feeds.iter().filter(|f| {
-        f.total_fetches == 0 || {
+    let healthy_feeds = feeds
+        .iter()
+        .filter(|f| {
+            f.total_fetches == 0 || {
+                let rate = (f.total_fetches - f.total_failures) as f64 / f.total_fetches as f64;
+                rate >= 0.9
+            }
+        })
+        .count();
+    let degraded_feeds = feeds
+        .iter()
+        .filter(|f| {
+            if f.total_fetches == 0 {
+                return false;
+            }
             let rate = (f.total_fetches - f.total_failures) as f64 / f.total_fetches as f64;
-            rate >= 0.9
-        }
-    }).count();
-    let degraded_feeds = feeds.iter().filter(|f| {
-        if f.total_fetches == 0 { return false; }
-        let rate = (f.total_fetches - f.total_failures) as f64 / f.total_fetches as f64;
-        rate >= 0.5 && rate < 0.9
-    }).count();
-    let failing_feeds = feeds.iter().filter(|f| {
-        if f.total_fetches == 0 { return false; }
-        let rate = (f.total_fetches - f.total_failures) as f64 / f.total_fetches as f64;
-        rate < 0.5
-    }).count();
+            rate >= 0.5 && rate < 0.9
+        })
+        .count();
+    let failing_feeds = feeds
+        .iter()
+        .filter(|f| {
+            if f.total_fetches == 0 {
+                return false;
+            }
+            let rate = (f.total_fetches - f.total_failures) as f64 / f.total_fetches as f64;
+            rate < 0.5
+        })
+        .count();
 
     let now = chrono::Utc::now();
 
@@ -67,7 +80,10 @@ pub async fn run(args: DiagArgs, core: &PulseCore, global_json: bool) -> anyhow:
         return Ok(());
     }
 
-    println!("Pulse Diagnostic Report — {}", now.format("%Y-%m-%d %H:%M:%S UTC"));
+    println!(
+        "Pulse Diagnostic Report — {}",
+        now.format("%Y-%m-%d %H:%M:%S UTC")
+    );
     println!();
     println!("System:");
     println!("  DB path:    {}", core.config.db_path.display());
@@ -86,7 +102,11 @@ pub async fn run(args: DiagArgs, core: &PulseCore, global_json: bool) -> anyhow:
     println!("  Saved:   {}", stats.saved_count);
     println!();
     println!("AI Pipeline:");
-    println!("  Active model:  {}", core.active_model_name().unwrap_or_else(|| "rule-engine".to_string()));
+    println!(
+        "  Active model:  {}",
+        core.active_model_name()
+            .unwrap_or_else(|| "rule-engine".to_string())
+    );
     println!("  ONNX loaded:   {}", core.onnx_loaded());
     println!("  Tags applied:  {}", stats.tag_count);
     println!();
@@ -97,9 +117,17 @@ pub async fn run(args: DiagArgs, core: &PulseCore, global_json: bool) -> anyhow:
         println!("Failing Feeds:");
         for f in &failing {
             let title = f.title.as_deref().unwrap_or(&f.url);
-            let last = f.last_fetched_at.map(|ts| relative_time(ts)).unwrap_or_else(|| "never".to_string());
-            println!("  {} ({}): {} failures — last attempt {} ago",
-                &f.id[..f.id.len().min(8)], title, f.failure_streak, last);
+            let last = f
+                .last_fetched_at
+                .map(|ts| relative_time(ts))
+                .unwrap_or_else(|| "never".to_string());
+            println!(
+                "  {} ({}): {} failures — last attempt {} ago",
+                &f.id[..f.id.len().min(8)],
+                title,
+                f.failure_streak,
+                last
+            );
         }
     }
 

@@ -1,7 +1,7 @@
+use crate::error::FeedError;
 use reqwest::Client;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
-use crate::error::FeedError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,7 +44,10 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
         let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
         let (name, feed_url) = if parts.len() >= 2 && parts[0] == "r" && !parts[1].is_empty() {
             let sub = parts[1];
-            (format!("r/{sub}"), format!("https://www.reddit.com/r/{sub}.rss"))
+            (
+                format!("r/{sub}"),
+                format!("https://www.reddit.com/r/{sub}.rss"),
+            )
         } else {
             ("Reddit".into(), "https://www.reddit.com/.rss".into())
         };
@@ -110,13 +113,10 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
         || content_type.contains("application/feed")
         || (content_type.contains("xml") && !content_type.contains("html"));
 
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| FeedError::Network {
-            url: url.clone(),
-            source: e,
-        })?;
+    let bytes = response.bytes().await.map_err(|e| FeedError::Network {
+        url: url.clone(),
+        source: e,
+    })?;
 
     if is_feed_ct {
         let name = feed_rs::parser::parse(bytes.as_ref())
@@ -362,18 +362,16 @@ fn find_alternate_links(html: &str, base_url: &str) -> Vec<FeedLink> {
                 .map(|u| u.to_string())
                 .unwrap_or_else(|| href.to_string());
             let title = el.value().attr("title").map(|t| t.trim().to_string());
-            Some(FeedLink { url: absolute, title })
+            Some(FeedLink {
+                url: absolute,
+                title,
+            })
         })
         .collect()
 }
 
 fn domain_name(url: &str) -> String {
     reqwest::Url::parse(url)
-        .map(|u| {
-            u.host_str()
-                .unwrap_or("")
-                .replace("www.", "")
-                .to_string()
-        })
+        .map(|u| u.host_str().unwrap_or("").replace("www.", "").to_string())
         .unwrap_or_default()
 }

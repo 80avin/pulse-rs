@@ -1,8 +1,8 @@
 use clap::Args;
 use pulse_core::PulseCore;
 
-use crate::output::print_json;
 use crate::commands::timeline::print_items_human;
+use crate::output::print_json;
 
 #[derive(Debug, Args)]
 pub struct SearchArgs {

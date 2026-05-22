@@ -1,10 +1,10 @@
+use crate::error::FeedError;
+use crate::feeds::normalize::{count_words, strip_html};
+use crate::types::{Feed, FeedItem};
+use futures::stream::{self, StreamExt};
 use reqwest::Client;
 use serde::Deserialize;
 use uuid::Uuid;
-use futures::stream::{self, StreamExt};
-use crate::error::FeedError;
-use crate::types::{Feed, FeedItem};
-use crate::feeds::normalize::{strip_html, count_words};
 
 const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)";
 const HN_API_BASE: &str = "https://hacker-news.firebaseio.com/v0";
@@ -39,37 +39,44 @@ pub struct HnFetchResult {
 ///
 /// - First sync: fetches top `initial_limit` items (default 30)
 /// - Subsequent syncs: only fetches items with ID > `last_seen_id`
-pub async fn fetch_hn(
-    client: &Client,
-    feed: &Feed,
-) -> Result<HnFetchResult, FeedError> {
+pub async fn fetch_hn(client: &Client, feed: &Feed) -> Result<HnFetchResult, FeedError> {
     let fetched_at = chrono::Utc::now().timestamp();
 
     // Parse source_config
-    let section = feed.source_config
+    let section = feed
+        .source_config
         .get("section")
         .and_then(|v| v.as_str())
         .unwrap_or("topstories");
 
-    let initial_limit = feed.source_config
+    let initial_limit = feed
+        .source_config
         .get("initial_limit")
         .and_then(|v| v.as_u64())
         .unwrap_or(FIRST_SYNC_LIMIT as u64) as usize;
 
-    let last_seen_id: Option<u64> = feed.source_config
+    let last_seen_id: Option<u64> = feed
+        .source_config
         .get("last_seen_id")
         .and_then(|v| v.as_u64());
 
     // Fetch the IDs list
     let list_url = format!("{}/{}.json", HN_API_BASE, section);
-    let all_ids: Vec<u64> = client.get(&list_url)
+    let all_ids: Vec<u64> = client
+        .get(&list_url)
         .header("User-Agent", USER_AGENT)
         .send()
         .await
-        .map_err(|e| FeedError::Network { url: list_url.clone(), source: e })?
+        .map_err(|e| FeedError::Network {
+            url: list_url.clone(),
+            source: e,
+        })?
         .json()
         .await
-        .map_err(|e| FeedError::Network { url: list_url.clone(), source: e })?;
+        .map_err(|e| FeedError::Network {
+            url: list_url.clone(),
+            source: e,
+        })?;
 
     if all_ids.is_empty() {
         return Ok(HnFetchResult {
@@ -106,9 +113,7 @@ pub async fn fetch_hn(
         .map(|id| {
             let client = client.clone();
             let feed_id = feed.id.clone();
-            async move {
-                fetch_hn_item(&client, id, &feed_id, ns_uuid, fetched_at).await
-            }
+            async move { fetch_hn_item(&client, id, &feed_id, ns_uuid, fetched_at).await }
         })
         .buffer_unordered(CONCURRENT_ITEM_FETCHES)
         .filter_map(|r| async move {
@@ -139,14 +144,21 @@ async fn fetch_hn_item(
     fetched_at: i64,
 ) -> Result<Option<FeedItem>, FeedError> {
     let url = format!("{}/item/{}.json", HN_API_BASE, id);
-    let hn_item: HnItem = client.get(&url)
+    let hn_item: HnItem = client
+        .get(&url)
         .header("User-Agent", USER_AGENT)
         .send()
         .await
-        .map_err(|e| FeedError::Network { url: url.clone(), source: e })?
+        .map_err(|e| FeedError::Network {
+            url: url.clone(),
+            source: e,
+        })?
         .json()
         .await
-        .map_err(|e| FeedError::Network { url: url.clone(), source: e })?;
+        .map_err(|e| FeedError::Network {
+            url: url.clone(),
+            source: e,
+        })?;
 
     // Skip deleted or dead items
     if hn_item.deleted.unwrap_or(false) || hn_item.dead.unwrap_or(false) {
@@ -162,9 +174,12 @@ async fn fetch_hn_item(
     let source_guid = hn_item.id.to_string();
     let item_id = Uuid::new_v5(&ns_uuid, source_guid.as_bytes()).to_string();
 
-    let item_url = hn_item.url
-        .filter(|u| !u.is_empty())
-        .or_else(|| Some(format!("https://news.ycombinator.com/item?id={}", hn_item.id)));
+    let item_url = hn_item.url.filter(|u| !u.is_empty()).or_else(|| {
+        Some(format!(
+            "https://news.ycombinator.com/item?id={}",
+            hn_item.id
+        ))
+    });
 
     let comment_url = format!("https://news.ycombinator.com/item?id={}", hn_item.id);
 

@@ -20,9 +20,11 @@ impl TimelineService {
         cursor: Option<TimelineCursor>,
         limit: usize,
     ) -> Result<TimelinePage, StorageError> {
-        self.db.with_reader(|pool| async move {
-            get_timeline(&pool, &filter, cursor.as_ref(), limit).await
-        }).await
+        self.db
+            .with_reader(|pool| async move {
+                get_timeline(&pool, &filter, cursor.as_ref(), limit).await
+            })
+            .await
     }
 
     /// Fetch the first page of the timeline (no cursor)
@@ -36,14 +38,16 @@ impl TimelineService {
 
     /// Fetch all unread items count
     pub async fn unread_count(&self) -> Result<i64, StorageError> {
-        self.db.with_reader(|pool| async move {
-            let count: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM item_states WHERE is_read = 0 AND is_hidden = 0"
-            )
-            .fetch_one(&pool)
+        self.db
+            .with_reader(|pool| async move {
+                let count: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM item_states WHERE is_read = 0 AND is_hidden = 0",
+                )
+                .fetch_one(&pool)
+                .await
+                .map_err(StorageError::Sqlite)?;
+                Ok(count)
+            })
             .await
-            .map_err(StorageError::Sqlite)?;
-            Ok(count)
-        }).await
     }
 }

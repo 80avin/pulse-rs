@@ -6,30 +6,32 @@ pub mod search;
 pub mod storage;
 pub mod sync;
 pub mod timeline;
-pub mod types;
 pub mod training;
+pub mod types;
 
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 
-use crate::ai::{RuleEngine, TaggerHandle, OnnxTagger, VisionTagger, FastTextTagger, MiniMlTagger, default_rules, tagger_task, TAGGER_QUEUE_SIZE};
-use crate::ai::tagger::process_tag_request;
 use crate::ai::tagger::TagRequest;
-use crate::feeds::{fetch_enrichment, should_enrich, is_image_url, RedditAuth};
+use crate::ai::tagger::process_tag_request;
+use crate::ai::{
+    FastTextTagger, MiniMlTagger, OnnxTagger, RuleEngine, TAGGER_QUEUE_SIZE, TaggerHandle,
+    VisionTagger, default_rules, tagger_task,
+};
 use crate::config::PulseConfig;
 use crate::error::PulseError;
-use crate::storage::actor::{db_writer_task, DbHandle};
-use crate::storage::connection::{open_writer_pool, open_reader_pool};
+use crate::feeds::{RedditAuth, fetch_enrichment, is_image_url, should_enrich};
+use crate::search::SearchService;
+use crate::storage::actor::{DbHandle, db_writer_task};
+use crate::storage::connection::{open_reader_pool, open_writer_pool};
 use crate::storage::migrations::run_migrations;
+use crate::storage::queries::{count_pending_enrichment, get_pending_enrichment};
 use crate::sync::SyncScheduler;
 use crate::timeline::TimelineService;
-use crate::search::SearchService;
 use crate::types::{
-    FeedId, FeedType, ItemId, ItemStatePatch, Feed, FeedGroup,
-    TimelineCursor, TimelineFilter, TimelinePage, FeedItemView,
-    AiTag, DbStats, EnrichStats, EnrichItemResult, EnrichStatus,
+    AiTag, DbStats, EnrichItemResult, EnrichStats, EnrichStatus, Feed, FeedGroup, FeedId,
+    FeedItemView, FeedType, ItemId, ItemStatePatch, TimelineCursor, TimelineFilter, TimelinePage,
 };
-use crate::storage::queries::{get_pending_enrichment, count_pending_enrichment};
 
 /// Top-level application core. Holds all subsystem handles.
 pub struct PulseCore {
@@ -57,19 +59,21 @@ impl PulseCore {
 
         // Ensure data directory exists
         if let Some(parent) = config.db_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
-                PulseError::Config(format!("Failed to create data dir: {e}"))
-            })?;
+            std::fs::create_dir_all(parent)
+                .map_err(|e| PulseError::Config(format!("Failed to create data dir: {e}")))?;
         }
 
         // Open writer pool (single connection) and run migrations
-        let writer_pool = open_writer_pool(&config.db_path, &config).await
+        let writer_pool = open_writer_pool(&config.db_path, &config)
+            .await
             .map_err(PulseError::Storage)?;
-        run_migrations(&writer_pool).await
+        run_migrations(&writer_pool)
+            .await
             .map_err(PulseError::Storage)?;
 
         // Open reader pool (concurrent reads via WAL)
-        let reader_pool = open_reader_pool(&config.db_path, &config).await
+        let reader_pool = open_reader_pool(&config.db_path, &config)
+            .await
             .map_err(PulseError::Storage)?;
 
         // Spawn the DB writer actor
@@ -199,20 +203,42 @@ impl PulseCore {
         let vision_for_task = vision_tagger.clone();
         let text_backend_for_task = config.text_backend.clone();
         tokio::spawn(async move {
-            tagger_task(tagger_rx, db_for_tagger, text_backend_for_task, rule_engine_for_task, fasttext_for_task, miniml_for_task, vision_for_task).await;
+            tagger_task(
+                tagger_rx,
+                db_for_tagger,
+                text_backend_for_task,
+                rule_engine_for_task,
+                fasttext_for_task,
+                miniml_for_task,
+                vision_for_task,
+            )
+            .await;
         });
 
         // Build Reddit auth from config if credentials are provided
-        let reddit_auth = match (config.reddit_client_id.as_deref(), config.reddit_client_secret.as_deref()) {
+        let reddit_auth = match (
+            config.reddit_client_id.as_deref(),
+            config.reddit_client_secret.as_deref(),
+        ) {
             (Some(id), Some(secret)) => {
-                tracing::info!("Reddit OAuth2 enabled (client_id={}...)", &id[..id.len().min(8)]);
-                Some(Arc::new(RedditAuth::new(id.to_string(), secret.to_string())))
+                tracing::info!(
+                    "Reddit OAuth2 enabled (client_id={}...)",
+                    &id[..id.len().min(8)]
+                );
+                Some(Arc::new(RedditAuth::new(
+                    id.to_string(),
+                    secret.to_string(),
+                )))
             }
             _ => None,
         };
 
         // Initialize the sync scheduler
-        let scheduler = Arc::new(SyncScheduler::new(db.clone(), tagger_handle.clone(), reddit_auth));
+        let scheduler = Arc::new(SyncScheduler::new(
+            db.clone(),
+            tagger_handle.clone(),
+            reddit_auth,
+        ));
 
         let timeline = TimelineService::new(db.clone());
         let search = SearchService::new(db.clone());
@@ -239,7 +265,10 @@ impl PulseCore {
 
     /// Run a sync for a single feed, awaiting completion. Returns new item count.
     pub async fn sync_feed(&self, feed_id: &FeedId) -> Result<usize, PulseError> {
-        self.scheduler.sync_feed_blocking(feed_id).await.map_err(PulseError::Sync)
+        self.scheduler
+            .sync_feed_blocking(feed_id)
+            .await
+            .map_err(PulseError::Sync)
     }
 
     /// Shut down all background tasks
@@ -260,9 +289,12 @@ impl PulseCore {
     ) -> Result<EnrichStats, PulseError> {
         let candidates = {
             let fid = feed_id.map(|s| s.to_string());
-            self.db.with_reader(|pool| async move {
-                get_pending_enrichment(&pool, fid.as_deref(), limit).await
-            }).await.map_err(PulseError::Storage)?
+            self.db
+                .with_reader(|pool| async move {
+                    get_pending_enrichment(&pool, fid.as_deref(), limit).await
+                })
+                .await
+                .map_err(PulseError::Storage)?
         };
 
         let http = self.scheduler.http_client();
@@ -302,14 +334,20 @@ impl PulseCore {
                     }
                     match fetch_enrichment(&http, url_str).await {
                         Ok(r) if r.skipped => EnrichItemResult {
-                            item_id: candidate.id, url,
+                            item_id: candidate.id,
+                            url,
                             status: EnrichStatus::Skipped,
-                            og_description: None, og_image: None, og_title: None,
+                            og_description: None,
+                            og_image: None,
+                            og_title: None,
                         },
                         Ok(r) if r.is_image => EnrichItemResult {
-                            item_id: candidate.id, url,
+                            item_id: candidate.id,
+                            url,
                             status: EnrichStatus::Image,
-                            og_description: None, og_image: None, og_title: None,
+                            og_description: None,
+                            og_image: None,
+                            og_title: None,
                         },
                         Ok(r) => EnrichItemResult {
                             item_id: candidate.id,
@@ -322,9 +360,12 @@ impl PulseCore {
                         Err(e) => {
                             tracing::debug!("Enrichment failed for {}: {}", url, e);
                             EnrichItemResult {
-                                item_id: candidate.id, url,
+                                item_id: candidate.id,
+                                url,
                                 status: EnrichStatus::Error(e.to_string()),
-                                og_description: None, og_image: None, og_title: None,
+                                og_description: None,
+                                og_image: None,
+                                og_title: None,
                             }
                         }
                     }
@@ -338,8 +379,8 @@ impl PulseCore {
             progress_cb(result);
 
             match &result.status {
-                EnrichStatus::Ok     => stats.enriched += 1,
-                EnrichStatus::Image  => stats.image_posts += 1,
+                EnrichStatus::Ok => stats.enriched += 1,
+                EnrichStatus::Image => stats.image_posts += 1,
                 EnrichStatus::Skipped => stats.skipped += 1,
                 EnrichStatus::Error(_) => stats.errors += 1,
             }
@@ -364,13 +405,17 @@ impl PulseCore {
             }
 
             let body_text = result.og_description.clone();
-            let _ = db.enrich_item(result.item_id.clone(), body_text, patch).await;
+            let _ = db
+                .enrich_item(result.item_id.clone(), body_text, patch)
+                .await;
 
             // Re-queue for tagging if og_image was acquired — the vision tagger
             // needs the image URL which wasn't available at initial sync time.
             if let Some(ref img) = result.og_image {
                 if !img.is_empty() {
-                    self.tagger.tag_item(result.item_id.clone(), FeedType::Rss).await;
+                    self.tagger
+                        .tag_item(result.item_id.clone(), FeedType::Rss)
+                        .await;
                 }
             }
         }
@@ -381,47 +426,62 @@ impl PulseCore {
     /// Count items pending enrichment (no enriched_at in source_meta).
     pub async fn count_pending_enrichment(&self, feed_id: Option<&str>) -> Result<i64, PulseError> {
         let fid = feed_id.map(|s| s.to_string());
-        self.db.with_reader(|pool| async move {
-            count_pending_enrichment(&pool, fid.as_deref()).await
-        }).await.map_err(PulseError::Storage)
+        self.db
+            .with_reader(
+                |pool| async move { count_pending_enrichment(&pool, fid.as_deref()).await },
+            )
+            .await
+            .map_err(PulseError::Storage)
     }
 
     // ─── Feed management ──────────────────────────────────────────────────────
 
     pub async fn get_feeds(&self) -> Result<Vec<Feed>, PulseError> {
-        self.db.with_reader(|pool| async move {
-            storage::queries::get_feeds(&pool).await
-        }).await.map_err(PulseError::Storage)
+        self.db
+            .with_reader(|pool| async move { storage::queries::get_feeds(&pool).await })
+            .await
+            .map_err(PulseError::Storage)
     }
 
     pub async fn get_feed(&self, feed_id: &FeedId) -> Result<Feed, PulseError> {
         let fid = feed_id.clone();
-        self.db.with_reader(|pool| async move {
-            storage::queries::get_feed(&pool, &fid).await
-        }).await.map_err(PulseError::Storage)
+        self.db
+            .with_reader(|pool| async move { storage::queries::get_feed(&pool, &fid).await })
+            .await
+            .map_err(PulseError::Storage)
     }
 
     pub async fn add_feed(&self, feed: Feed) -> Result<(), PulseError> {
         let feed_id = feed.id.clone();
-        self.db.upsert_feed(feed).await.map_err(PulseError::Storage)?;
+        self.db
+            .upsert_feed(feed)
+            .await
+            .map_err(PulseError::Storage)?;
         self.scheduler.add_feed(feed_id).await;
         Ok(())
     }
 
     pub async fn delete_feed(&self, feed_id: &FeedId) -> Result<(), PulseError> {
         self.scheduler.remove_feed(feed_id).await;
-        self.db.delete_feed(feed_id.clone()).await.map_err(PulseError::Storage)
+        self.db
+            .delete_feed(feed_id.clone())
+            .await
+            .map_err(PulseError::Storage)
     }
 
     pub async fn get_feed_groups(&self) -> Result<Vec<FeedGroup>, PulseError> {
-        self.db.with_reader(|pool| async move {
-            storage::queries::get_feed_groups(&pool).await
-        }).await.map_err(PulseError::Storage)
+        self.db
+            .with_reader(|pool| async move { storage::queries::get_feed_groups(&pool).await })
+            .await
+            .map_err(PulseError::Storage)
     }
 
     /// Delete a feed group. Member feeds have their group_id set to NULL.
     pub async fn delete_feed_group(&self, id: &str) -> Result<(), PulseError> {
-        self.db.delete_feed_group(id.to_string()).await.map_err(PulseError::Storage)
+        self.db
+            .delete_feed_group(id.to_string())
+            .await
+            .map_err(PulseError::Storage)
     }
 
     /// Delete all feed items (leaves feeds intact).
@@ -431,35 +491,52 @@ impl PulseCore {
 
     /// Mark all items in a feed as read.
     pub async fn mark_feed_read(&self, feed_id: &FeedId) -> Result<(), PulseError> {
-        self.db.mark_feed_read(feed_id.clone()).await.map_err(PulseError::Storage)
+        self.db
+            .mark_feed_read(feed_id.clone())
+            .await
+            .map_err(PulseError::Storage)
     }
 
     /// Return a map of feed_id → unread item count.
-    pub async fn get_unread_counts_by_feed(&self) -> Result<std::collections::HashMap<FeedId, i64>, PulseError> {
-        self.db.with_reader(|pool| async move {
-            storage::queries::get_unread_counts_by_feed(&pool).await
-        }).await.map_err(PulseError::Storage)
+    pub async fn get_unread_counts_by_feed(
+        &self,
+    ) -> Result<std::collections::HashMap<FeedId, i64>, PulseError> {
+        self.db
+            .with_reader(
+                |pool| async move { storage::queries::get_unread_counts_by_feed(&pool).await },
+            )
+            .await
+            .map_err(PulseError::Storage)
     }
 
     /// Return a map of feed_id → total (non-hidden) item count.
-    pub async fn get_total_counts_by_feed(&self) -> Result<std::collections::HashMap<String, i64>, PulseError> {
-        self.db.with_reader(|pool| async move {
-            storage::queries::get_total_counts_by_feed(&pool).await
-        }).await.map_err(PulseError::Storage)
+    pub async fn get_total_counts_by_feed(
+        &self,
+    ) -> Result<std::collections::HashMap<String, i64>, PulseError> {
+        self.db
+            .with_reader(
+                |pool| async move { storage::queries::get_total_counts_by_feed(&pool).await },
+            )
+            .await
+            .map_err(PulseError::Storage)
     }
 
     /// Fetch a single item by full or prefix ID. Returns body_text, body_html, source_meta.
     pub async fn get_item(&self, item_id: &ItemId) -> Result<crate::types::FeedItem, PulseError> {
         let iid = item_id.clone();
-        self.db.with_reader(|pool| async move {
-            storage::queries::get_item(&pool, &iid).await
-        }).await.map_err(PulseError::Storage)
+        self.db
+            .with_reader(|pool| async move { storage::queries::get_item(&pool, &iid).await })
+            .await
+            .map_err(PulseError::Storage)
     }
 
     /// Clear the ETag, Last-Modified, and source_config cache keys for a feed,
     /// forcing the next sync to perform a full re-fetch regardless of prior state.
     pub async fn clear_feed_cache(&self, feed_id: &FeedId) -> Result<(), PulseError> {
-        self.db.clear_feed_cache(feed_id.clone()).await.map_err(PulseError::Storage)
+        self.db
+            .clear_feed_cache(feed_id.clone())
+            .await
+            .map_err(PulseError::Storage)
     }
 
     // ─── Timeline ─────────────────────────────────────────────────────────────
@@ -470,7 +547,10 @@ impl PulseCore {
         cursor: Option<TimelineCursor>,
         limit: usize,
     ) -> Result<TimelinePage, PulseError> {
-        self.timeline.get_page(filter, cursor, limit).await.map_err(PulseError::Storage)
+        self.timeline
+            .get_page(filter, cursor, limit)
+            .await
+            .map_err(PulseError::Storage)
     }
 
     // ─── Item state ───────────────────────────────────────────────────────────
@@ -478,9 +558,12 @@ impl PulseCore {
     /// Resolve a full or prefix item ID to the canonical full UUID.
     pub async fn resolve_item_id(&self, prefix: &str) -> Result<Option<ItemId>, PulseError> {
         let prefix = prefix.to_string();
-        self.db.with_reader(|pool| async move {
-            storage::queries::resolve_item_id(&pool, &prefix).await
-        }).await.map_err(PulseError::Storage)
+        self.db
+            .with_reader(
+                |pool| async move { storage::queries::resolve_item_id(&pool, &prefix).await },
+            )
+            .await
+            .map_err(PulseError::Storage)
     }
 
     pub async fn update_item_state(
@@ -488,34 +571,56 @@ impl PulseCore {
         item_id: &ItemId,
         patch: ItemStatePatch,
     ) -> Result<(), PulseError> {
-        self.db.update_item_state(item_id.clone(), patch).await.map_err(PulseError::Storage)
+        self.db
+            .update_item_state(item_id.clone(), patch)
+            .await
+            .map_err(PulseError::Storage)
     }
 
     pub async fn mark_read(&self, item_id: &ItemId) -> Result<(), PulseError> {
-        self.update_item_state(item_id, ItemStatePatch {
-            is_read: Some(true),
-            ..Default::default()
-        }).await
+        self.update_item_state(
+            item_id,
+            ItemStatePatch {
+                is_read: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
     }
 
     pub async fn toggle_saved(&self, item_id: &ItemId, saved: bool) -> Result<(), PulseError> {
-        self.update_item_state(item_id, ItemStatePatch {
-            is_saved: Some(saved),
-            ..Default::default()
-        }).await
+        self.update_item_state(
+            item_id,
+            ItemStatePatch {
+                is_saved: Some(saved),
+                ..Default::default()
+            },
+        )
+        .await
     }
 
     pub async fn hide_item(&self, item_id: &ItemId) -> Result<(), PulseError> {
-        self.update_item_state(item_id, ItemStatePatch {
-            is_hidden: Some(true),
-            ..Default::default()
-        }).await
+        self.update_item_state(
+            item_id,
+            ItemStatePatch {
+                is_hidden: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
     }
 
     // ─── Search ───────────────────────────────────────────────────────────────
 
-    pub async fn search(&self, query: &str, limit: Option<usize>) -> Result<Vec<FeedItemView>, PulseError> {
-        self.search.search(query, limit).await.map_err(PulseError::Storage)
+    pub async fn search(
+        &self,
+        query: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<FeedItemView>, PulseError> {
+        self.search
+            .search(query, limit)
+            .await
+            .map_err(PulseError::Storage)
     }
 
     // ─── AI tags ──────────────────────────────────────────────────────────────
@@ -540,11 +645,16 @@ impl PulseCore {
 
         let mut work: Vec<(FeedItemView, crate::types::FeedType)> = Vec::new();
         for feed in &targets {
-            let page = self.get_timeline_page(
-                TimelineFilter { feed_id: Some(feed.id.clone()), ..Default::default() },
-                None,
-                10_000,
-            ).await?;
+            let page = self
+                .get_timeline_page(
+                    TimelineFilter {
+                        feed_id: Some(feed.id.clone()),
+                        ..Default::default()
+                    },
+                    None,
+                    10_000,
+                )
+                .await?;
             for item in page.items {
                 if force || item.ai_tags.is_empty() {
                     work.push((item, feed.feed_type.clone()));
@@ -565,13 +675,27 @@ impl PulseCore {
                 // Clear stale tags so removed/renamed tags don't persist.
                 let _ = self.db.delete_item_tags(item.id.clone()).await;
             }
-            let req = TagRequest { item_id: item.id.clone(), feed_type };
+            let req = TagRequest {
+                item_id: item.id.clone(),
+                feed_type,
+            };
             match process_tag_request(
-                &self.db, &self.config.text_backend, &self.rule_engine,
-                fasttext.as_deref(), miniml.as_deref(), vision.as_deref(), &req,
-            ).await {
-                Ok(n) => { tags_created += n; }
-                Err(e) => { tracing::warn!(item_id = %item.id, "Direct tagging failed: {}", e); }
+                &self.db,
+                &self.config.text_backend,
+                &self.rule_engine,
+                fasttext.as_deref(),
+                miniml.as_deref(),
+                vision.as_deref(),
+                &req,
+            )
+            .await
+            {
+                Ok(n) => {
+                    tags_created += n;
+                }
+                Err(e) => {
+                    tracing::warn!(item_id = %item.id, "Direct tagging failed: {}", e);
+                }
             }
             items_processed += 1;
             if let Some(cb) = on_progress {
@@ -585,14 +709,18 @@ impl PulseCore {
     /// Delete all AI tags with confidence below the given threshold (global post-filter).
     /// Used by `retag_all` to apply the user's confidence_threshold setting.
     pub async fn delete_tags_below_confidence(&self, threshold: f32) -> Result<(), PulseError> {
-        self.db.delete_tags_below_confidence(threshold).await.map_err(PulseError::Storage)
+        self.db
+            .delete_tags_below_confidence(threshold)
+            .await
+            .map_err(PulseError::Storage)
     }
 
     pub async fn get_item_tags(&self, item_id: &ItemId) -> Result<Vec<AiTag>, PulseError> {
         let iid = item_id.clone();
-        self.db.with_reader(|pool| async move {
-            storage::queries::get_ai_tags(&pool, &iid).await
-        }).await.map_err(PulseError::Storage)
+        self.db
+            .with_reader(|pool| async move { storage::queries::get_ai_tags(&pool, &iid).await })
+            .await
+            .map_err(PulseError::Storage)
     }
 
     // ─── AI model management ──────────────────────────────────────────────────
@@ -600,7 +728,9 @@ impl PulseCore {
     /// Returns the name of the currently active model, or None if using rules-only.
     pub fn active_model_name(&self) -> Option<String> {
         let path = self.config.data_dir.join("active_model");
-        std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+        std::fs::read_to_string(path)
+            .ok()
+            .map(|s| s.trim().to_string())
     }
 
     /// List all downloaded model names (directories under {data_dir}/models/).
@@ -608,10 +738,13 @@ impl PulseCore {
         let models_dir = self.config.data_dir.join("models");
         std::fs::read_dir(&models_dir)
             .map(|entries| {
-                entries.filter_map(|e| e.ok())
+                entries
+                    .filter_map(|e| e.ok())
                     .filter(|e| {
                         let p = e.path();
-                        p.is_dir() && (p.join("model_quantized.onnx").exists() || p.join("model.onnx").exists())
+                        p.is_dir()
+                            && (p.join("model_quantized.onnx").exists()
+                                || p.join("model.onnx").exists())
                     })
                     .filter_map(|e| e.file_name().into_string().ok())
                     .collect()
@@ -650,7 +783,10 @@ impl PulseCore {
     pub fn remove_model(&self, model_name: &str) -> Result<(), PulseError> {
         let model_dir = self.config.data_dir.join("models").join(model_name);
         if !model_dir.exists() {
-            return Err(PulseError::NotFound(format!("model '{}' not found", model_name)));
+            return Err(PulseError::NotFound(format!(
+                "model '{}' not found",
+                model_name
+            )));
         }
         std::fs::remove_dir_all(&model_dir)
             .map_err(|e| PulseError::Config(format!("failed to remove model directory: {e}")))?;
@@ -670,14 +806,21 @@ impl PulseCore {
 
     pub fn active_vision_model_name(&self) -> Option<String> {
         let path = self.config.data_dir.join("active_vision_model");
-        std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+        std::fs::read_to_string(path)
+            .ok()
+            .map(|s| s.trim().to_string())
     }
 
     pub fn set_active_vision_model(&self, model_name: &str) -> Result<(), PulseError> {
         let model_dir = self.config.data_dir.join("models").join(model_name);
         // Accept any supported vision model filename (MobileCLIP int8 or CLIP ViT-B/32 q4f16)
-        let has_model = ["vision_model_quantized.onnx", "vision_model_q4f16.onnx", "vision_model.onnx"]
-            .iter().any(|f| model_dir.join(f).exists());
+        let has_model = [
+            "vision_model_quantized.onnx",
+            "vision_model_q4f16.onnx",
+            "vision_model.onnx",
+        ]
+        .iter()
+        .any(|f| model_dir.join(f).exists());
         if !has_model {
             return Err(PulseError::NotFound(format!(
                 "vision model '{}' not found at {:?} — run 'pulse ai vision-download {}' first",
@@ -694,8 +837,9 @@ impl PulseCore {
     pub fn unset_active_vision_model(&self) -> Result<(), PulseError> {
         let active_file = self.config.data_dir.join("active_vision_model");
         if active_file.exists() {
-            std::fs::remove_file(&active_file)
-                .map_err(|e| PulseError::Config(format!("failed to remove active_vision_model: {e}")))?;
+            std::fs::remove_file(&active_file).map_err(|e| {
+                PulseError::Config(format!("failed to remove active_vision_model: {e}"))
+            })?;
         }
         Ok(())
     }
@@ -703,10 +847,14 @@ impl PulseCore {
     // ─── Tagger hot-reload ────────────────────────────────────────────────────
 
     /// Whether an NLI text tagger is currently loaded.
-    pub fn onnx_loaded(&self) -> bool { self.onnx_tagger.read().unwrap().is_some() }
+    pub fn onnx_loaded(&self) -> bool {
+        self.onnx_tagger.read().unwrap().is_some()
+    }
 
     /// Whether a CLIP vision tagger is currently loaded.
-    pub fn vision_loaded(&self) -> bool { self.vision_tagger.read().unwrap().is_some() }
+    pub fn vision_loaded(&self) -> bool {
+        self.vision_tagger.read().unwrap().is_some()
+    }
 
     /// Reload the NLI tagger from the active_model file. Call after downloading a new model.
     /// The background tagger task sees the change on its next queued item.
@@ -743,23 +891,34 @@ impl PulseCore {
 
         let tagger = VisionTagger::load(&model_dir).map_err(PulseError::Tagging)?;
         *self.vision_tagger.write().unwrap() = Some(Arc::new(tagger));
-        tracing::info!("CLIP vision tagger hot-reloaded from {}", model_dir.display());
+        tracing::info!(
+            "CLIP vision tagger hot-reloaded from {}",
+            model_dir.display()
+        );
         Ok(())
     }
 
     // ─── FastText model management ────────────────────────────────────────────
 
-    pub fn fasttext_loaded(&self) -> bool { self.fasttext_tagger.read().unwrap().is_some() }
-    pub fn miniml_loaded(&self) -> bool { self.miniml_tagger.read().unwrap().is_some() }
+    pub fn fasttext_loaded(&self) -> bool {
+        self.fasttext_tagger.read().unwrap().is_some()
+    }
+    pub fn miniml_loaded(&self) -> bool {
+        self.miniml_tagger.read().unwrap().is_some()
+    }
 
     pub fn active_fasttext_model_name(&self) -> Option<String> {
         let path = self.config.data_dir.join("active_fasttext_model");
-        std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+        std::fs::read_to_string(path)
+            .ok()
+            .map(|s| s.trim().to_string())
     }
 
     pub fn active_miniml_model_name(&self) -> Option<String> {
         let path = self.config.data_dir.join("active_miniml_model");
-        std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+        std::fs::read_to_string(path)
+            .ok()
+            .map(|s| s.trim().to_string())
     }
 
     pub fn set_active_fasttext_model(&self, model_name: &str) -> Result<(), PulseError> {
@@ -771,14 +930,16 @@ impl PulseCore {
             )));
         }
         let ptr = self.config.data_dir.join("active_fasttext_model");
-        std::fs::write(&ptr, model_name)
-            .map_err(|e| PulseError::Config(format!("failed to write active_fasttext_model: {e}")))?;
+        std::fs::write(&ptr, model_name).map_err(|e| {
+            PulseError::Config(format!("failed to write active_fasttext_model: {e}"))
+        })?;
         Ok(())
     }
 
     pub fn set_active_miniml_model(&self, model_name: &str) -> Result<(), PulseError> {
         let model_dir = self.config.data_dir.join("models").join(model_name);
-        let has_model = model_dir.join("model.onnx").exists() || model_dir.join("model_quantized.onnx").exists();
+        let has_model = model_dir.join("model.onnx").exists()
+            || model_dir.join("model_quantized.onnx").exists();
         if !has_model {
             return Err(PulseError::NotFound(format!(
                 "MiniLM model '{}' not found — download model.onnx and run scripts/train_miniml.py first",
@@ -845,8 +1006,9 @@ impl PulseCore {
     // ─── Stats ────────────────────────────────────────────────────────────────
 
     pub async fn get_db_stats(&self) -> Result<DbStats, PulseError> {
-        self.db.with_reader(|pool| async move {
-            storage::queries::get_db_stats(&pool).await
-        }).await.map_err(PulseError::Storage)
+        self.db
+            .with_reader(|pool| async move { storage::queries::get_db_stats(&pool).await })
+            .await
+            .map_err(PulseError::Storage)
     }
 }

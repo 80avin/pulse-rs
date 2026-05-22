@@ -1,8 +1,11 @@
 use clap::{Args, Subcommand};
-use pulse_core::{PulseCore, types::{Feed, FeedType, FeedGroup}};
+use pulse_core::{
+    PulseCore,
+    types::{Feed, FeedGroup, FeedType},
+};
 use uuid::Uuid;
 
-use crate::output::{print_json, print_error, relative_time, confirm};
+use crate::output::{confirm, print_error, print_json, relative_time};
 
 #[derive(Debug, Args)]
 pub struct FeedArgs {
@@ -185,7 +188,9 @@ async fn cmd_add(args: FeedAddArgs, core: &PulseCore) -> anyhow::Result<()> {
         None
     };
 
-    let interval = args.interval.unwrap_or_else(|| default_interval(&feed_type));
+    let interval = args
+        .interval
+        .unwrap_or_else(|| default_interval(&feed_type));
     let now = chrono::Utc::now().timestamp();
 
     let feed = Feed {
@@ -228,9 +233,15 @@ async fn cmd_list(args: FeedListArgs, core: &PulseCore, global_json: bool) -> an
 
     // Filter by group name if requested
     let filtered: Vec<_> = if let Some(ref gname) = args.group {
-        let gid = groups.iter().find(|g| g.name.eq_ignore_ascii_case(gname)).map(|g| g.id.clone());
+        let gid = groups
+            .iter()
+            .find(|g| g.name.eq_ignore_ascii_case(gname))
+            .map(|g| g.id.clone());
         match gid {
-            Some(ref id) => feeds.iter().filter(|f| f.group_id.as_deref() == Some(id.as_str())).collect(),
+            Some(ref id) => feeds
+                .iter()
+                .filter(|f| f.group_id.as_deref() == Some(id.as_str()))
+                .collect(),
             None => {
                 print_error(&format!("group '{}' not found", gname));
                 return Ok(());
@@ -242,44 +253,60 @@ async fn cmd_list(args: FeedListArgs, core: &PulseCore, global_json: bool) -> an
 
     if use_json {
         // Enrich with group_name
-        let enriched: Vec<serde_json::Value> = filtered.iter().map(|f| {
-            let group_name = f.group_id.as_ref()
-                .and_then(|gid| groups.iter().find(|g| &g.id == gid))
-                .map(|g| g.name.clone());
-            let success_rate = if f.total_fetches > 0 {
-                Some((f.total_fetches - f.total_failures) as f64 / f.total_fetches as f64 * 100.0)
-            } else {
-                None
-            };
-            serde_json::json!({
-                "id": f.id,
-                "url": f.url,
-                "feed_type": f.feed_type,
-                "title": f.title,
-                "group_id": f.group_id,
-                "group_name": group_name,
-                "poll_interval_secs": f.poll_interval_secs,
-                "failure_streak": f.failure_streak,
-                "success_rate_pct": success_rate,
-                "avg_latency_ms": f.avg_latency_ms,
-                "last_success_at": f.last_success_at,
-                "last_item_at": f.last_item_at,
-                "is_enabled": f.is_enabled,
+        let enriched: Vec<serde_json::Value> = filtered
+            .iter()
+            .map(|f| {
+                let group_name = f
+                    .group_id
+                    .as_ref()
+                    .and_then(|gid| groups.iter().find(|g| &g.id == gid))
+                    .map(|g| g.name.clone());
+                let success_rate = if f.total_fetches > 0 {
+                    Some(
+                        (f.total_fetches - f.total_failures) as f64 / f.total_fetches as f64
+                            * 100.0,
+                    )
+                } else {
+                    None
+                };
+                serde_json::json!({
+                    "id": f.id,
+                    "url": f.url,
+                    "feed_type": f.feed_type,
+                    "title": f.title,
+                    "group_id": f.group_id,
+                    "group_name": group_name,
+                    "poll_interval_secs": f.poll_interval_secs,
+                    "failure_streak": f.failure_streak,
+                    "success_rate_pct": success_rate,
+                    "avg_latency_ms": f.avg_latency_ms,
+                    "last_success_at": f.last_success_at,
+                    "last_item_at": f.last_item_at,
+                    "is_enabled": f.is_enabled,
+                })
             })
-        }).collect();
+            .collect();
         print_json(&enriched);
         return Ok(());
     }
 
     // Human-readable table
-    println!("{:<8}  {:<6}  {:<32}  {:<12}  {:<8}  {:<6}  {}",
-        "ID", "TYPE", "TITLE", "GROUP", "INTERVAL", "HEALTH", "LAST SYNC");
+    println!(
+        "{:<8}  {:<6}  {:<32}  {:<12}  {:<8}  {:<6}  {}",
+        "ID", "TYPE", "TITLE", "GROUP", "INTERVAL", "HEALTH", "LAST SYNC"
+    );
     for f in &filtered {
         let id_prefix = &f.id[..f.id.len().min(8)];
         let feed_type = f.feed_type.as_str();
         let title = f.title.as_deref().unwrap_or(&f.url);
-        let title_trunc = if title.len() > 32 { &title[..32] } else { title };
-        let group_name = f.group_id.as_ref()
+        let title_trunc = if title.len() > 32 {
+            &title[..32]
+        } else {
+            title
+        };
+        let group_name = f
+            .group_id
+            .as_ref()
             .and_then(|gid| groups.iter().find(|g| &g.id == gid))
             .map(|g| g.name.as_str())
             .unwrap_or("-");
@@ -297,12 +324,15 @@ async fn cmd_list(args: FeedListArgs, core: &PulseCore, global_json: bool) -> an
             }
         };
 
-        let last_sync = f.last_success_at
+        let last_sync = f
+            .last_success_at
             .map(|ts| relative_time(ts))
             .unwrap_or_else(|| "never".to_string());
 
-        println!("{:<8}  {:<6}  {:<32}  {:<12}  {:<8}  {:<8}  {}",
-            id_prefix, feed_type, title_trunc, group_name, interval_str, health_str, last_sync);
+        println!(
+            "{:<8}  {:<6}  {:<32}  {:<12}  {:<8}  {:<8}  {}",
+            id_prefix, feed_type, title_trunc, group_name, interval_str, health_str, last_sync
+        );
     }
     Ok(())
 }
@@ -320,7 +350,9 @@ async fn cmd_show(args: FeedShowArgs, core: &PulseCore, global_json: bool) -> an
     }
 
     let groups = core.get_feed_groups().await?;
-    let group_name = feed.group_id.as_ref()
+    let group_name = feed
+        .group_id
+        .as_ref()
         .and_then(|gid| groups.iter().find(|g| &g.id == gid))
         .map(|g| g.name.as_str())
         .unwrap_or("-");
@@ -329,7 +361,10 @@ async fn cmd_show(args: FeedShowArgs, core: &PulseCore, global_json: bool) -> an
     println!("URL:          {}", feed.url);
     println!("Type:         {}", feed.feed_type);
     println!("Title:        {}", feed.title.as_deref().unwrap_or("-"));
-    println!("Description:  {}", feed.description.as_deref().unwrap_or("-"));
+    println!(
+        "Description:  {}",
+        feed.description.as_deref().unwrap_or("-")
+    );
     println!("Group:        {}", group_name);
     println!("Interval:     {}s", feed.poll_interval_secs);
     println!("Enabled:      {}", feed.is_enabled);
@@ -375,7 +410,11 @@ async fn cmd_enable(args: FeedIdArgs, core: &PulseCore, enabled: bool) -> anyhow
     feed.is_enabled = enabled;
     feed.updated_at = chrono::Utc::now().timestamp();
     core.db.upsert_feed(feed).await?;
-    println!("feed {} {}", &args.id, if enabled { "enabled" } else { "disabled" });
+    println!(
+        "feed {} {}",
+        &args.id,
+        if enabled { "enabled" } else { "disabled" }
+    );
     Ok(())
 }
 
@@ -414,7 +453,11 @@ struct FeedHealth {
     last_success_at: Option<i64>,
 }
 
-async fn cmd_health(args: FeedHealthArgs, core: &PulseCore, global_json: bool) -> anyhow::Result<()> {
+async fn cmd_health(
+    args: FeedHealthArgs,
+    core: &PulseCore,
+    global_json: bool,
+) -> anyhow::Result<()> {
     let use_json = args.json || global_json;
 
     let feeds = if let Some(ref id) = args.id {
@@ -426,37 +469,57 @@ async fn cmd_health(args: FeedHealthArgs, core: &PulseCore, global_json: bool) -
         core.get_feeds().await?
     };
 
-    let health: Vec<FeedHealth> = feeds.iter().map(|f| {
-        let success_rate = if f.total_fetches > 0 {
-            Some((f.total_fetches - f.total_failures) as f64 / f.total_fetches as f64 * 100.0)
-        } else {
-            None
-        };
-        FeedHealth {
-            id: f.id[..f.id.len().min(8)].to_string(),
-            title: f.title.clone(),
-            success_rate_pct: success_rate,
-            avg_latency_ms: f.avg_latency_ms,
-            failure_streak: f.failure_streak,
-            last_success_at: f.last_success_at,
-        }
-    }).collect();
+    let health: Vec<FeedHealth> = feeds
+        .iter()
+        .map(|f| {
+            let success_rate = if f.total_fetches > 0 {
+                Some((f.total_fetches - f.total_failures) as f64 / f.total_fetches as f64 * 100.0)
+            } else {
+                None
+            };
+            FeedHealth {
+                id: f.id[..f.id.len().min(8)].to_string(),
+                title: f.title.clone(),
+                success_rate_pct: success_rate,
+                avg_latency_ms: f.avg_latency_ms,
+                failure_streak: f.failure_streak,
+                last_success_at: f.last_success_at,
+            }
+        })
+        .collect();
 
     if use_json {
         print_json(&health);
         return Ok(());
     }
 
-    println!("{:<8}  {:<28}  {:<10}  {:<12}  {:<14}  {}",
-        "ID", "TITLE", "SUCCESS%", "AVG_LAT_MS", "FAIL_STREAK", "LAST_SUCCESS");
+    println!(
+        "{:<8}  {:<28}  {:<10}  {:<12}  {:<14}  {}",
+        "ID", "TITLE", "SUCCESS%", "AVG_LAT_MS", "FAIL_STREAK", "LAST_SUCCESS"
+    );
     for h in &health {
         let title = h.title.as_deref().unwrap_or("-");
-        let title_trunc = if title.len() > 28 { &title[..28] } else { title };
-        let rate = h.success_rate_pct.map(|r| format!("{:.0}%", r)).unwrap_or_else(|| "-".to_string());
-        let lat = h.avg_latency_ms.map(|l| format!("{:.0}", l)).unwrap_or_else(|| "-".to_string());
-        let last = h.last_success_at.map(|ts| relative_time(ts)).unwrap_or_else(|| "never".to_string());
-        println!("{:<8}  {:<28}  {:<10}  {:<12}  {:<14}  {}",
-            h.id, title_trunc, rate, lat, h.failure_streak, last);
+        let title_trunc = if title.len() > 28 {
+            &title[..28]
+        } else {
+            title
+        };
+        let rate = h
+            .success_rate_pct
+            .map(|r| format!("{:.0}%", r))
+            .unwrap_or_else(|| "-".to_string());
+        let lat = h
+            .avg_latency_ms
+            .map(|l| format!("{:.0}", l))
+            .unwrap_or_else(|| "-".to_string());
+        let last = h
+            .last_success_at
+            .map(|ts| relative_time(ts))
+            .unwrap_or_else(|| "never".to_string());
+        println!(
+            "{:<8}  {:<28}  {:<10}  {:<12}  {:<14}  {}",
+            h.id, title_trunc, rate, lat, h.failure_streak, last
+        );
     }
     Ok(())
 }

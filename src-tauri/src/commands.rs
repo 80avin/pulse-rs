@@ -2,13 +2,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::TimeZone;
-use pulse_core::types::{Feed, FeedGroup, FeedType, ItemStatePatch, TimelineCursor, TimelineFilter};
 use pulse_core::PulseCore;
+use pulse_core::types::{
+    Feed, FeedGroup, FeedType, ItemStatePatch, TimelineCursor, TimelineFilter,
+};
 use tauri::{Emitter, State};
 use uuid::Uuid;
 
-use crate::models::*;
 use crate::AppState;
+use crate::models::*;
 
 // ── Share / feed detection commands ───────────────────────────────────────────
 
@@ -34,7 +36,10 @@ pub async fn detect_feed(url: String) -> Result<FeedCandidateDto, String> {
         candidates: candidate
             .candidates
             .into_iter()
-            .map(|c| FeedLinkDto { url: c.url, title: c.title })
+            .map(|c| FeedLinkDto {
+                url: c.url,
+                title: c.title,
+            })
             .collect(),
     })
 }
@@ -82,11 +87,11 @@ fn adapt_item(view: &pulse_core::types::FeedItemView) -> FeedItemDto {
     // Decode Reddit HTML entities in body_html so the frontend can render it safely.
     let body_html = view.body_html.as_deref().map(|h| {
         h.replace("&amp;", "&")
-         .replace("&lt;", "<")
-         .replace("&gt;", ">")
-         .replace("&quot;", "\"")
-         .replace("&#39;", "'")
-         .replace("&nbsp;", "\u{00A0}")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&nbsp;", "\u{00A0}")
     });
     FeedItemDto {
         id: view.id.clone(),
@@ -155,7 +160,10 @@ const KNOWN_MODELS: &[ModelSpec] = &[
         hf_repo: "clip-vit-base-patch32",
         files: &[
             ("onnx/vision_model_q4f16.onnx", "vision_model_q4f16.onnx"),
-            ("onnx/text_model_quantized.onnx", "text_model_quantized.onnx"),
+            (
+                "onnx/text_model_quantized.onnx",
+                "text_model_quantized.onnx",
+            ),
             ("tokenizer.json", "tokenizer.json"),
         ],
         size_mb: 125,
@@ -350,8 +358,16 @@ pub async fn mark_source_read(state: State<'_, AppState>, source_id: String) -> 
 }
 
 #[tauri::command]
-pub async fn toggle_saved(state: State<'_, AppState>, id: String, saved: bool) -> Result<(), String> {
-    state.core.toggle_saved(&id, saved).await.map_err(|e| e.to_string())
+pub async fn toggle_saved(
+    state: State<'_, AppState>,
+    id: String,
+    saved: bool,
+) -> Result<(), String> {
+    state
+        .core
+        .toggle_saved(&id, saved)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -591,7 +607,7 @@ pub fn get_ai_status(state: State<'_, AppState>) -> AiStatusDto {
     let fasttext_model_name = core.active_fasttext_model_name();
     let miniml_model_name = core.active_miniml_model_name();
     let tagging_mode = match (fasttext_loaded, miniml_loaded, onnx_loaded, vision_loaded) {
-        (true, true, _, true)  => "fasttext+miniml+vision",
+        (true, true, _, true) => "fasttext+miniml+vision",
         (true, true, _, false) => "fasttext+miniml",
         (true, false, _, true) => "fasttext+vision",
         (true, false, _, false) => "fasttext",
@@ -617,31 +633,35 @@ pub fn get_ai_status(state: State<'_, AppState>) -> AiStatusDto {
 #[tauri::command]
 pub async fn list_models(state: State<'_, AppState>) -> Result<Vec<ModelInfoDto>, String> {
     let core = &state.core;
-    let active_nli     = core.active_model_name();
-    let active_vision  = core.active_vision_model_name();
+    let active_nli = core.active_model_name();
+    let active_vision = core.active_vision_model_name();
     let active_fasttext = core.active_fasttext_model_name();
-    let active_miniml  = core.active_miniml_model_name();
+    let active_miniml = core.active_miniml_model_name();
 
     Ok(KNOWN_MODELS
         .iter()
         .map(|spec| {
             let model_dir = core.config.models_dir().join(spec.id);
             let downloaded = match spec.kind {
-                "nli"    => model_dir.join("model_quantized.onnx").exists()
-                              || model_dir.join("model.onnx").exists(),
-                "vision" => model_dir.join("vision_model_q4f16.onnx").exists()
-                              || model_dir.join("vision_model_quantized.onnx").exists()
-                              || model_dir.join("vision_model.onnx").exists()
-                              || model_dir.join("model.onnx").exists(),
+                "nli" => {
+                    model_dir.join("model_quantized.onnx").exists()
+                        || model_dir.join("model.onnx").exists()
+                }
+                "vision" => {
+                    model_dir.join("vision_model_q4f16.onnx").exists()
+                        || model_dir.join("vision_model_quantized.onnx").exists()
+                        || model_dir.join("vision_model.onnx").exists()
+                        || model_dir.join("model.onnx").exists()
+                }
                 "miniml" => model_dir.join("model.onnx").exists(),
                 "fasttext" => model_dir.join("fasttext.pftm").exists(),
                 _ => false,
             };
             let active = match spec.kind {
-                "nli"     => active_nli.as_deref() == Some(spec.id),
-                "vision"  => active_vision.as_deref() == Some(spec.id),
+                "nli" => active_nli.as_deref() == Some(spec.id),
+                "vision" => active_vision.as_deref() == Some(spec.id),
                 "fasttext" => active_fasttext.as_deref() == Some(spec.id),
-                "miniml"  => active_miniml.as_deref() == Some(spec.id),
+                "miniml" => active_miniml.as_deref() == Some(spec.id),
                 _ => false,
             };
             ModelInfoDto {
@@ -697,7 +717,11 @@ pub async fn download_model(
 
         let total = resp.content_length().unwrap_or(0);
         let mut bytes_done: u64 = 0;
-        let mut buf: Vec<u8> = if total > 0 { Vec::with_capacity(total as usize) } else { Vec::new() };
+        let mut buf: Vec<u8> = if total > 0 {
+            Vec::with_capacity(total as usize)
+        } else {
+            Vec::new()
+        };
 
         use futures_util::StreamExt;
         let mut stream = resp.bytes_stream();
@@ -742,7 +766,9 @@ pub async fn download_model(
     } else if spec.kind == "vision" {
         // Delete stale label_embeddings.bin so descriptions are always fresh after download.
         let stale = model_dir.join("label_embeddings.bin");
-        if stale.exists() { let _ = std::fs::remove_file(&stale); }
+        if stale.exists() {
+            let _ = std::fs::remove_file(&stale);
+        }
         if let Err(e) = core.set_active_vision_model(spec.id) {
             eprintln!("[pulse] vision model downloaded but activation failed: {e}");
         } else if let Err(e) = core.reload_vision_tagger() {
@@ -766,10 +792,14 @@ pub async fn delete_model(state: State<'_, AppState>, model_id: String) -> Resul
     let core = &state.core;
     let spec = KNOWN_MODELS.iter().find(|m| m.id == model_id);
     match spec.map(|s| s.kind) {
-        Some("vision")  => core.remove_vision_model(&model_id).map_err(|e| e.to_string()),
-        Some("miniml")  => core.remove_miniml_model(&model_id).map_err(|e| e.to_string()),
+        Some("vision") => core
+            .remove_vision_model(&model_id)
+            .map_err(|e| e.to_string()),
+        Some("miniml") => core
+            .remove_miniml_model(&model_id)
+            .map_err(|e| e.to_string()),
         // NLI and unknown — fall back to the generic remove_model path
-        _               => core.remove_model(&model_id).map_err(|e| e.to_string()),
+        _ => core.remove_model(&model_id).map_err(|e| e.to_string()),
     }
 }
 
@@ -784,19 +814,23 @@ pub fn activate_model(state: State<'_, AppState>, model_id: String) -> Result<()
 
     match spec.kind {
         "nli" => {
-            core.set_active_model(&model_id).map_err(|e| e.to_string())?;
+            core.set_active_model(&model_id)
+                .map_err(|e| e.to_string())?;
             core.reload_onnx_tagger().map_err(|e| e.to_string())?;
         }
         "vision" => {
-            core.set_active_vision_model(&model_id).map_err(|e| e.to_string())?;
+            core.set_active_vision_model(&model_id)
+                .map_err(|e| e.to_string())?;
             core.reload_vision_tagger().map_err(|e| e.to_string())?;
         }
         "fasttext" => {
-            core.set_active_fasttext_model(&model_id).map_err(|e| e.to_string())?;
+            core.set_active_fasttext_model(&model_id)
+                .map_err(|e| e.to_string())?;
             core.reload_fasttext_tagger().map_err(|e| e.to_string())?;
         }
         "miniml" => {
-            core.set_active_miniml_model(&model_id).map_err(|e| e.to_string())?;
+            core.set_active_miniml_model(&model_id)
+                .map_err(|e| e.to_string())?;
             core.reload_miniml_tagger().map_err(|e| e.to_string())?;
         }
         _ => return Err(format!("unknown model kind '{}'", spec.kind)),
@@ -815,14 +849,28 @@ pub async fn retag_all(state: State<'_, AppState>, app: tauri::AppHandle) -> Res
 
     let app2 = app.clone();
     let progress = move |tagged: usize, total: usize| {
-        let _ = app2.emit("ai://tagging-progress", TaggingProgressEvent { tagged, total, done: false });
+        let _ = app2.emit(
+            "ai://tagging-progress",
+            TaggingProgressEvent {
+                tagged,
+                total,
+                done: false,
+            },
+        );
     };
     let (items, tags) = state
         .core
         .run_tagger_direct(None, true, Some(&progress))
         .await
         .map_err(|e| e.to_string())?;
-    let _ = app.emit("ai://tagging-progress", TaggingProgressEvent { tagged: items, total: items, done: true });
+    let _ = app.emit(
+        "ai://tagging-progress",
+        TaggingProgressEvent {
+            tagged: items,
+            total: items,
+            done: true,
+        },
+    );
 
     // Apply the global confidence floor: delete any tags that fell below the user's threshold.
     // Guard at > 0.15 to avoid wiping rule-based tags (which always have confidence 1.0)

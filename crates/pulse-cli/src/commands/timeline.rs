@@ -1,5 +1,8 @@
 use clap::Args;
-use pulse_core::{PulseCore, types::{TimelineFilter, FeedItemView}};
+use pulse_core::{
+    PulseCore,
+    types::{FeedItemView, TimelineFilter},
+};
 
 use crate::output::{print_json, relative_time, score_display};
 
@@ -81,8 +84,14 @@ pub fn print_items_human(items: &[FeedItemView]) {
         let feed = item.feed_title.as_deref().unwrap_or(&item.feed_url);
         let feed_trunc = if feed.len() > 20 { &feed[..20] } else { feed };
         let title = &item.title;
-        let title_trunc = if title.len() > 60 { &title[..60] } else { title };
-        println!("{} {} {}  {:<5}  {:<20}  \"{}\"",
-            id_prefix, state, age, score, feed_trunc, title_trunc);
+        let title_trunc = if title.len() > 60 {
+            &title[..60]
+        } else {
+            title
+        };
+        println!(
+            "{} {} {}  {:<5}  {:<20}  \"{}\"",
+            id_prefix, state, age, score, feed_trunc, title_trunc
+        );
     }
 }
