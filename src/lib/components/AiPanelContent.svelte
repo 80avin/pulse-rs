@@ -1,6 +1,7 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
   import { items, sources, aiStatus, models, taggingProgress, downloadModel, deleteModel, activateModel, retagAll, reloadAiInfo } from '$lib/store.svelte';
+  import { logger } from '$lib/logger';
   import Icon from '$lib/components/Icon.svelte';
   import ScoreBar from '$lib/components/ScoreBar.svelte';
   import TagChip from '$lib/components/TagChip.svelte';
@@ -60,18 +61,18 @@
     try {
       await downloadModel(modelId);
     } catch (e) {
-      console.error('[pulse] download failed:', e);
+      logger.error('model download failed', { modelId, error: String(e) });
       delete downloadProgress[modelId];
       downloading.delete(modelId);
     }
   }
 
   async function handleDelete(modelId: string) {
-    try { await deleteModel(modelId); } catch (e) { console.error('[pulse] delete failed:', e); }
+    try { await deleteModel(modelId); } catch (e) { logger.error('model delete failed', { modelId, error: String(e) }); }
   }
 
   async function handleActivate(modelId: string) {
-    try { await activateModel(modelId); } catch (e) { console.error('[pulse] activate failed:', e); }
+    try { await activateModel(modelId); } catch (e) { logger.error('model activate failed', { modelId, error: String(e) }); }
   }
 
   async function handleRetag() {

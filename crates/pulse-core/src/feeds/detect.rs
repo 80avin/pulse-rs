@@ -39,6 +39,8 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
     let path = parsed.path().to_lowercase();
     let query = parsed.query().unwrap_or("").to_string();
 
+    tracing::debug!(url = %url, "detecting feed type");
+
     // Reddit pattern
     if host.contains("reddit.com") {
         let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
@@ -79,6 +81,8 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
     if let Some(known) = detect_well_known(&host, &path, &query) {
         return Ok(known);
     }
+
+    tracing::debug!(url = %url, "fetching URL for feed discovery");
 
     // Fetch the URL
     let response = client
@@ -124,6 +128,7 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
             .and_then(|f| f.title)
             .map(|t| t.content)
             .unwrap_or_else(|| domain_name(&url));
+        tracing::debug!(url = %url, name = %name, "direct feed detected");
         return Ok(FeedCandidate {
             feed_url: url,
             kind: "rss".into(),
@@ -140,6 +145,7 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
         let html_str = String::from_utf8_lossy(&bytes[..bytes.len().min(204_800)]);
         let candidates = find_alternate_links(&html_str, &url);
         if let Some(first) = candidates.first() {
+            tracing::debug!(url = %url, feed_url = %first.url, candidates = candidates.len(), "found feed links in HTML");
             return Ok(FeedCandidate {
                 feed_url: first.url.clone(),
                 kind: "rss".into(),
@@ -151,6 +157,7 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
             });
         }
         // HTML but no RSS links found
+        tracing::debug!(url = %url, "no feed links found in HTML");
         return Ok(FeedCandidate {
             feed_url: url.clone(),
             kind: "rss".into(),

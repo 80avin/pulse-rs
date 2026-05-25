@@ -23,6 +23,9 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
 
 # pulse-core provides: sync, storage, AI pipeline, model management
 pulse-core = { path = "../crates/pulse-core", features = ["ai-onnx", "ai-vision", "ai-fasttext", "ai-miniml"] }

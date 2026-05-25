@@ -1,3 +1,5 @@
+import { logger } from './logger';
+
 export type MarkReadMode = 'open' | 'never';
 export type SyncInterval = 5 | 15 | 30 | 60;
 
@@ -28,6 +30,7 @@ export const settings = $state({
   confidenceThreshold: (saved.confidenceThreshold ?? 0.5)     as number,
   notifyHighSignal:    (saved.notifyHighSignal     ?? false)   as boolean,
   notifySaved:         (saved.notifySaved          ?? false)   as boolean,
+  verboseLogging:      (saved.verboseLogging       ?? false)   as boolean,
 });
 
 // Called from +layout.svelte onMount — same timing guarantee as initStore().
@@ -57,9 +60,10 @@ export async function initSettings(): Promise<void> {
       settings.confidenceThreshold = s.confidenceThreshold;
       settings.notifyHighSignal    = s.notifyHighSignal;
       settings.notifySaved         = s.notifySaved;
+      settings.verboseLogging      = s.verboseLogging ?? false;
       return;
     } catch (e) {
-      console.error(`[pulse] settings init attempt ${attempt + 1} failed:`, e);
+      logger.warn(`settings init attempt ${attempt + 1} failed`, e);
     }
   }
 }
@@ -77,12 +81,22 @@ $effect.root(() => {
       confidenceThreshold: settings.confidenceThreshold,
       notifyHighSignal:    settings.notifyHighSignal,
       notifySaved:         settings.notifySaved,
+      verboseLogging:      settings.verboseLogging,
     };
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(KEY, JSON.stringify(snap));
     }
     if (IS_TAURI) {
-      tauriInvoke('save_settings', { settings: snap }).catch(console.error);
+      tauriInvoke('save_settings', { settings: snap }).catch(e => logger.warn('save_settings failed', e));
+    }
+  });
+
+  // Apply the log filter live whenever verboseLogging changes — separate effect
+  // so the Rust filter update fires immediately and independently of save_settings.
+  $effect(() => {
+    const verbose = settings.verboseLogging;
+    if (IS_TAURI) {
+      tauriInvoke('set_log_level', { verbose }).catch(() => {});
     }
   });
 });

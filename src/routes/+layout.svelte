@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import '../app.css';
   import { setupTaggingListener, initStore } from '$lib/store.svelte';
+  import { logger } from '$lib/logger';
   import { setupShareListener, shareSheet } from '$lib/share.svelte';
   import { initSettings } from '$lib/settings.svelte';
   import ShareSheet from '$lib/components/ShareSheet.svelte';
@@ -11,7 +12,7 @@
   // onMount fires after the WebView has painted, guaranteeing the Tauri IPC
   // bridge is ready — avoids the silent-failure race on Android cold start.
   onMount(() => {
-    Promise.all([initStore(), initSettings()]).catch(console.error);
+    Promise.all([initStore(), initSettings()]).catch(e => logger.error('app init failed', e));
   });
 
   $effect(() => {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import { sources, groups, items, markAllRead, markSourceRead, addSource as storeAddSource, removeSource as storeRemoveSource, updateSource as storeUpdateSource, doSync as storeSync, syncSource as storeSyncSource, createGroup } from '$lib/store.svelte';
+  import { logger } from '$lib/logger';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import StatusDot from '$lib/components/StatusDot.svelte';
   import SourceGlyph from '$lib/components/SourceGlyph.svelte';
@@ -176,7 +177,7 @@
     addUrl = '';
     const newSourceId = await storeAddSource(name, normUrl, kind, groupId);
     // Immediately fetch the new feed so items appear without a manual sync.
-    storeSyncSource(newSourceId).catch(console.error);
+    storeSyncSource(newSourceId).catch(e => logger.warn('sync after mobile source add failed', e));
   }
 
   async function removeSource(id: string) {

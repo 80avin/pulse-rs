@@ -1,4 +1,5 @@
 import { groups, addSource as storeAddSource, syncSource as storeSyncSource, createGroup } from '$lib/store.svelte';
+import { logger } from '$lib/logger';
 
 const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
 
@@ -50,9 +51,9 @@ export async function confirmShare(): Promise<void> {
   dismissShare();
   try {
     const newId = await storeAddSource(name || feedUrl, feedUrl, kind, group);
-    storeSyncSource(newId).catch(console.error);
+    storeSyncSource(newId).catch(e => logger.warn('sync after share-add failed', e));
   } catch (e) {
-    console.error('[share] add failed:', e);
+    logger.error('share: add source failed', e);
   }
 }
 

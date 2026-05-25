@@ -1,5 +1,6 @@
 import { ITEMS as MOCK_ITEMS, SOURCES as MOCK_SOURCES, GROUPS as MOCK_GROUPS } from './mock-data';
 import type { FeedItem, Source, Group, AiStatus, ModelInfo } from './types';
+import { logger } from './logger';
 
 const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
 
@@ -260,11 +261,11 @@ export async function initStore(): Promise<void> {
       groups.splice(0, groups.length, ...bg);
       storeReady.loading = false;
       storeReady.error = false;
-      reloadAiStatus().catch(e => console.error('[pulse] ai status failed:', e));
-      reloadModelsInternal().catch(e => console.error('[pulse] list_models failed:', e));
+      reloadAiStatus().catch(e => logger.warn('ai status failed', e));
+      reloadModelsInternal().catch(e => logger.warn('list_models failed', e));
       return;
     } catch (e) {
-      console.error(`[pulse] init attempt ${attempt + 1} failed:`, e);
+      logger.warn(`init attempt ${attempt + 1} failed`, e);
     }
   }
   storeReady.loading = false;
@@ -315,7 +316,7 @@ export async function doSync(): Promise<void> {
       syncState.lastNewCount = batch;
     }
   } catch (e) {
-    console.error('[pulse] sync failed:', e);
+    logger.error('sync_all failed', e);
   } finally {
     syncState.syncing = false;
   }
@@ -336,7 +337,7 @@ export async function loadMoreItems(groupId?: string): Promise<void> {
     items.push(...page.items.map(adaptItem));
     loadingMore.cursor = page.nextCursor ?? null;
   } catch (e) {
-    console.error('[pulse] loadMoreItems failed:', e);
+    logger.warn('loadMoreItems failed', e);
   } finally {
     loadingMore.active = false;
   }
@@ -360,7 +361,7 @@ export function markRead(id: string, read = true) {
     }
   }
   if (IS_TAURI) {
-    tauriInvoke('mark_items_read', { ids: [id], read }).catch(console.error);
+    tauriInvoke('mark_items_read', { ids: [id], read }).catch(e => logger.warn('mark_items_read failed', e));
   }
 }
 
@@ -369,7 +370,7 @@ export function toggleSaved(id: string) {
   if (!item) return;
   item.saved = !item.saved;
   if (IS_TAURI) {
-    tauriInvoke('toggle_saved', { id, saved: item.saved }).catch(console.error);
+    tauriInvoke('toggle_saved', { id, saved: item.saved }).catch(e => logger.warn('toggle_saved failed', e));
   }
 }
 
@@ -398,7 +399,7 @@ export function markSourceRead(sourceId: string) {
     }
   }
   if (IS_TAURI) {
-    tauriInvoke('mark_source_read', { sourceId }).catch(console.error);
+    tauriInvoke('mark_source_read', { sourceId }).catch(e => logger.warn('mark_source_read failed', e));
   }
 }
 
@@ -407,7 +408,7 @@ export function hideItem(id: string) {
   if (idx !== -1) {
     items.splice(idx, 1);
     if (IS_TAURI) {
-      tauriInvoke('hide_item', { id }).catch(console.error);
+      tauriInvoke('hide_item', { id }).catch(e => logger.warn('hide_item failed', e));
     }
   }
 }
@@ -486,7 +487,7 @@ export async function syncSource(sourceId: string): Promise<void> {
       await tauriInvoke('sync_source', { sourceId });
       await Promise.all([reloadItems(), reloadSources(), reloadGroups()]);
     } catch (e) {
-      console.error('[pulse] sync_source failed:', e);
+      logger.error('sync_source failed', e);
     }
   } else {
     await doSync();
@@ -517,7 +518,7 @@ export async function renameGroup(id: string, name: string): Promise<void> {
   const g = groups.find(g => g.id === id);
   if (g) g.name = name;
   if (IS_TAURI) {
-    tauriInvoke('rename_group', { id, name }).catch(console.error);
+    tauriInvoke('rename_group', { id, name }).catch(e => logger.warn('rename_group failed', e));
   }
 }
 
@@ -553,8 +554,8 @@ export async function searchItems(query: string, limit = 100): Promise<FeedItem[
 export async function reloadAiInfo(): Promise<void> {
   if (!IS_TAURI) return;
   await Promise.all([
-    reloadAiStatus().catch(console.error),
-    reloadModelsInternal().catch(console.error),
+    reloadAiStatus().catch(e => logger.warn('reloadAiStatus failed', e)),
+    reloadModelsInternal().catch(e => logger.warn('reloadModels failed', e)),
   ]);
 }
 

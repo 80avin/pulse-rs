@@ -156,10 +156,18 @@ pub(crate) async fn process_tag_request(
         let text = crate::training::build_input_text(&item.title, item.url.as_deref());
         match text_backend {
             crate::config::TextBackend::FastText => fasttext
-                .and_then(|ft| ft.classify(&text).ok())
+                .and_then(|ft| {
+                    ft.classify(&text)
+                        .map_err(|e| tracing::warn!(error = %e, "fasttext classify failed"))
+                        .ok()
+                })
                 .unwrap_or_default(),
             crate::config::TextBackend::MiniMl => miniml
-                .and_then(|ml| ml.classify(&text).ok())
+                .and_then(|ml| {
+                    ml.classify(&text)
+                        .map_err(|e| tracing::warn!(error = %e, "miniml classify failed"))
+                        .ok()
+                })
                 .unwrap_or_default(),
             crate::config::TextBackend::HybridFastTextMiniMl => {
                 hybrid_classify(fasttext, miniml, &text)
@@ -272,11 +280,19 @@ fn hybrid_classify(
     text: &str,
 ) -> Vec<TagResult> {
     let ft_tags = fasttext
-        .and_then(|ft| ft.classify(text).ok())
+        .and_then(|ft| {
+            ft.classify(text)
+                .map_err(|e| tracing::warn!(error = %e, "fasttext classify failed"))
+                .ok()
+        })
         .unwrap_or_default();
 
     let ml_tags = miniml
-        .and_then(|ml| ml.classify(text).ok())
+        .and_then(|ml| {
+            ml.classify(text)
+                .map_err(|e| tracing::warn!(error = %e, "miniml classify failed"))
+                .ok()
+        })
         .unwrap_or_default();
 
     // Start with FastText results

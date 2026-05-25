@@ -503,7 +503,7 @@ pub async fn sync_source(
         let sid = source_id.clone();
         tokio::spawn(async move {
             if let Err(e) = core2.enrich_pending(Some(&sid), 50, 4, |_| {}).await {
-                eprintln!("[enrich] enrichment failed for {}: {}", sid, e);
+                tracing::warn!(feed_id = %sid, error = %e, "enrichment failed");
             }
         });
     }
@@ -529,15 +529,15 @@ pub async fn sync_all(state: State<'_, AppState>) -> Result<SyncResultDto, Strin
     for handle in handles {
         match handle.await {
             Ok(Ok(n)) => total_new += n as i64,
-            Ok(Err(e)) => eprintln!("[sync] feed error: {}", e),
-            Err(e) => eprintln!("[sync] task panic: {}", e),
+            Ok(Err(e)) => tracing::warn!(error = %e, "feed sync error"),
+            Err(e) => tracing::error!(error = %e, "feed sync task panicked"),
         }
     }
 
     let core2 = Arc::clone(&state.core);
     tokio::spawn(async move {
         if let Err(e) = core2.enrich_pending(None, 200, 4, |_| {}).await {
-            eprintln!("[enrich] enrichment failed: {}", e);
+            tracing::warn!(error = %e, "enrichment failed");
         }
     });
 
@@ -759,9 +759,9 @@ pub async fn download_model(
     // Activate + hot-reload the model into memory (best-effort — files are on disk regardless)
     if spec.kind == "nli" {
         if let Err(e) = core.set_active_model(spec.id) {
-            eprintln!("[pulse] model downloaded but activation failed: {e}");
+            tracing::error!(model_id = %model_id, error = %e, "model activation failed after download");
         } else if let Err(e) = core.reload_onnx_tagger() {
-            eprintln!("[pulse] model activated but hot-reload failed: {e}");
+            tracing::error!(model_id = %model_id, error = %e, "model hot-reload failed after activation");
         }
     } else if spec.kind == "vision" {
         // Delete stale label_embeddings.bin so descriptions are always fresh after download.
@@ -770,17 +770,17 @@ pub async fn download_model(
             let _ = std::fs::remove_file(&stale);
         }
         if let Err(e) = core.set_active_vision_model(spec.id) {
-            eprintln!("[pulse] vision model downloaded but activation failed: {e}");
+            tracing::error!(model_id = %model_id, error = %e, "vision model activation failed after download");
         } else if let Err(e) = core.reload_vision_tagger() {
-            eprintln!("[pulse] vision model activated but hot-reload failed: {e}");
+            tracing::error!(model_id = %model_id, error = %e, "vision model hot-reload failed after activation");
         }
     } else if spec.kind == "miniml" {
         // mlp_head.pmlp + miniml_thresholds.json are extracted by lib.rs on startup;
         // model.onnx + tokenizer.json were just downloaded above — now activate.
         if let Err(e) = core.set_active_miniml_model(spec.id) {
-            eprintln!("[pulse] miniml model downloaded but activation failed: {e}");
+            tracing::error!(model_id = %model_id, error = %e, "miniml model activation failed after download");
         } else if let Err(e) = core.reload_miniml_tagger() {
-            eprintln!("[pulse] miniml model activated but hot-reload failed: {e}");
+            tracing::error!(model_id = %model_id, error = %e, "miniml model hot-reload failed after activation");
         }
     }
 
@@ -881,4 +881,106 @@ pub async fn retag_all(state: State<'_, AppState>, app: tauri::AppHandle) -> Res
     }
 
     Ok(tags as i64)
+}
+
+// ── Diagnostics commands ───────────────────────────────────────────────────────
+
+/// Update the tracing filter level at runtime — no restart required.
+/// Called by the frontend when the user toggles "Verbose logging" in settings.
+#[tauri::command]
+pub fn set_log_level(state: State<'_, AppState>, verbose: bool) -> Result<(), String> {
+    let directive = crate::log_directive(verbose);
+    state
+        .log_filter
+        .modify(|f| *f = tracing_subscriber::EnvFilter::new(directive))
+        .map_err(|e| e.to_string())
+}
+
+/// Return the last `lines` lines of the most recent log file.
+/// Used by the mobile "Share logs" flow.
+#[tauri::command]
+pub async fn get_log_content(
+    state: State<'_, AppState>,
+    lines: Option<usize>,
+) -> Result<String, String> {
+    let log_dir = state.core.config.data_dir.join("logs");
+    let max_lines = lines.unwrap_or(500);
+
+    let log_file = find_most_recent_log(&log_dir).ok_or_else(|| {
+        "No log file found yet — try again after the app has been running.".to_string()
+    })?;
+
+    let content = std::fs::read_to_string(&log_file).map_err(|e| e.to_string())?;
+
+    let collected: Vec<&str> = content.lines().collect();
+    let start = collected.len().saturating_sub(max_lines);
+    Ok(collected[start..].join("\n"))
+}
+
+/// Return the log directory path so the frontend can display or open it.
+#[tauri::command]
+pub fn get_log_path(state: State<'_, AppState>) -> String {
+    state
+        .core
+        .config
+        .data_dir
+        .join("logs")
+        .to_string_lossy()
+        .to_string()
+}
+
+/// Open the log directory in the system file manager (desktop only).
+#[tauri::command]
+pub fn open_logs_folder(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let log_dir = state.core.config.data_dir.join("logs");
+    let _ = std::fs::create_dir_all(&log_dir);
+    app.opener()
+        .open_path(log_dir.to_string_lossy().as_ref(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+fn find_most_recent_log(log_dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    std::fs::read_dir(log_dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_name().to_string_lossy().starts_with("pulse.log."))
+        .max_by_key(|e| {
+            e.metadata()
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+        })
+        .map(|e| e.path())
+}
+
+// ── Frontend logging bridge ────────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum FrontendLogLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
+}
+
+/// Route a log event from the JS/TS frontend into the Rust tracing subscriber
+/// so it lands in the same log file as backend events.
+#[tauri::command]
+pub fn log_from_frontend(level: FrontendLogLevel, message: String, context: Option<String>) {
+    match level {
+        FrontendLogLevel::Error => {
+            tracing::error!(target: "pulse_frontend", context = ?context, "{}", message)
+        }
+        FrontendLogLevel::Warn => {
+            tracing::warn!(target: "pulse_frontend", context = ?context, "{}", message)
+        }
+        FrontendLogLevel::Info => {
+            tracing::info!(target: "pulse_frontend", context = ?context, "{}", message)
+        }
+        FrontendLogLevel::Debug => {
+            tracing::debug!(target: "pulse_frontend", context = ?context, "{}", message)
+        }
+    }
 }

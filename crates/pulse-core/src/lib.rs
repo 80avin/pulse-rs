@@ -358,7 +358,7 @@ impl PulseCore {
                             og_title: r.og_title,
                         },
                         Err(e) => {
-                            tracing::debug!("Enrichment failed for {}: {}", url, e);
+                            tracing::warn!(url = %url, error = %e, "enrichment fetch failed");
                             EnrichItemResult {
                                 item_id: candidate.id,
                                 url,

@@ -2,6 +2,7 @@
   import { T } from '$lib/tokens';
   import { items, sources, clearItems, loadMockData, aiStatus } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
+  import { logger } from '$lib/logger';
   import Icon from '$lib/components/Icon.svelte';
   import KeyCap from '$lib/components/KeyCap.svelte';
   import { version } from '$app/environment';
@@ -10,6 +11,10 @@
   let { showShortcuts = false }: { showShortcuts?: boolean } = $props();
 
   const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
+  // IS_DESKTOP: true when running in Tauri on a non-mobile platform.
+  // navigator.maxTouchPoints > 1 is a reasonable heuristic used elsewhere in the app.
+  const IS_DESKTOP = IS_TAURI && (typeof navigator === 'undefined' || navigator.maxTouchPoints <= 1);
+
   async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
     const { invoke } = await import('@tauri-apps/api/core');
     return invoke<T>(cmd, args);
@@ -23,11 +28,19 @@
   let dbSizeKb = $state(0);
   let clearing = $state(false);
 
+  // Diagnostics state
+  let logPath = $state('');
+  let sharingLogs = $state(false);
+  let shareStatus = $state<'idle' | 'copied' | 'error'>('idle');
+
   $effect(() => {
     if (!IS_TAURI) return;
     tauriInvoke<{ dbSizeKb: number }>('get_db_stats')
       .then(s => { dbSizeKb = s.dbSizeKb; })
       .catch(() => {});
+    if (IS_DESKTOP) {
+      tauriInvoke<string>('get_log_path').then(p => { logPath = p; }).catch(() => {});
+    }
   });
 
   async function handleClearItems() {
@@ -36,6 +49,38 @@
     await clearItems();
     dbSizeKb = 0;
     clearing = false;
+  }
+
+  async function handleOpenLogsFolder() {
+    await tauriInvoke('open_logs_folder').catch(e => logger.warn('open_logs_folder failed', e));
+  }
+
+  async function handleShareLogs() {
+    sharingLogs = true;
+    shareStatus = 'idle';
+    try {
+      const content = await tauriInvoke<string>('get_log_content', { lines: 500 });
+      if (!content.trim()) {
+        shareStatus = 'error';
+        return;
+      }
+      // Use Web Share API if available (Android WebView), fall back to clipboard.
+      // Cast to any to avoid TypeScript narrowing the type to never in the else branch.
+      const navAny = navigator as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (typeof navAny?.share === 'function') {
+        await navAny.share({ title: 'Pulse debug logs', text: content });
+      } else {
+        await navigator.clipboard.writeText(content);
+        shareStatus = 'copied';
+        setTimeout(() => { shareStatus = 'idle'; }, 2500);
+      }
+    } catch (e) {
+      logger.warn('share logs failed', e);
+      shareStatus = 'error';
+      setTimeout(() => { shareStatus = 'idle'; }, 2500);
+    } finally {
+      sharingLogs = false;
+    }
   }
 </script>
 
@@ -173,6 +218,50 @@
   <div style="font:11px/1.4 {T.mono};color:{T.ink1};">{items.length} items · {sources.length} sources</div>
   <div style="margin-top:4px;font:10px/1.4 {T.mono};color:{T.ink3};">SQLite WAL{dbSizeKb > 0 ? ` · ${dbSizeKb >= 1024 ? (dbSizeKb/1024).toFixed(1)+' MB' : dbSizeKb+' KB'}` : ''}</div>
 </div>
+
+<!-- Diagnostics -->
+{#if IS_TAURI}
+<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
+  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">diagnostics</div>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+
+    <!-- Verbose logging toggle -->
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="flex:1;">
+        <div style="font:11px/1 {T.mono};color:{T.ink1};">Verbose logging</div>
+        <div style="margin-top:3px;font:9px/1.4 {T.mono};color:{T.ink3};">Logs per-item tagging, sync steps, and inference calls. Enable before reproducing a bug.</div>
+      </div>
+      {@render toggle(settings.verboseLogging, () => { settings.verboseLogging = !settings.verboseLogging; })}
+    </div>
+
+    <!-- Desktop: show log path + open folder -->
+    {#if IS_DESKTOP}
+      {#if logPath}
+        <div style="font:9px/1.4 {T.mono};color:{T.ink3};word-break:break-all;">Logs: {logPath}</div>
+      {/if}
+      <button
+        onclick={handleOpenLogsFolder}
+        style="display:flex;align-items:center;gap:6px;width:100%;padding:8px 10px;background:transparent;border:1px solid {T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{T.ink1};cursor:pointer;text-align:left;"
+      >
+        <Icon name="ext" size={11} color={T.ink2} />
+        Open logs folder
+      </button>
+    {/if}
+
+    <!-- Mobile: share logs -->
+    {#if !IS_DESKTOP}
+      <button
+        onclick={handleShareLogs}
+        disabled={sharingLogs}
+        style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px 10px;background:transparent;border:1px solid {T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{sharingLogs ? T.ink3 : shareStatus === 'error' ? T.amber : T.ink1};cursor:{sharingLogs ? 'default' : 'pointer'};"
+      >
+        {sharingLogs ? 'preparing…' : shareStatus === 'copied' ? 'copied to clipboard' : shareStatus === 'error' ? 'no logs yet' : 'Share recent logs'}
+      </button>
+    {/if}
+
+  </div>
+</div>
+{/if}
 
 <!-- About -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">

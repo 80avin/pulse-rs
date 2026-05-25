@@ -8,12 +8,88 @@ use tauri::Manager;
 mod commands;
 mod models;
 
+/// Type alias for the reloadable log-filter handle stored in AppState.
+type LogFilterHandle =
+    tracing_subscriber::reload::Handle<tracing_subscriber::EnvFilter, tracing_subscriber::Registry>;
+
+/// Map a verbose flag to a tracing directive string.
+pub(crate) fn log_directive(verbose: bool) -> &'static str {
+    if verbose {
+        "pulse_core=debug,pulse_rs_lib=debug,pulse_frontend=debug,debug"
+    } else {
+        "pulse_core=info,pulse_rs_lib=info,warn"
+    }
+}
+
+/// Read `verboseLogging` from the persisted settings JSON without initialising
+/// PulseCore — called before tracing is set up so the first log event uses
+/// the correct level.
+fn read_verbose_setting(data_dir: &std::path::Path) -> bool {
+    std::fs::read_to_string(data_dir.join("tauri_settings.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| v["verboseLogging"].as_bool())
+        .unwrap_or(false)
+}
+
+/// Set up the tracing subscriber for the lifetime of the app.
+///
+/// Returns:
+/// - `WorkerGuard` — must be kept alive; dropping it shuts down the file-flush thread.
+/// - `LogFilterHandle` — call `.modify()` on it to change the log level at runtime.
+///
+/// Both platforms write to a rolling daily file in `{data_dir}/logs/` (7-day retention).
+/// Desktop also echoes to stderr for development convenience.
+fn init_tracing(
+    data_dir: &std::path::Path,
+    verbose: bool,
+) -> (tracing_appender::non_blocking::WorkerGuard, LogFilterHandle) {
+    use tracing_subscriber::{
+        EnvFilter, fmt, layer::SubscriberExt, reload, util::SubscriberInitExt,
+    };
+
+    let directive = log_directive(verbose);
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(directive));
+    let (filter_layer, filter_handle) =
+        reload::Layer::<EnvFilter, tracing_subscriber::Registry>::new(filter);
+
+    let log_dir = data_dir.join("logs");
+    let _ = std::fs::create_dir_all(&log_dir);
+    let file_appender = tracing_appender::rolling::Builder::new()
+        .rotation(tracing_appender::rolling::Rotation::DAILY)
+        .filename_prefix("pulse.log")
+        .max_log_files(7)
+        .build(&log_dir)
+        .unwrap_or_else(|_| tracing_appender::rolling::daily(&log_dir, "pulse.log"));
+    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+
+    // Desktop: file + stderr. Android: file only (stderr goes nowhere useful there).
+    #[cfg(not(target_os = "android"))]
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt::layer().with_writer(non_blocking).with_ansi(false))
+        .with(fmt::layer().with_writer(std::io::stderr))
+        .init();
+
+    #[cfg(target_os = "android")]
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt::layer().with_writer(non_blocking).with_ansi(false))
+        .init();
+
+    (guard, filter_handle)
+}
+
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static PENDING_SHARE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 
 pub struct AppState {
     pub core: Arc<PulseCore>,
     pub pending_share: Arc<Mutex<Option<String>>>,
+    /// Live handle to change the tracing filter without restarting.
+    pub log_filter: LogFilterHandle,
+    /// Keeps the background log-flush thread alive for the app lifetime.
+    _log_guard: tracing_appender::non_blocking::WorkerGuard,
 }
 
 // FastText model embedded at compile time (9.6 MB + tiny thresholds file).
@@ -73,9 +149,15 @@ fn extract_bundled_models(data_dir: &std::path::Path) {
 pub fn run() {
     let _ = PENDING_SHARE.set(Mutex::new(None));
 
+    // Read the persisted verbose setting before init so the correct filter is
+    // active from the very first log event (important for crash reproduction).
+    let data_dir = pulse_core::config::platform_data_dir();
+    let verbose = read_verbose_setting(&data_dir);
+    let (log_guard, log_filter) = init_tracing(&data_dir, verbose);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
+        .setup(move |app| {
             // Persist the AppHandle so the JNI bridge can emit events
             let _ = APP_HANDLE.set(app.handle().clone());
 
@@ -108,6 +190,8 @@ pub fn run() {
             app.manage(AppState {
                 core,
                 pending_share,
+                log_filter,
+                _log_guard: log_guard,
             });
 
             // Drain any share URL that arrived before the WebView was ready (cold-start)
@@ -163,6 +247,13 @@ pub fn run() {
             // Share intent
             commands::detect_feed,
             commands::get_pending_share,
+            // Frontend log bridge
+            commands::log_from_frontend,
+            // Diagnostics
+            commands::set_log_level,
+            commands::get_log_content,
+            commands::get_log_path,
+            commands::open_logs_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -111,6 +111,9 @@ pub struct AppSettingsDto {
     pub confidence_threshold: f64,
     pub notify_high_signal: bool,
     pub notify_saved: bool,
+    /// When true: pulse_core=debug + per-item inference logs. When false: info + warn only.
+    #[serde(default)]
+    pub verbose_logging: bool,
 }
 
 impl Default for AppSettingsDto {
@@ -125,6 +128,7 @@ impl Default for AppSettingsDto {
             confidence_threshold: 0.5,
             notify_high_signal: false,
             notify_saved: false,
+            verbose_logging: false,
         }
     }
 }
