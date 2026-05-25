@@ -55,6 +55,7 @@ pub struct PulseCore {
 impl PulseCore {
     /// Initialize PulseCore with the given configuration.
     pub async fn init(config: PulseConfig) -> Result<Self, PulseError> {
+        let t0 = std::time::Instant::now();
         let config = Arc::new(config);
 
         // Ensure data directory exists
@@ -70,11 +71,19 @@ impl PulseCore {
         run_migrations(&writer_pool)
             .await
             .map_err(PulseError::Storage)?;
+        tracing::info!(
+            elapsed_ms = t0.elapsed().as_millis(),
+            "coldstart: db open + migrations"
+        );
 
         // Open reader pool (concurrent reads via WAL)
         let reader_pool = open_reader_pool(&config.db_path, &config)
             .await
             .map_err(PulseError::Storage)?;
+        tracing::info!(
+            elapsed_ms = t0.elapsed().as_millis(),
+            "coldstart: reader pool open"
+        );
 
         // Spawn the DB writer actor
         let (writer_tx, writer_rx) = mpsc::channel::<crate::storage::actor::DbCommand>(128);
@@ -84,112 +93,104 @@ impl PulseCore {
         });
 
         let db = DbHandle::new(writer_tx, reader_pool);
+        tracing::info!(elapsed_ms = t0.elapsed().as_millis(), "coldstart: DB ready");
 
-        // Try loading the active ONNX model (non-fatal if absent or feature disabled)
-        let onnx_tagger: Option<Arc<OnnxTagger>> = {
-            let active_model_file = config.data_dir.join("active_model");
-            if let Ok(model_name) = std::fs::read_to_string(&active_model_file) {
-                let model_name = model_name.trim().to_string();
-                let model_dir = config.data_dir.join("models").join(&model_name);
-                match OnnxTagger::load(&model_dir) {
-                    Ok(t) => {
-                        tracing::info!(model = %model_name, "ONNX tagger loaded");
-                        Some(Arc::new(t))
-                    }
-                    Err(crate::error::TaggingError::ModelNotLoaded) => {
-                        tracing::debug!(model = %model_name, "Model files not found or ai-onnx feature disabled");
-                        None
-                    }
-                    Err(e) => {
-                        tracing::warn!(model = %model_name, error = %e, "Failed to load ONNX model, falling back to rules");
-                        None
+        // Create tagger handles as empty — models load on blocking threads in background so
+        // init returns fast. The tagger task handles None gracefully until each model is ready.
+        let onnx_tagger = Arc::new(RwLock::new(None::<Arc<OnnxTagger>>));
+        let vision_tagger = Arc::new(RwLock::new(None::<Arc<VisionTagger>>));
+        let fasttext_tagger = Arc::new(RwLock::new(None::<Arc<FastTextTagger>>));
+        let miniml_tagger = Arc::new(RwLock::new(None::<Arc<MiniMlTagger>>));
+
+        // Spawn one blocking thread per model — all load concurrently.
+        {
+            let arc = onnx_tagger.clone();
+            let data_dir = config.data_dir.clone();
+            tokio::task::spawn_blocking(move || {
+                let active = data_dir.join("active_model");
+                if let Ok(name) = std::fs::read_to_string(&active) {
+                    let name = name.trim().to_string();
+                    let dir = data_dir.join("models").join(&name);
+                    let t = std::time::Instant::now();
+                    match OnnxTagger::load(&dir) {
+                        Ok(tagger) => {
+                            tracing::info!(model=%name, elapsed_ms=t.elapsed().as_millis(), "background: ONNX tagger loaded");
+                            *arc.write().unwrap() = Some(Arc::new(tagger));
+                        }
+                        Err(crate::error::TaggingError::ModelNotLoaded) => {
+                            tracing::debug!(model=%name, "ONNX model not found or feature disabled");
+                        }
+                        Err(e) => tracing::warn!(model=%name, error=%e, "ONNX load failed"),
                     }
                 }
-            } else {
-                None
-            }
-        };
-
-        // Try loading the active vision model (non-fatal if absent)
-        let vision_tagger: Option<Arc<VisionTagger>> = {
-            let active_vision_file = config.data_dir.join("active_vision_model");
-            if let Ok(model_name) = std::fs::read_to_string(&active_vision_file) {
-                let model_name = model_name.trim().to_string();
-                let model_dir = config.data_dir.join("models").join(&model_name);
-                match VisionTagger::load(&model_dir) {
-                    Ok(t) => {
-                        tracing::info!(model = %model_name, "CLIP vision tagger loaded");
-                        Some(Arc::new(t))
-                    }
-                    Err(crate::error::TaggingError::ModelNotLoaded) => {
-                        tracing::debug!(model = %model_name, "Vision model files not found or ai-vision feature disabled");
-                        None
-                    }
-                    Err(e) => {
-                        tracing::warn!(model = %model_name, error = %e, "Failed to load vision model");
-                        None
+            });
+        }
+        {
+            let arc = vision_tagger.clone();
+            let data_dir = config.data_dir.clone();
+            tokio::task::spawn_blocking(move || {
+                let active = data_dir.join("active_vision_model");
+                if let Ok(name) = std::fs::read_to_string(&active) {
+                    let name = name.trim().to_string();
+                    let dir = data_dir.join("models").join(&name);
+                    let t = std::time::Instant::now();
+                    match VisionTagger::load(&dir) {
+                        Ok(tagger) => {
+                            tracing::info!(model=%name, elapsed_ms=t.elapsed().as_millis(), "background: vision tagger loaded");
+                            *arc.write().unwrap() = Some(Arc::new(tagger));
+                        }
+                        Err(crate::error::TaggingError::ModelNotLoaded) => {
+                            tracing::debug!(model=%name, "Vision model not found or feature disabled");
+                        }
+                        Err(e) => tracing::warn!(model=%name, error=%e, "Vision load failed"),
                     }
                 }
-            } else {
-                None
-            }
-        };
-
-        // Try loading the active FastText model (non-fatal if absent or feature disabled)
-        let fasttext_tagger: Option<Arc<FastTextTagger>> = {
-            let ptr = config.data_dir.join("active_fasttext_model");
-            if let Ok(model_name) = std::fs::read_to_string(&ptr) {
-                let model_name = model_name.trim().to_string();
-                let model_dir = config.data_dir.join("models").join(&model_name);
-                match FastTextTagger::load(&model_dir) {
-                    Ok(t) => {
-                        tracing::info!(model = %model_name, "FastText tagger loaded");
-                        Some(Arc::new(t))
-                    }
-                    Err(crate::error::TaggingError::ModelNotLoaded) => {
-                        tracing::debug!(model = %model_name, "FastText model files not found or ai-fasttext feature disabled");
-                        None
-                    }
-                    Err(e) => {
-                        tracing::warn!(model = %model_name, error = %e, "Failed to load FastText model");
-                        None
+            });
+        }
+        {
+            let arc = fasttext_tagger.clone();
+            let data_dir = config.data_dir.clone();
+            tokio::task::spawn_blocking(move || {
+                let active = data_dir.join("active_fasttext_model");
+                if let Ok(name) = std::fs::read_to_string(&active) {
+                    let name = name.trim().to_string();
+                    let dir = data_dir.join("models").join(&name);
+                    let t = std::time::Instant::now();
+                    match FastTextTagger::load(&dir) {
+                        Ok(tagger) => {
+                            tracing::info!(model=%name, elapsed_ms=t.elapsed().as_millis(), "background: FastText tagger loaded");
+                            *arc.write().unwrap() = Some(Arc::new(tagger));
+                        }
+                        Err(crate::error::TaggingError::ModelNotLoaded) => {
+                            tracing::debug!(model=%name, "FastText model not found or feature disabled");
+                        }
+                        Err(e) => tracing::warn!(model=%name, error=%e, "FastText load failed"),
                     }
                 }
-            } else {
-                None
-            }
-        };
-
-        // Try loading the active MiniLM model (non-fatal if absent or feature disabled)
-        let miniml_tagger: Option<Arc<MiniMlTagger>> = {
-            let ptr = config.data_dir.join("active_miniml_model");
-            if let Ok(model_name) = std::fs::read_to_string(&ptr) {
-                let model_name = model_name.trim().to_string();
-                let model_dir = config.data_dir.join("models").join(&model_name);
-                match MiniMlTagger::load(&model_dir) {
-                    Ok(t) => {
-                        tracing::info!(model = %model_name, "MiniLM tagger loaded");
-                        Some(Arc::new(t))
-                    }
-                    Err(crate::error::TaggingError::ModelNotLoaded) => {
-                        tracing::debug!(model = %model_name, "MiniLM model files not found or ai-miniml feature disabled");
-                        None
-                    }
-                    Err(e) => {
-                        tracing::warn!(model = %model_name, error = %e, "Failed to load MiniLM model");
-                        None
+            });
+        }
+        {
+            let arc = miniml_tagger.clone();
+            let data_dir = config.data_dir.clone();
+            tokio::task::spawn_blocking(move || {
+                let active = data_dir.join("active_miniml_model");
+                if let Ok(name) = std::fs::read_to_string(&active) {
+                    let name = name.trim().to_string();
+                    let dir = data_dir.join("models").join(&name);
+                    let t = std::time::Instant::now();
+                    match MiniMlTagger::load(&dir) {
+                        Ok(tagger) => {
+                            tracing::info!(model=%name, elapsed_ms=t.elapsed().as_millis(), "background: MiniLM tagger loaded");
+                            *arc.write().unwrap() = Some(Arc::new(tagger));
+                        }
+                        Err(crate::error::TaggingError::ModelNotLoaded) => {
+                            tracing::debug!(model=%name, "MiniLM model not found or feature disabled");
+                        }
+                        Err(e) => tracing::warn!(model=%name, error=%e, "MiniLM load failed"),
                     }
                 }
-            } else {
-                None
-            }
-        };
-
-        // Wrap taggers in shared RwLock so hot-reload propagates to background tagger task.
-        let onnx_tagger = Arc::new(RwLock::new(onnx_tagger));
-        let vision_tagger = Arc::new(RwLock::new(vision_tagger));
-        let fasttext_tagger = Arc::new(RwLock::new(fasttext_tagger));
-        let miniml_tagger = Arc::new(RwLock::new(miniml_tagger));
+            });
+        }
 
         // Spawn the AI tagger task
         let (tagger_tx, tagger_rx) = mpsc::channel(TAGGER_QUEUE_SIZE);
@@ -242,6 +243,10 @@ impl PulseCore {
 
         let timeline = TimelineService::new(db.clone());
         let search = SearchService::new(db.clone());
+        tracing::info!(
+            elapsed_ms = t0.elapsed().as_millis(),
+            "coldstart: PulseCore::init complete"
+        );
 
         Ok(Self {
             db,

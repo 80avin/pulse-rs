@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { items, sources, clearItems, loadMockData, aiStatus } from '$lib/store.svelte';
+  import { items, sources, clearItems, loadMockData, aiStatus, coldstartTiming } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
   import Icon from '$lib/components/Icon.svelte';
@@ -260,6 +260,34 @@
     {/if}
 
   </div>
+</div>
+{/if}
+
+<!-- Performance -->
+{#if IS_TAURI}
+<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
+  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">performance</div>
+  {#if coldstartTiming.data}
+    {@const d = coldstartTiming.data}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      {#each [
+        { label: 'cold start',  val: `${d.totalMs} ms`, color: d.totalMs < 300 ? T.green : d.totalMs < 700 ? T.amber : T.red },
+        { label: 'ipc latency', val: `${d.ipcMs} ms`,   color: d.ipcMs   < 200 ? T.green : d.ipcMs   < 500 ? T.amber : T.red },
+        { label: 'items',       val: String(d.itemCount),   color: T.cyan },
+        { label: 'sources',     val: String(d.sourceCount), color: T.cyan },
+      ] as stat}
+        <div style="padding:8px;background:{T.bg0};border:1px solid {T.bd0};border-radius:3px;">
+          <div style="font:16px/1 {T.mono};color:{stat.color};font-variant-numeric:tabular-nums;">{stat.val}</div>
+          <div style="margin-top:5px;font:9px/1 {T.mono};color:{T.ink3};">{stat.label}</div>
+        </div>
+      {/each}
+    </div>
+    {#if d.attempt > 0}
+      <div style="margin-top:8px;font:9px/1.4 {T.mono};color:{T.amber};">loaded on retry {d.attempt} (bridge delay: {d.waitMs} ms)</div>
+    {/if}
+  {:else}
+    <div style="font:10px/1.4 {T.mono};color:{T.ink3};">loading…</div>
+  {/if}
 </div>
 {/if}
 

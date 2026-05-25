@@ -154,6 +154,20 @@ export const loadingMore = $state({
 /** Reflects whether the initial data load from the backend has completed. */
 export const storeReady = $state({ loading: true, error: false });
 
+export interface ColdstartTiming {
+  attempt: number;
+  totalMs: number;
+  waitMs: number;
+  ipcMs: number;
+  adaptMs: number;
+  itemCount: number;
+  sourceCount: number;
+  groupCount: number;
+}
+
+/** Populated once initStore completes. Null until then. */
+export const coldstartTiming = $state<{ data: ColdstartTiming | null }>({ data: null });
+
 /** Call once from layout to wire the global tagging-progress event listener. */
 export async function setupTaggingListener(): Promise<() => void> {
   if (!IS_TAURI) return () => {};
@@ -237,6 +251,8 @@ export async function initStore(): Promise<void> {
     return;
   }
 
+  const t0 = performance.now();
+
   // Short timeout on early attempts: if bridge is ready the query finishes in
   // <200 ms, so 2 s is safe. Later attempts allow more time for slow devices.
   const TIMEOUTS = [2000, 2000, 3000, 4000, 5000];
@@ -244,7 +260,9 @@ export async function initStore(): Promise<void> {
 
   for (let attempt = 0; attempt < TIMEOUTS.length; attempt++) {
     if (attempt > 0) await new Promise(r => setTimeout(r, DELAYS[attempt]));
+    const tAttempt = performance.now();
     try {
+      const tInvoke = performance.now();
       const [page, bs, bg] = await Promise.race([
         Promise.all([
           tauriInvoke<BackendPage>('get_items_page', { limit: 100 }),
@@ -255,17 +273,31 @@ export async function initStore(): Promise<void> {
           setTimeout(() => reject(new Error('init timeout')), TIMEOUTS[attempt])
         ),
       ]);
+      const tInvokeDone = performance.now();
       items.splice(0, items.length, ...page.items.map(adaptItem));
       loadingMore.cursor = page.nextCursor ?? null;
       sources.splice(0, sources.length, ...bs.map(adaptSource));
       groups.splice(0, groups.length, ...bg);
+      const tAdaptDone = performance.now();
       storeReady.loading = false;
       storeReady.error = false;
+      const timing: ColdstartTiming = {
+        attempt,
+        totalMs:     Math.round(tAdaptDone - t0),
+        waitMs:      Math.round(tAttempt - t0),
+        ipcMs:       Math.round(tInvokeDone - tInvoke),
+        adaptMs:     Math.round(tAdaptDone - tInvokeDone),
+        itemCount:   page.items.length,
+        sourceCount: bs.length,
+        groupCount:  bg.length,
+      };
+      coldstartTiming.data = timing;
+      logger.info('coldstart: initStore complete', timing);
       reloadAiStatus().catch(e => logger.warn('ai status failed', e));
       reloadModelsInternal().catch(e => logger.warn('list_models failed', e));
       return;
     } catch (e) {
-      logger.warn(`init attempt ${attempt + 1} failed`, e);
+      logger.warn(`coldstart: initStore attempt ${attempt + 1} failed after ${Math.round(performance.now() - tAttempt)}ms`, e);
     }
   }
   storeReady.loading = false;

@@ -84,12 +84,31 @@ static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static PENDING_SHARE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 
 pub struct AppState {
-    pub core: Arc<PulseCore>,
+    /// Populated once PulseCore::init completes. Commands await this before proceeding.
+    core_rx: tokio::sync::watch::Receiver<Option<Arc<PulseCore>>>,
+    /// Available immediately — before PulseCore is ready. Used by diagnostic commands.
+    pub data_dir: std::path::PathBuf,
     pub pending_share: Arc<Mutex<Option<String>>>,
     /// Live handle to change the tracing filter without restarting.
     pub log_filter: LogFilterHandle,
     /// Keeps the background log-flush thread alive for the app lifetime.
     _log_guard: tracing_appender::non_blocking::WorkerGuard,
+}
+
+impl AppState {
+    /// Wait for PulseCore to finish initializing and return a clone of the Arc.
+    /// Returns almost instantly on warm calls (watch channel is already set).
+    pub async fn core(&self) -> Arc<PulseCore> {
+        let mut rx = self.core_rx.clone();
+        loop {
+            if let Some(c) = rx.borrow().clone() {
+                return c;
+            }
+            if rx.changed().await.is_err() {
+                panic!("PulseCore init task exited without completing — app cannot continue");
+            }
+        }
+    }
 }
 
 // FastText model embedded at compile time (9.6 MB + tiny thresholds file).
@@ -158,6 +177,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(move |app| {
+            let t_setup = std::time::Instant::now();
+
             // Persist the AppHandle so the JNI bridge can emit events
             let _ = APP_HANDLE.set(app.handle().clone());
 
@@ -173,26 +194,65 @@ pub fn run() {
             let data_dir = pulse_core::config::platform_data_dir();
 
             std::fs::create_dir_all(&data_dir)?;
+            tracing::info!(
+                elapsed_ms = t_setup.elapsed().as_millis(),
+                "coldstart: setup: data_dir ready"
+            );
 
             // Extract FastText + MiniLM MLP head to data_dir on first run.
             extract_bundled_models(&data_dir);
+            tracing::info!(
+                elapsed_ms = t_setup.elapsed().as_millis(),
+                "coldstart: setup: extract_bundled_models done"
+            );
 
-            let config = PulseConfig::default_config().with_data_dir(data_dir);
+            // Build config before moving data_dir into AppState.
+            let config = PulseConfig::default_config().with_data_dir(data_dir.clone());
 
-            let core = tauri::async_runtime::block_on(PulseCore::init(config))
-                .map_err(|e| format!("PulseCore init failed: {e}"))?;
-
-            let core = Arc::new(core);
-            let core_bg = Arc::clone(&core);
-            tauri::async_runtime::spawn(async move { core_bg.start_sync().await });
-
+            // Manage AppState immediately so Tauri can start dispatching queued IPC.
+            // Commands await `state.core()` which blocks on core_rx until PulseCore is ready.
+            let (core_tx, core_rx) = tokio::sync::watch::channel::<Option<Arc<PulseCore>>>(None);
             let pending_share = Arc::new(Mutex::new(None));
             app.manage(AppState {
-                core,
+                core_rx,
+                data_dir,
                 pending_share,
                 log_filter,
                 _log_guard: log_guard,
             });
+            tracing::info!(
+                elapsed_ms = t_setup.elapsed().as_millis(),
+                "coldstart: setup: AppState managed, IPC ready"
+            );
+
+            // Init PulseCore on a dedicated thread using Handle::block_on.
+            // PulseCore::init's future is not Send (sqlx HRTB limitation), so we
+            // can't use tauri::async_runtime::spawn which requires Send + 'static.
+            // Handle::block_on has no Send requirement and keeps all tokio tasks
+            // (db writer, tagger) on the shared Tauri runtime.
+            let rt_handle = tauri::async_runtime::handle();
+            std::thread::Builder::new()
+                .name("pulse-core-init".into())
+                .spawn(move || {
+                    rt_handle.block_on(async move {
+                        match PulseCore::init(config).await {
+                            Ok(core) => {
+                                let core = Arc::new(core);
+                                let core_bg = Arc::clone(&core);
+                                tauri::async_runtime::spawn(
+                                    async move { core_bg.start_sync().await },
+                                );
+                                let _ = core_tx.send(Some(core));
+                                tracing::info!("coldstart: PulseCore ready, commands unblocked");
+                            }
+                            Err(e) => {
+                                tracing::error!("PulseCore init failed: {e}");
+                                // core_tx dropped → channel closed → awaiting commands panic.
+                            }
+                        }
+                    });
+                })
+                .expect("failed to spawn pulse-core-init thread");
 
             // Drain any share URL that arrived before the WebView was ready (cold-start)
             #[cfg(target_os = "android")]
