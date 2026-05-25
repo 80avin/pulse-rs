@@ -126,7 +126,7 @@
       alt=""
       loading="lazy"
       style="width:{thumbSize}px;height:{thumbSize}px;object-fit:cover;border-radius:3px;border:1px solid {T.bd0};flex-shrink:0;align-self:flex-start;"
-      onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+      onerror={() => { item.ogImage = null; }}
     />
   {/if}
 </div>

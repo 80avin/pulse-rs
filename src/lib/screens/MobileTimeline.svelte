@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { groups, sources, items, storeReady, markAllRead, doSync as storeSync, syncState, loadingMore, loadMoreItems } from '$lib/store.svelte';
+  import { groups, sources, items, storeReady, markAllRead, doSync as storeSync, syncState, loadingMore, loadMoreItems, hasPrecedingItems } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import FilterStrip from '$lib/components/FilterStrip.svelte';
@@ -8,6 +8,8 @@
   import ItemRow from '$lib/components/ItemRow.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import IconBtn from '$lib/components/IconBtn.svelte';
+  import { createVirtualizer } from '@tanstack/svelte-virtual';
+  import { get } from 'svelte/store';
 
   let { tab, onTabChange, onOpen, filterSource = null, onClearSourceFilter, activeTag = null, onClearTagFilter, onTagFilter }: {
     tab: string;
@@ -72,6 +74,22 @@
     syncing = true;
     await storeSync();
     syncing = false;
+  }
+
+  // Virtual list — renders only visible rows, saving ~80% DOM nodes at scale.
+  let listScrollEl: HTMLElement | null = $state(null);
+  const listVirtualizer = createVirtualizer({
+    count: 0,
+    getScrollElement: () => listScrollEl,
+    estimateSize: () => (settings.density === 'dense' ? 52 : 82),
+    overscan: 10,
+  });
+  $effect(() => {
+    get(listVirtualizer).setOptions({ count: filteredItems.length });
+  });
+
+  function measureItem(el: HTMLElement) {
+    get(listVirtualizer).measureElement(el);
   }
 </script>
 
@@ -157,23 +175,39 @@
   {/if}
 
   <!-- Timeline list -->
-  <div style="flex:1;overflow-y:auto;overflow-x:hidden;">
-    {#each filteredItems as item}
-      {@const source = sources.find(s => s.id === item.src)}
-      <ItemRow
-        {item}
-        {source}
-        isFocused={false}
-        density={settings.density}
-        onclick={() => onOpen(item.id, filteredItems.map(i => i.id))}
-        onTagClick={onTagFilter}
-      />
-    {/each}
+  <div bind:this={listScrollEl} style="flex:1;overflow-y:auto;overflow-x:hidden;position:relative;">
     {#if filteredItems.length === 0 && !storeReady.loading}
       <div style="padding:32px;text-align:center;font:11px/1.6 {T.mono};color:{T.ink3};">
         {filter !== 'all' ? `no ${filter} items in this view` : 'no items'}
       </div>
     {:else}
+      <div style="height:{$listVirtualizer.getTotalSize()}px;position:relative;">
+        {#each $listVirtualizer.getVirtualItems() as vItem (vItem.key)}
+          {@const item = filteredItems[vItem.index]}
+          {#if item}
+            {@const source = sources.find(s => s.id === item.src)}
+            <div
+              data-index={vItem.index}
+              use:measureItem
+              style="position:absolute;top:0;left:0;width:100%;transform:translateY({vItem.start}px);"
+            >
+              <ItemRow
+                {item}
+                {source}
+                isFocused={false}
+                density={settings.density}
+                onclick={() => onOpen(item.id, filteredItems.map(i => i.id))}
+                onTagClick={onTagFilter}
+              />
+            </div>
+          {/if}
+        {/each}
+      </div>
+      {#if hasPrecedingItems.value}
+        <div style="padding:6px 10px;font:9px/1 {T.mono};color:{T.ink3};text-align:center;border-top:1px solid {T.bd0};">
+          older items evicted · use search to find them
+        </div>
+      {/if}
       <div style="padding:14px 10px;font:10px/1 {T.mono};color:{T.ink3};text-align:center;">
         — {filteredItems.length} shown · {items.length} cached —
       </div>

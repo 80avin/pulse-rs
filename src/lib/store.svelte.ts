@@ -151,6 +151,12 @@ export const loadingMore = $state({
   cursor: null as { publishedAt: number; itemId: string } | null,
 });
 
+/** True when the items array was trimmed to stay under MAX_CACHED_ITEMS. */
+export const hasPrecedingItems = $state({ value: false });
+
+const MAX_CACHED_ITEMS = 500;
+const EVICT_COUNT = 100;
+
 /** Reflects whether the initial data load from the backend has completed. */
 export const storeReady = $state({ loading: true, error: false });
 
@@ -354,7 +360,9 @@ export async function doSync(): Promise<void> {
   }
 }
 
-/** Fetch the next page of items and append them to the `items` array. */
+/** Fetch the next page of items and append them to the `items` array.
+ * Evicts the oldest EVICT_COUNT items when the array exceeds MAX_CACHED_ITEMS
+ * to keep the JS heap bounded. Use FTS search to find older items. */
 export async function loadMoreItems(groupId?: string): Promise<void> {
   if (!IS_TAURI || !loadingMore.cursor || loadingMore.active) return;
   loadingMore.active = true;
@@ -367,6 +375,10 @@ export async function loadMoreItems(groupId?: string): Promise<void> {
         : null,
     });
     items.push(...page.items.map(adaptItem));
+    if (items.length > MAX_CACHED_ITEMS) {
+      items.splice(0, EVICT_COUNT);
+      hasPrecedingItems.value = true;
+    }
     loadingMore.cursor = page.nextCursor ?? null;
   } catch (e) {
     logger.warn('loadMoreItems failed', e);

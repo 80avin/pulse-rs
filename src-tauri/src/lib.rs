@@ -32,6 +32,14 @@ fn read_verbose_setting(data_dir: &std::path::Path) -> bool {
         .unwrap_or(false)
 }
 
+fn read_ai_enabled_setting(data_dir: &std::path::Path) -> bool {
+    std::fs::read_to_string(data_dir.join("tauri_settings.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| v["aiTagging"].as_bool())
+        .unwrap_or(true) // default on: load models unless user explicitly disabled
+}
+
 /// Set up the tracing subscriber for the lifetime of the app.
 ///
 /// Returns:
@@ -207,7 +215,12 @@ pub fn run() {
             );
 
             // Build config before moving data_dir into AppState.
-            let config = PulseConfig::default_config().with_data_dir(data_dir.clone());
+            // Read ai_enabled from persisted settings so model loading is skipped at startup
+            // when the user has disabled AI tagging — saves significant memory on low-end devices.
+            let ai_enabled = read_ai_enabled_setting(&data_dir);
+            let config = PulseConfig::default_config()
+                .with_data_dir(data_dir.clone())
+                .with_ai_enabled(ai_enabled);
 
             // Manage AppState immediately so Tauri can start dispatching queued IPC.
             // Commands await `state.core()` which blocks on core_rx until PulseCore is ready.

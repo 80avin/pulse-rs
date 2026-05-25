@@ -9,14 +9,14 @@ pub mod timeline;
 pub mod training;
 pub mod types;
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use tokio::sync::mpsc;
 
 use crate::ai::tagger::TagRequest;
 use crate::ai::tagger::process_tag_request;
 use crate::ai::{
-    FastTextTagger, MiniMlTagger, OnnxTagger, RuleEngine, TAGGER_QUEUE_SIZE, TaggerHandle,
-    VisionTagger, default_rules, tagger_task,
+    FastTextTagger, MiniMlTagger, ModelHandle, OnnxTagger, RuleEngine, TAGGER_QUEUE_SIZE,
+    TaggerHandle, VisionTagger, default_rules, tagger_task,
 };
 use crate::config::PulseConfig;
 use crate::error::PulseError;
@@ -42,14 +42,14 @@ pub struct PulseCore {
     pub search: SearchService,
     pub config: Arc<PulseConfig>,
     pub rule_engine: Arc<RuleEngine>,
-    /// NLI cross-encoder — shared RwLock allows hot-reload after model download.
-    pub onnx_tagger: Arc<RwLock<Option<Arc<OnnxTagger>>>>,
-    /// CLIP vision encoder — shared RwLock allows hot-reload after model download.
-    pub vision_tagger: Arc<RwLock<Option<Arc<VisionTagger>>>>,
+    /// NLI cross-encoder — idle-unloadable; only loaded when TextBackend::Nli is active.
+    pub onnx_tagger: ModelHandle<OnnxTagger>,
+    /// CLIP vision encoder — idle-unloadable; loaded on first image post, dropped when idle.
+    pub vision_tagger: ModelHandle<VisionTagger>,
     /// FastText supervised classifier — primary text tagger (<10MB, <1ms/item).
-    pub fasttext_tagger: Arc<RwLock<Option<Arc<FastTextTagger>>>>,
+    pub fasttext_tagger: ModelHandle<FastTextTagger>,
     /// MiniLM + MLP semantic classifier — secondary for research/discussion/clickbait.
-    pub miniml_tagger: Arc<RwLock<Option<Arc<MiniMlTagger>>>>,
+    pub miniml_tagger: ModelHandle<MiniMlTagger>,
 }
 
 impl PulseCore {
@@ -95,99 +95,133 @@ impl PulseCore {
         let db = DbHandle::new(writer_tx, reader_pool);
         tracing::info!(elapsed_ms = t0.elapsed().as_millis(), "coldstart: DB ready");
 
-        // Create tagger handles as empty — models load on blocking threads in background so
-        // init returns fast. The tagger task handles None gracefully until each model is ready.
-        let onnx_tagger = Arc::new(RwLock::new(None::<Arc<OnnxTagger>>));
-        let vision_tagger = Arc::new(RwLock::new(None::<Arc<VisionTagger>>));
-        let fasttext_tagger = Arc::new(RwLock::new(None::<Arc<FastTextTagger>>));
-        let miniml_tagger = Arc::new(RwLock::new(None::<Arc<MiniMlTagger>>));
+        // Build loader closures — each captures the data_dir and loads from the active-model
+        // pointer file. Returning None means "no active model configured"; errors are logged.
+        let make_onnx_loader = {
+            let data_dir = config.data_dir.clone();
+            Arc::new(move || -> Option<Arc<OnnxTagger>> {
+                let name = std::fs::read_to_string(data_dir.join("active_model")).ok()?;
+                let dir = data_dir.join("models").join(name.trim());
+                let t = std::time::Instant::now();
+                match OnnxTagger::load(&dir) {
+                    Ok(tagger) => {
+                        tracing::info!(elapsed_ms = t.elapsed().as_millis(), "ONNX tagger loaded");
+                        Some(Arc::new(tagger))
+                    }
+                    Err(crate::error::TaggingError::ModelNotLoaded) => None,
+                    Err(e) => {
+                        tracing::warn!(error=%e, "ONNX load failed");
+                        None
+                    }
+                }
+            }) as Arc<dyn Fn() -> Option<Arc<OnnxTagger>> + Send + Sync>
+        };
 
-        // Spawn one blocking thread per model — all load concurrently.
-        {
-            let arc = onnx_tagger.clone();
+        let make_vision_loader = {
             let data_dir = config.data_dir.clone();
-            tokio::task::spawn_blocking(move || {
-                let active = data_dir.join("active_model");
-                if let Ok(name) = std::fs::read_to_string(&active) {
-                    let name = name.trim().to_string();
-                    let dir = data_dir.join("models").join(&name);
-                    let t = std::time::Instant::now();
-                    match OnnxTagger::load(&dir) {
-                        Ok(tagger) => {
-                            tracing::info!(model=%name, elapsed_ms=t.elapsed().as_millis(), "background: ONNX tagger loaded");
-                            *arc.write().unwrap() = Some(Arc::new(tagger));
-                        }
-                        Err(crate::error::TaggingError::ModelNotLoaded) => {
-                            tracing::debug!(model=%name, "ONNX model not found or feature disabled");
-                        }
-                        Err(e) => tracing::warn!(model=%name, error=%e, "ONNX load failed"),
+            Arc::new(move || -> Option<Arc<VisionTagger>> {
+                let name = std::fs::read_to_string(data_dir.join("active_vision_model")).ok()?;
+                let dir = data_dir.join("models").join(name.trim());
+                let t = std::time::Instant::now();
+                match VisionTagger::load(&dir) {
+                    Ok(tagger) => {
+                        tracing::info!(
+                            elapsed_ms = t.elapsed().as_millis(),
+                            "Vision tagger loaded"
+                        );
+                        Some(Arc::new(tagger))
+                    }
+                    Err(crate::error::TaggingError::ModelNotLoaded) => None,
+                    Err(e) => {
+                        tracing::warn!(error=%e, "Vision load failed");
+                        None
                     }
                 }
-            });
-        }
-        {
-            let arc = vision_tagger.clone();
+            }) as Arc<dyn Fn() -> Option<Arc<VisionTagger>> + Send + Sync>
+        };
+
+        let make_fasttext_loader = {
             let data_dir = config.data_dir.clone();
-            tokio::task::spawn_blocking(move || {
-                let active = data_dir.join("active_vision_model");
-                if let Ok(name) = std::fs::read_to_string(&active) {
-                    let name = name.trim().to_string();
-                    let dir = data_dir.join("models").join(&name);
-                    let t = std::time::Instant::now();
-                    match VisionTagger::load(&dir) {
-                        Ok(tagger) => {
-                            tracing::info!(model=%name, elapsed_ms=t.elapsed().as_millis(), "background: vision tagger loaded");
-                            *arc.write().unwrap() = Some(Arc::new(tagger));
-                        }
-                        Err(crate::error::TaggingError::ModelNotLoaded) => {
-                            tracing::debug!(model=%name, "Vision model not found or feature disabled");
-                        }
-                        Err(e) => tracing::warn!(model=%name, error=%e, "Vision load failed"),
+            Arc::new(move || -> Option<Arc<FastTextTagger>> {
+                let name = std::fs::read_to_string(data_dir.join("active_fasttext_model")).ok()?;
+                let dir = data_dir.join("models").join(name.trim());
+                let t = std::time::Instant::now();
+                match FastTextTagger::load(&dir) {
+                    Ok(tagger) => {
+                        tracing::info!(
+                            elapsed_ms = t.elapsed().as_millis(),
+                            "FastText tagger loaded"
+                        );
+                        Some(Arc::new(tagger))
+                    }
+                    Err(crate::error::TaggingError::ModelNotLoaded) => None,
+                    Err(e) => {
+                        tracing::warn!(error=%e, "FastText load failed");
+                        None
                     }
                 }
-            });
-        }
-        {
-            let arc = fasttext_tagger.clone();
+            }) as Arc<dyn Fn() -> Option<Arc<FastTextTagger>> + Send + Sync>
+        };
+
+        let make_miniml_loader = {
             let data_dir = config.data_dir.clone();
-            tokio::task::spawn_blocking(move || {
-                let active = data_dir.join("active_fasttext_model");
-                if let Ok(name) = std::fs::read_to_string(&active) {
-                    let name = name.trim().to_string();
-                    let dir = data_dir.join("models").join(&name);
-                    let t = std::time::Instant::now();
-                    match FastTextTagger::load(&dir) {
-                        Ok(tagger) => {
-                            tracing::info!(model=%name, elapsed_ms=t.elapsed().as_millis(), "background: FastText tagger loaded");
-                            *arc.write().unwrap() = Some(Arc::new(tagger));
-                        }
-                        Err(crate::error::TaggingError::ModelNotLoaded) => {
-                            tracing::debug!(model=%name, "FastText model not found or feature disabled");
-                        }
-                        Err(e) => tracing::warn!(model=%name, error=%e, "FastText load failed"),
+            Arc::new(move || -> Option<Arc<MiniMlTagger>> {
+                let name = std::fs::read_to_string(data_dir.join("active_miniml_model")).ok()?;
+                let dir = data_dir.join("models").join(name.trim());
+                let t = std::time::Instant::now();
+                match MiniMlTagger::load(&dir) {
+                    Ok(tagger) => {
+                        tracing::info!(
+                            elapsed_ms = t.elapsed().as_millis(),
+                            "MiniLM tagger loaded"
+                        );
+                        Some(Arc::new(tagger))
+                    }
+                    Err(crate::error::TaggingError::ModelNotLoaded) => None,
+                    Err(e) => {
+                        tracing::warn!(error=%e, "MiniLM load failed");
+                        None
                     }
                 }
-            });
+            }) as Arc<dyn Fn() -> Option<Arc<MiniMlTagger>> + Send + Sync>
+        };
+
+        // Create ModelHandles. snapshot() sets pending_reload=true before spawning so concurrent
+        // calls from tagger_task cannot trigger a second load while init is still in flight.
+        let onnx_tagger = ModelHandle::new(make_onnx_loader);
+        let vision_tagger = ModelHandle::new(make_vision_loader);
+        let fasttext_tagger = ModelHandle::new(make_fasttext_loader);
+        let miniml_tagger = ModelHandle::new(make_miniml_loader);
+
+        // Kick off background loads only when AI tagging is enabled.
+        // When disabled, models stay unloaded until the user re-enables AI and triggers a retag;
+        // snapshot() in run_tagger_direct / tagger_task will load them on demand at that point.
+        if config.ai_enabled {
+            if config.text_backend == crate::config::TextBackend::Nli {
+                onnx_tagger.snapshot();
+            }
+            fasttext_tagger.snapshot();
+            miniml_tagger.snapshot();
+            vision_tagger.snapshot();
+        } else {
+            tracing::info!("AI tagging disabled — skipping model preload");
         }
+
+        // Spawn idle-unload janitor — checks every 60 s and evicts models unused past their threshold.
         {
-            let arc = miniml_tagger.clone();
-            let data_dir = config.data_dir.clone();
-            tokio::task::spawn_blocking(move || {
-                let active = data_dir.join("active_miniml_model");
-                if let Ok(name) = std::fs::read_to_string(&active) {
-                    let name = name.trim().to_string();
-                    let dir = data_dir.join("models").join(&name);
-                    let t = std::time::Instant::now();
-                    match MiniMlTagger::load(&dir) {
-                        Ok(tagger) => {
-                            tracing::info!(model=%name, elapsed_ms=t.elapsed().as_millis(), "background: MiniLM tagger loaded");
-                            *arc.write().unwrap() = Some(Arc::new(tagger));
-                        }
-                        Err(crate::error::TaggingError::ModelNotLoaded) => {
-                            tracing::debug!(model=%name, "MiniLM model not found or feature disabled");
-                        }
-                        Err(e) => tracing::warn!(model=%name, error=%e, "MiniLM load failed"),
-                    }
+            let ft = fasttext_tagger.clone();
+            let ml = miniml_tagger.clone();
+            let onnx = onnx_tagger.clone();
+            let vis = vision_tagger.clone();
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+                interval.tick().await; // first tick fires immediately; skip it
+                loop {
+                    interval.tick().await;
+                    ft.idle_drop(std::time::Duration::from_secs(30 * 60));
+                    ml.idle_drop(std::time::Duration::from_secs(10 * 60));
+                    onnx.idle_drop(std::time::Duration::from_secs(5 * 60));
+                    vis.idle_drop(std::time::Duration::from_secs(5 * 60));
                 }
             });
         }
@@ -671,9 +705,9 @@ impl PulseCore {
         let mut items_processed = 0usize;
         let mut tags_created = 0usize;
 
-        let fasttext = self.fasttext_tagger.read().unwrap().clone();
-        let miniml = self.miniml_tagger.read().unwrap().clone();
-        let vision = self.vision_tagger.read().unwrap().clone();
+        let fasttext = self.fasttext_tagger.snapshot();
+        let miniml = self.miniml_tagger.snapshot();
+        let vision = self.vision_tagger.snapshot();
 
         for (item, feed_type) in work {
             if force {
@@ -853,12 +887,12 @@ impl PulseCore {
 
     /// Whether an NLI text tagger is currently loaded.
     pub fn onnx_loaded(&self) -> bool {
-        self.onnx_tagger.read().unwrap().is_some()
+        self.onnx_tagger.is_loaded()
     }
 
     /// Whether a CLIP vision tagger is currently loaded.
     pub fn vision_loaded(&self) -> bool {
-        self.vision_tagger.read().unwrap().is_some()
+        self.vision_tagger.is_loaded()
     }
 
     /// Reload the NLI tagger from the active_model file. Call after downloading a new model.
@@ -869,7 +903,7 @@ impl PulseCore {
             .map_err(|e| PulseError::Config(format!("no active model set: {e}")))?;
         let model_dir = self.config.data_dir.join("models").join(model_name.trim());
         let tagger = OnnxTagger::load(&model_dir).map_err(PulseError::Tagging)?;
-        *self.onnx_tagger.write().unwrap() = Some(Arc::new(tagger));
+        self.onnx_tagger.store(Arc::new(tagger));
         tracing::info!("NLI tagger hot-reloaded from {}", model_dir.display());
         Ok(())
     }
@@ -895,7 +929,7 @@ impl PulseCore {
         }
 
         let tagger = VisionTagger::load(&model_dir).map_err(PulseError::Tagging)?;
-        *self.vision_tagger.write().unwrap() = Some(Arc::new(tagger));
+        self.vision_tagger.store(Arc::new(tagger));
         tracing::info!(
             "CLIP vision tagger hot-reloaded from {}",
             model_dir.display()
@@ -906,10 +940,10 @@ impl PulseCore {
     // ─── FastText model management ────────────────────────────────────────────
 
     pub fn fasttext_loaded(&self) -> bool {
-        self.fasttext_tagger.read().unwrap().is_some()
+        self.fasttext_tagger.is_loaded()
     }
     pub fn miniml_loaded(&self) -> bool {
-        self.miniml_tagger.read().unwrap().is_some()
+        self.miniml_tagger.is_loaded()
     }
 
     pub fn active_fasttext_model_name(&self) -> Option<String> {
@@ -963,7 +997,7 @@ impl PulseCore {
             .map_err(|e| PulseError::Config(format!("no active fasttext model set: {e}")))?;
         let model_dir = self.config.data_dir.join("models").join(model_name.trim());
         let tagger = FastTextTagger::load(&model_dir).map_err(PulseError::Tagging)?;
-        *self.fasttext_tagger.write().unwrap() = Some(Arc::new(tagger));
+        self.fasttext_tagger.store(Arc::new(tagger));
         tracing::info!("FastText tagger hot-reloaded from {}", model_dir.display());
         Ok(())
     }
@@ -974,7 +1008,7 @@ impl PulseCore {
             .map_err(|e| PulseError::Config(format!("no active miniml model set: {e}")))?;
         let model_dir = self.config.data_dir.join("models").join(model_name.trim());
         let tagger = MiniMlTagger::load(&model_dir).map_err(PulseError::Tagging)?;
-        *self.miniml_tagger.write().unwrap() = Some(Arc::new(tagger));
+        self.miniml_tagger.store(Arc::new(tagger));
         tracing::info!("MiniLM tagger hot-reloaded from {}", model_dir.display());
         Ok(())
     }
@@ -989,7 +1023,7 @@ impl PulseCore {
         if self.active_vision_model_name().as_deref() == Some(model_name) {
             let _ = self.unset_active_vision_model();
         }
-        *self.vision_tagger.write().unwrap() = None;
+        self.vision_tagger.clear();
         Ok(())
     }
 
@@ -1004,7 +1038,7 @@ impl PulseCore {
             let ptr = self.config.data_dir.join("active_miniml_model");
             let _ = std::fs::remove_file(&ptr);
         }
-        *self.miniml_tagger.write().unwrap() = None;
+        self.miniml_tagger.clear();
         Ok(())
     }
 

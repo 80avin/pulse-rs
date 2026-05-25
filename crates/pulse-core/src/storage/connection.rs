@@ -26,7 +26,7 @@ pub async fn open_writer_pool(
         .synchronous(sync)
         .busy_timeout(Duration::from_secs(5))
         .foreign_keys(true)
-        .pragma("cache_size", "-32768")
+        .pragma("cache_size", "-8192")
         .pragma("temp_store", "memory")
         .pragma("mmap_size", mmap);
 
@@ -50,12 +50,12 @@ pub async fn open_reader_pool(
         .read_only(true)
         .busy_timeout(Duration::from_secs(5))
         .foreign_keys(true)
-        .pragma("cache_size", "-32768")
+        .pragma("cache_size", "-16384")
         .pragma("temp_store", "memory")
         .pragma("mmap_size", mmap);
 
     SqlitePoolOptions::new()
-        .max_connections(4)
+        .max_connections(3)
         .connect_with(opts)
         .await
         .map_err(StorageError::Sqlite)
@@ -82,7 +82,7 @@ pub async fn apply_pragmas(
     conn.execute("PRAGMA busy_timeout = 5000;")
         .await
         .map_err(StorageError::Sqlite)?;
-    conn.execute("PRAGMA cache_size = -32768;")
+    conn.execute("PRAGMA cache_size = -16384;")
         .await
         .map_err(StorageError::Sqlite)?;
     conn.execute("PRAGMA temp_store = MEMORY;")

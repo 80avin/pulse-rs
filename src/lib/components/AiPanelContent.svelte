@@ -1,6 +1,7 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
   import { items, sources, aiStatus, models, taggingProgress, downloadModel, deleteModel, activateModel, retagAll, reloadAiInfo } from '$lib/store.svelte';
+  import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
   import Icon from '$lib/components/Icon.svelte';
   import ScoreBar from '$lib/components/ScoreBar.svelte';
@@ -77,10 +78,14 @@
 
   async function handleRetag() {
     if (taggingProgress.active) return;
+    if (!settings.aiTagging) {
+      retagResult = 'ai tagging is disabled — enable it in settings';
+      return;
+    }
     retagResult = null;
     try {
       const count = await retagAll();
-      retagResult = `${count} tags applied`;
+      retagResult = count > 0 ? `${count} tags applied` : 'done — no new tags (check confidence threshold)';
     } catch {
       retagResult = 'error — check console';
     }
@@ -153,8 +158,8 @@
       <div style="display:flex;align-items:center;gap:8px;">
         <button
           onclick={handleRetag}
-          disabled={taggingProgress.active || !IS_TAURI}
-          style="flex:1;padding:8px;background:{taggingProgress.active ? T.bg0 : T.bg2};border:1px solid {taggingProgress.active ? T.amber : T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{taggingProgress.active ? T.amber : T.ink0};cursor:{taggingProgress.active ? 'default' : 'pointer'};"
+          disabled={taggingProgress.active || !IS_TAURI || !settings.aiTagging}
+          style="flex:1;padding:8px;background:{taggingProgress.active ? T.bg0 : T.bg2};border:1px solid {taggingProgress.active ? T.amber : T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{taggingProgress.active ? T.amber : !settings.aiTagging ? T.ink3 : T.ink0};cursor:{taggingProgress.active || !settings.aiTagging ? 'default' : 'pointer'};"
         >
           {taggingProgress.active ? `tagging ${taggingProgress.tagged} / ${taggingProgress.total}…` : 're-tag all items'}
         </button>

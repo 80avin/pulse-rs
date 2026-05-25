@@ -37,6 +37,9 @@ pub struct PulseConfig {
     pub text_backend: TextBackend,
     /// Whether to supplement model tags with rule engine (always false in new stack)
     pub use_rules: bool,
+    /// Whether AI tagging is enabled (mirrors the user's UI setting). When false,
+    /// models are not loaded at startup and the tagger task skips ML inference.
+    pub ai_enabled: bool,
 }
 
 impl PulseConfig {
@@ -56,6 +59,7 @@ impl PulseConfig {
             reddit_client_secret: None,
             text_backend: TextBackend::HybridFastTextMiniMl,
             use_rules: false,
+            ai_enabled: true,
         }
     }
 
@@ -69,6 +73,12 @@ impl PulseConfig {
     pub fn with_data_dir(mut self, data_dir: PathBuf) -> Self {
         self.data_dir = data_dir.clone();
         self.db_path = data_dir.join("pulse.db");
+        self
+    }
+
+    /// Override the ai_enabled flag (mirrors the user's AI tagging setting).
+    pub fn with_ai_enabled(mut self, enabled: bool) -> Self {
+        self.ai_enabled = enabled;
         self
     }
 

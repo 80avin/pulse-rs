@@ -1,3 +1,4 @@
+use crate::ai::model_handle::ModelHandle;
 use crate::ai::rules::RuleEngine;
 use crate::ai::vision::VisionTagger;
 use crate::error::TaggingError;
@@ -6,7 +7,7 @@ use crate::storage::DbHandle;
 use crate::storage::queries::get_item;
 use crate::types::{FeedType, ItemId, TagResult};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use tokio::sync::mpsc;
 
 /// The bounded channel capacity for the tagging queue
@@ -51,24 +52,24 @@ impl TaggerHandle {
     }
 }
 
-/// The tagging background task. Receives shared RwLock handles so hot-reloaded models
-/// are picked up immediately on the next queued item.
+/// The tagging background task. Uses ModelHandle so hot-reloaded and on-demand-reloaded
+/// models are picked up on the next queued item, and last-used timestamps stay current.
 pub async fn tagger_task(
     mut rx: mpsc::Receiver<TagRequest>,
     db: DbHandle,
     text_backend: crate::config::TextBackend,
     rule_engine: Arc<RuleEngine>,
-    fasttext_tagger: Arc<RwLock<Option<Arc<crate::ai::fasttext::FastTextTagger>>>>,
-    miniml_tagger: Arc<RwLock<Option<Arc<crate::ai::miniml::MiniMlTagger>>>>,
-    vision_tagger: Arc<RwLock<Option<Arc<crate::ai::vision::VisionTagger>>>>,
+    fasttext_tagger: ModelHandle<crate::ai::fasttext::FastTextTagger>,
+    miniml_tagger: ModelHandle<crate::ai::miniml::MiniMlTagger>,
+    vision_tagger: ModelHandle<crate::ai::vision::VisionTagger>,
 ) {
     tracing::info!("Tagger task started");
 
     while let Some(req) = rx.recv().await {
-        // Snapshot current tagger Arcs (hold lock only briefly).
-        let fasttext = fasttext_tagger.read().unwrap().clone();
-        let miniml = miniml_tagger.read().unwrap().clone();
-        let vision = vision_tagger.read().unwrap().clone();
+        // Snapshot current models (updates last_used; triggers background reload if None).
+        let fasttext = fasttext_tagger.snapshot();
+        let miniml = miniml_tagger.snapshot();
+        let vision = vision_tagger.snapshot();
         match process_tag_request(
             &db,
             &text_backend,

@@ -661,7 +661,7 @@ async fn cmd_debug(args: AiDebugArgs, core: &PulseCore) -> anyhow::Result<()> {
     let mut showed = false;
 
     // FastText scores
-    let ft = core.fasttext_tagger.read().unwrap().clone();
+    let ft = core.fasttext_tagger.snapshot();
     if let Some(ref ft) = ft {
         match ft.scores(&args.text) {
             Ok(scores) => {
@@ -679,7 +679,7 @@ async fn cmd_debug(args: AiDebugArgs, core: &PulseCore) -> anyhow::Result<()> {
     }
 
     // MiniLM scores
-    let ml = core.miniml_tagger.read().unwrap().clone();
+    let ml = core.miniml_tagger.snapshot();
     if let Some(ref ml) = ml {
         match ml.scores(&args.text) {
             Ok(scores) => {
@@ -697,7 +697,7 @@ async fn cmd_debug(args: AiDebugArgs, core: &PulseCore) -> anyhow::Result<()> {
     }
 
     // Legacy NLI ONNX scores
-    let tagger = core.onnx_tagger.read().unwrap().clone();
+    let tagger = core.onnx_tagger.snapshot();
     if let Some(ref tagger) = tagger {
         let sims = tagger.similarities(&args.text)?;
         println!("=== NLI ONNX ===");
@@ -717,7 +717,7 @@ async fn cmd_debug(args: AiDebugArgs, core: &PulseCore) -> anyhow::Result<()> {
 }
 
 async fn cmd_vision_debug(args: AiVisionDebugArgs, core: &PulseCore) -> anyhow::Result<()> {
-    let vision = core.vision_tagger.read().unwrap().clone();
+    let vision = core.vision_tagger.snapshot();
     let Some(ref vision) = vision else {
         print_error("no vision model loaded — run 'pulse ai vision-download' first");
         return Ok(());
