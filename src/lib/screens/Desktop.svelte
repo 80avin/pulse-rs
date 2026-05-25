@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
-  import { items, sources, groups, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, createGroup, syncState, aiStatus, taggingProgress, loadingMore, loadMoreItems, searchItems } from '$lib/store.svelte';
+  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, createGroup, syncState, aiStatus, taggingProgress, loadingMore, loadMoreItems, searchItems } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, sanitizeHtml } from '$lib/utils';
   import Icon from '$lib/components/Icon.svelte';
@@ -16,17 +16,6 @@
   let activeGroup  = $state('all');
   let activeSource = $state<string | null>(null);
 
-  const groupCounts = $derived.by(() => {
-    const srcGroup = new Map(sources.map(s => [s.id, s.group]));
-    const counts: Record<string, number> = { all: 0 };
-    for (const item of items) {
-      if (item.read) continue;
-      counts['all'] = (counts['all'] ?? 0) + 1;
-      const gid = srcGroup.get(item.src);
-      if (gid && gid !== 'all') counts[gid] = (counts[gid] ?? 0) + 1;
-    }
-    return counts;
-  });
   // Resizable pane widths (clamped in the template)
   let leftRailWidth  = $state(232);
   let timelineWidth  = $state(460);
@@ -253,6 +242,11 @@
   }
 </script>
 
+{#if storeReady.error}
+  <div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:{T.bg0};font:11px/1.6 {T.mono};color:{T.red};">
+    failed to load data — check console for details
+  </div>
+{:else}
 <div style="display:flex;flex-direction:column;width:100%;height:100%;background:{T.bg0};color:{T.ink0};overflow:hidden;">
 
   <!-- Window chrome -->
@@ -332,7 +326,7 @@
           style="display:flex;align-items:center;gap:8px;padding:5px 12px;background:{g.id === activeGroup ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {g.id === activeGroup ? T.cyan : 'transparent'};color:{g.id === activeGroup ? T.ink0 : T.ink1};font:{g.id === activeGroup ? '600' : '400'} 12px/1.2 {T.mono};cursor:pointer;text-align:left;width:100%;"
         >
           <span style="flex:1;">{g.name}</span>
-          <span style="font:10px/1 {T.mono};color:{g.id === activeGroup ? T.cyan : T.ink3};font-variant-numeric:tabular-nums;">{groupCounts[g.id] ?? 0}</span>
+          <span style="font:10px/1 {T.mono};color:{g.id === activeGroup ? T.cyan : T.ink3};font-variant-numeric:tabular-nums;">{g.n}</span>
         </button>
       {/each}
       {#if showAddGroup}
@@ -454,7 +448,7 @@
       </div>
 
       <div style="flex:1;overflow-y:auto;">
-        {#if filteredItems.length === 0}
+        {#if filteredItems.length === 0 && !storeReady.loading}
           <div style="padding:32px;text-align:center;font:11px/1.6 {T.mono};color:{T.ink3};">
             {searchQuery ? `no results for "${searchQuery}"` : 'no items in this view'}
           </div>
@@ -832,3 +826,4 @@
     <button onclick={() => showCheatsheet = !showCheatsheet} style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink3};padding:0;" title="keyboard shortcuts (?)">?</button>
   </div>
 </div>
+{/if}

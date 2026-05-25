@@ -30,11 +30,24 @@ export const settings = $state({
   notifySaved:         (saved.notifySaved          ?? false)   as boolean,
 });
 
-// Load from Tauri backend on startup (overrides localStorage if present)
-if (IS_TAURI) {
-  (async () => {
+// Called from +layout.svelte onMount — same timing guarantee as initStore().
+// Settings have a localStorage fallback, so failure here is non-fatal.
+export async function initSettings(): Promise<void> {
+  if (!IS_TAURI) return;
+  const MAX_ATTEMPTS = 5;
+  const ATTEMPT_TIMEOUT_MS = 4000;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      const delay = attempt < 3 ? 300 * attempt : 1000 * (attempt - 1);
+      await new Promise(r => setTimeout(r, delay));
+    }
     try {
-      const s = await tauriInvoke<typeof settings>('get_settings');
+      const s = await Promise.race([
+        tauriInvoke<typeof settings>('get_settings'),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('settings timeout')), ATTEMPT_TIMEOUT_MS)
+        ),
+      ]);
       settings.density             = s.density as typeof settings.density;
       settings.markReadOn          = s.markReadOn as MarkReadMode;
       settings.syncIntervalMin     = s.syncIntervalMin as SyncInterval;
@@ -44,10 +57,11 @@ if (IS_TAURI) {
       settings.confidenceThreshold = s.confidenceThreshold;
       settings.notifyHighSignal    = s.notifyHighSignal;
       settings.notifySaved         = s.notifySaved;
+      return;
     } catch (e) {
-      console.error('[pulse] failed to load settings from backend:', e);
+      console.error(`[pulse] settings init attempt ${attempt + 1} failed:`, e);
     }
-  })();
+  }
 }
 
 // Persist every change to localStorage + Tauri backend

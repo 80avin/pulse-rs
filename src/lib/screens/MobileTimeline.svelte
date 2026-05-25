@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { groups, sources, items, markAllRead, doSync as storeSync, syncState, loadingMore, loadMoreItems } from '$lib/store.svelte';
+  import { groups, sources, items, storeReady, markAllRead, doSync as storeSync, syncState, loadingMore, loadMoreItems } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import FilterStrip from '$lib/components/FilterStrip.svelte';
@@ -26,17 +26,6 @@
   let syncing = $state(false);
   let showFilter = $state(true);
 
-  const groupCounts = $derived.by(() => {
-    const srcGroup = new Map(sources.map(s => [s.id, s.group]));
-    const counts: Record<string, number> = { all: 0 };
-    for (const item of items) {
-      if (item.read) continue;
-      counts['all'] = (counts['all'] ?? 0) + 1;
-      const gid = srcGroup.get(item.src);
-      if (gid && gid !== 'all') counts[gid] = (counts[gid] ?? 0) + 1;
-    }
-    return counts;
-  });
 
   // Group- and source-filtered items (base for counts and further filtering)
   const groupItems = $derived.by(() => {
@@ -149,7 +138,7 @@
     </div>
   {:else}
     <!-- Group tabs -->
-    <GroupTabs {groups} active={activeGroup} counts={groupCounts} onSelect={(id) => { activeGroup = id; filter = 'all'; }} />
+    <GroupTabs {groups} active={activeGroup} onSelect={(id) => { activeGroup = id; filter = 'all'; }} />
   {/if}
 
   <!-- Tag filter banner -->
@@ -180,7 +169,7 @@
         onTagClick={onTagFilter}
       />
     {/each}
-    {#if filteredItems.length === 0}
+    {#if filteredItems.length === 0 && !storeReady.loading}
       <div style="padding:32px;text-align:center;font:11px/1.6 {T.mono};color:{T.ink3};">
         {filter !== 'all' ? `no ${filter} items in this view` : 'no items'}
       </div>

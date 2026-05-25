@@ -150,6 +150,9 @@ export const loadingMore = $state({
   cursor: null as { publishedAt: number; itemId: string } | null,
 });
 
+/** Reflects whether the initial data load from the backend has completed. */
+export const storeReady = $state({ loading: true, error: false });
+
 /** Call once from layout to wire the global tagging-progress event listener. */
 export async function setupTaggingListener(): Promise<() => void> {
   if (!IS_TAURI) return () => {};
@@ -213,26 +216,63 @@ async function reloadModelsInternal(): Promise<void> {
 }
 
 // --- Init from DB on startup ---
-if (IS_TAURI) {
-  (async () => {
+// Fires at module-import time so data is in-flight while Svelte renders the
+// first frame — latency is hidden rather than shown as a loading screen.
+// +layout.svelte also calls this from onMount as a safety net; the
+// _initStarted guard makes that call a no-op if the module-level run already
+// started.
+//
+// On Android cold start after force-stop, the Tauri IPC bridge can silently
+// drop messages whose invoke() promise never settles. A per-attempt timeout
+// converts a hung invoke into a rejection so the retry loop can advance.
+let _initStarted = false;
+
+export async function initStore(): Promise<void> {
+  if (_initStarted) return;
+  _initStarted = true;
+
+  if (!IS_TAURI) {
+    storeReady.loading = false;
+    return;
+  }
+
+  // Short timeout on early attempts: if bridge is ready the query finishes in
+  // <200 ms, so 2 s is safe. Later attempts allow more time for slow devices.
+  const TIMEOUTS = [2000, 2000, 3000, 4000, 5000];
+  const DELAYS   = [0, 200, 500, 1000, 2000];
+
+  for (let attempt = 0; attempt < TIMEOUTS.length; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, DELAYS[attempt]));
     try {
-      const [page, bs, bg] = await Promise.all([
-        tauriInvoke<BackendPage>('get_items_page', { limit: 100 }),
-        tauriInvoke<BackendSource[]>('get_sources'),
-        tauriInvoke<BackendGroup[]>('get_groups'),
+      const [page, bs, bg] = await Promise.race([
+        Promise.all([
+          tauriInvoke<BackendPage>('get_items_page', { limit: 100 }),
+          tauriInvoke<BackendSource[]>('get_sources'),
+          tauriInvoke<BackendGroup[]>('get_groups'),
+        ]),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('init timeout')), TIMEOUTS[attempt])
+        ),
       ]);
       items.splice(0, items.length, ...page.items.map(adaptItem));
       loadingMore.cursor = page.nextCursor ?? null;
       sources.splice(0, sources.length, ...bs.map(adaptSource));
       groups.splice(0, groups.length, ...bg);
+      storeReady.loading = false;
+      storeReady.error = false;
+      reloadAiStatus().catch(e => console.error('[pulse] ai status failed:', e));
+      reloadModelsInternal().catch(e => console.error('[pulse] list_models failed:', e));
+      return;
     } catch (e) {
-      console.error('[pulse] init failed:', e);
+      console.error(`[pulse] init attempt ${attempt + 1} failed:`, e);
     }
-    // Load AI status independently so a model init failure doesn't block the feed
-    reloadAiStatus().catch(e => console.error('[pulse] ai status failed:', e));
-    reloadModelsInternal().catch(e => console.error('[pulse] list_models failed:', e));
-  })();
+  }
+  storeReady.loading = false;
+  storeReady.error = true;
 }
+
+// Kick off immediately so data loads in parallel with the first render.
+if (IS_TAURI) initStore();
 
 export function loadMockData() {
   items.splice(0, items.length, ...MOCK_ITEMS.map(i => ({ ...i })));

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { T } from '$lib/tokens';
-  import { items } from '$lib/store.svelte';
+  import { storeReady } from '$lib/store.svelte';
   import MobileTimeline from './MobileTimeline.svelte';
   import MobileReader from './MobileReader.svelte';
   import MobileSources from './MobileSources.svelte';
@@ -12,7 +12,7 @@
   let tab = $state('timeline');
   let openItemId = $state<string | null>(null);
   let filterSource = $state<string | null>(null);
-  let timelineIds = $state<string[]>(items.map(i => i.id));
+  let timelineIds = $state<string[]>([]);
   let activeTag = $state<string | null>(null);
 
   // ── History-based back navigation ──────────────────────────────────────────
@@ -90,7 +90,11 @@
   <div style="height:var(--sat);flex-shrink:0;"></div>
 
   <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
-    {#if openItemId}
+    {#if storeReady.error}
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;font:11px/1 {T.mono};color:{T.red};">
+        failed to load data — restart the app
+      </div>
+    {:else if openItemId}
       <MobileReader
         itemId={openItemId}
         allIds={timelineIds}

@@ -3,8 +3,9 @@
   import Desktop from '$lib/screens/Desktop.svelte';
   import Mobile from '$lib/screens/Mobile.svelte';
 
-  // Mobile: width < 768px (Android WebView will report real device width)
-  let isMobile = $state(false);
+  // null until onMount determines the viewport — prevents Desktop from
+  // mounting and tearing down immediately on Android.
+  let isMobile = $state<boolean | null>(null);
 
   onMount(() => {
     const check = () => { isMobile = window.innerWidth < 768; };
@@ -14,8 +15,8 @@
   });
 </script>
 
-{#if isMobile}
+{#if isMobile === true}
   <Mobile />
-{:else}
+{:else if isMobile === false}
   <Desktop />
 {/if}
