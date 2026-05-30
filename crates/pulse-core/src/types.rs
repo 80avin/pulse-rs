@@ -117,6 +117,7 @@ pub struct ItemState {
     pub read_at: Option<i64>,
     pub saved_at: Option<i64>,
     pub hidden_at: Option<i64>,
+    pub note: Option<String>,
     pub updated_at: i64,
 }
 
@@ -126,6 +127,7 @@ pub struct ItemStatePatch {
     pub is_read: Option<bool>,
     pub is_saved: Option<bool>,
     pub is_hidden: Option<bool>,
+    pub note: Option<Option<String>>,
 }
 
 /// An AI-generated tag for a feed item
@@ -214,6 +216,7 @@ pub struct FeedItemView {
     pub is_read: bool,
     pub is_saved: bool,
     pub is_hidden: bool,
+    pub note: Option<String>,
 
     // Enrichment fields
     pub og_image: Option<String>,

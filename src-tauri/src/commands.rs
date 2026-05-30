@@ -115,6 +115,7 @@ fn adapt_item(view: &pulse_core::types::FeedItemView) -> FeedItemDto {
         tags: view.ai_tags.clone(),
         og_image: view.og_image.clone(),
         signal: view.signal,
+        note: view.note.clone(),
     }
 }
 
@@ -190,7 +191,7 @@ const KNOWN_MODELS: &[ModelSpec] = &[
 
 #[tauri::command]
 pub async fn get_sources(state: State<'_, AppState>) -> Result<Vec<SourceDto>, String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let feeds = core.get_feeds().await.map_err(|e| e.to_string())?;
     let unread_map = core.get_unread_counts_by_feed().await.unwrap_or_default();
     let total_map = core.get_total_counts_by_feed().await.unwrap_or_default();
@@ -207,7 +208,7 @@ pub async fn get_sources(state: State<'_, AppState>) -> Result<Vec<SourceDto>, S
 
 #[tauri::command]
 pub async fn add_source(state: State<'_, AppState>, source: SourceDto) -> Result<(), String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let now = chrono::Utc::now().timestamp();
     let feed_type = match source.kind.as_str() {
         "reddit" => FeedType::Reddit,
@@ -250,12 +251,8 @@ pub async fn add_source(state: State<'_, AppState>, source: SourceDto) -> Result
 
 #[tauri::command]
 pub async fn delete_source(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    state
-        .core()
-        .await
-        .delete_feed(&id)
-        .await
-        .map_err(|e| e.to_string())
+    let core = state.core().await?;
+    core.delete_feed(&id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -267,7 +264,7 @@ pub async fn update_source(
     kind: String,
     group: String,
 ) -> Result<(), String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let existing = core.get_feed(&id).await.map_err(|e| e.to_string())?;
     let feed_type = match kind.as_str() {
         "reddit" => FeedType::Reddit,
@@ -309,7 +306,7 @@ pub async fn get_items_page(
     limit: Option<usize>,
     cursor: Option<CursorInput>,
 ) -> Result<ItemPageDto, String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let limit = limit.unwrap_or(100);
     let filter = TimelineFilter {
         group_id: group_id.filter(|g| g != "all"),
@@ -340,7 +337,7 @@ pub async fn mark_items_read(
     ids: Vec<String>,
     read: bool,
 ) -> Result<(), String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     for id in &ids {
         core.update_item_state(
             id,
@@ -357,10 +354,8 @@ pub async fn mark_items_read(
 
 #[tauri::command]
 pub async fn mark_source_read(state: State<'_, AppState>, source_id: String) -> Result<(), String> {
-    state
-        .core()
-        .await
-        .mark_feed_read(&source_id)
+    let core = state.core().await?;
+    core.mark_feed_read(&source_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -370,40 +365,31 @@ pub async fn toggle_saved(
     state: State<'_, AppState>,
     id: String,
     saved: bool,
+    note: Option<String>,
 ) -> Result<(), String> {
-    state
-        .core()
-        .await
-        .toggle_saved(&id, saved)
+    let core = state.core().await?;
+    core.toggle_saved(&id, saved, note)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn hide_item(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    state
-        .core()
-        .await
-        .hide_item(&id)
-        .await
-        .map_err(|e| e.to_string())
+    let core = state.core().await?;
+    core.hide_item(&id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn clear_items(state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .core()
-        .await
-        .clear_all_items()
-        .await
-        .map_err(|e| e.to_string())
+    let core = state.core().await?;
+    core.clear_all_items().await.map_err(|e| e.to_string())
 }
 
 // ── Group commands ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub async fn get_groups(state: State<'_, AppState>) -> Result<Vec<GroupDto>, String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let groups = core.get_feed_groups().await.map_err(|e| e.to_string())?;
     let unread_map = core.get_unread_counts_by_feed().await.unwrap_or_default();
 
@@ -442,7 +428,7 @@ pub async fn get_groups(state: State<'_, AppState>) -> Result<Vec<GroupDto>, Str
 
 #[tauri::command]
 pub async fn add_group(state: State<'_, AppState>, id: String, name: String) -> Result<(), String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let now = chrono::Utc::now().timestamp();
     let group = FeedGroup {
         id,
@@ -465,7 +451,7 @@ pub async fn rename_group(
     id: String,
     name: String,
 ) -> Result<(), String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     // Fetch the existing group to preserve other fields, then upsert with new name
     let groups = core.get_feed_groups().await.map_err(|e| e.to_string())?;
     let existing = groups
@@ -489,12 +475,8 @@ pub async fn delete_group(state: State<'_, AppState>, id: String) -> Result<(), 
     if id == "all" {
         return Ok(());
     }
-    state
-        .core()
-        .await
-        .delete_feed_group(&id)
-        .await
-        .map_err(|e| e.to_string())
+    let core = state.core().await?;
+    core.delete_feed_group(&id).await.map_err(|e| e.to_string())
 }
 
 // ── Sync commands ──────────────────────────────────────────────────────────────
@@ -504,7 +486,7 @@ pub async fn sync_source(
     state: State<'_, AppState>,
     source_id: String,
 ) -> Result<SyncResultDto, String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let result = match core.sync_feed(&source_id).await {
         Ok(n) => SyncResultDto {
             new_count: n as i64,
@@ -529,7 +511,7 @@ pub async fn sync_source(
 
 #[tauri::command]
 pub async fn sync_all(state: State<'_, AppState>) -> Result<SyncResultDto, String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let feeds = core.get_feeds().await.map_err(|e| e.to_string())?;
     let mut total_new = 0i64;
 
@@ -587,9 +569,8 @@ pub async fn search_items(
     query: String,
     limit: Option<usize>,
 ) -> Result<Vec<FeedItemDto>, String> {
-    let views = state
-        .core()
-        .await
+    let core = state.core().await?;
+    let views = core
         .search(&query, limit)
         .await
         .map_err(|e| e.to_string())?;
@@ -600,12 +581,8 @@ pub async fn search_items(
 
 #[tauri::command]
 pub async fn get_db_stats(state: State<'_, AppState>) -> Result<DbStatsDto, String> {
-    let stats = state
-        .core()
-        .await
-        .get_db_stats()
-        .await
-        .map_err(|e| e.to_string())?;
+    let core = state.core().await?;
+    let stats = core.get_db_stats().await.map_err(|e| e.to_string())?;
     Ok(DbStatsDto {
         total_items: stats.item_count,
         unread_items: stats.unread_count,
@@ -620,7 +597,7 @@ pub async fn get_db_stats(state: State<'_, AppState>) -> Result<DbStatsDto, Stri
 
 #[tauri::command]
 pub async fn get_ai_status(state: State<'_, AppState>) -> Result<AiStatusDto, String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let onnx_loaded = core.onnx_loaded();
     let vision_loaded = core.vision_loaded();
     let fasttext_loaded = core.fasttext_loaded();
@@ -655,7 +632,7 @@ pub async fn get_ai_status(state: State<'_, AppState>) -> Result<AiStatusDto, St
 
 #[tauri::command]
 pub async fn list_models(state: State<'_, AppState>) -> Result<Vec<ModelInfoDto>, String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let active_nli = core.active_model_name();
     let active_vision = core.active_vision_model_name();
     let active_fasttext = core.active_fasttext_model_name();
@@ -706,7 +683,7 @@ pub async fn download_model(
     app: tauri::AppHandle,
     model_id: String,
 ) -> Result<(), String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let spec = KNOWN_MODELS
         .iter()
         .find(|m| m.id == model_id)
@@ -812,7 +789,7 @@ pub async fn download_model(
 
 #[tauri::command]
 pub async fn delete_model(state: State<'_, AppState>, model_id: String) -> Result<(), String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let spec = KNOWN_MODELS.iter().find(|m| m.id == model_id);
     match spec.map(|s| s.kind) {
         Some("vision") => core
@@ -829,7 +806,7 @@ pub async fn delete_model(state: State<'_, AppState>, model_id: String) -> Resul
 /// Switch to an already-downloaded model without re-downloading it.
 #[tauri::command]
 pub async fn activate_model(state: State<'_, AppState>, model_id: String) -> Result<(), String> {
-    let core = state.core().await;
+    let core = state.core().await?;
     let spec = KNOWN_MODELS
         .iter()
         .find(|m| m.id == model_id)
@@ -870,7 +847,7 @@ pub async fn retag_all(state: State<'_, AppState>, app: tauri::AppHandle) -> Res
         return Ok(0);
     }
 
-    let core = state.core().await;
+    let core = state.core().await?;
     let app2 = app.clone();
     let progress = move |tagged: usize, total: usize| {
         let _ = app2.emit(

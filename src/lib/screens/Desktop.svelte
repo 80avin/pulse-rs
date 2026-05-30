@@ -59,6 +59,10 @@
   // Context menu state
   let contextMenu = $state<{ x: number; y: number; item: import('$lib/types').FeedItem } | null>(null);
 
+  // Note editing state
+  let desktopNoteEditing = $state(false);
+  let desktopNoteDraft = $state('');
+
   // Virtual list — renders only visible rows, saving ~80% of DOM nodes at scale.
   let listScrollEl: HTMLElement | null = $state(null);
   const listVirtualizer = createVirtualizer({
@@ -589,6 +593,45 @@
             {#if openItem.n > 0}<span style="font:11px/1 {T.mono};color:{T.ink1};">{openItem.n} comments</span>{/if}
           </div>
 
+          <!-- Note block -->
+          {#if desktopNoteEditing}
+            <div style="margin-top:14px;padding:10px;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;">
+              <textarea
+                bind:value={desktopNoteDraft}
+                placeholder="Add a note about this post…"
+                style="width:100%;min-height:60px;background:transparent;border:none;outline:none;font:12px/1.5 {T.sans};color:{T.ink0};resize:vertical;"
+              ></textarea>
+              <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px;">
+                <button
+                  onclick={() => { desktopNoteEditing = false; }}
+                  style="padding:4px 10px;background:transparent;color:{T.ink2};border:1px solid {T.bd2};border-radius:2px;font:10px/1 {T.mono};cursor:pointer;"
+                >cancel</button>
+                <button
+                  onclick={() => { toggleSaved(openItem!.id, desktopNoteDraft.trim() || undefined); desktopNoteEditing = false; }}
+                  style="padding:4px 10px;background:{T.amber};color:{T.bg0};border:none;border-radius:2px;font:10px/1 {T.mono};cursor:pointer;"
+                >save note</button>
+              </div>
+            </div>
+          {:else if openItem.note}
+            <div style="margin-top:14px;padding:10px 12px;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                <span style="font:9px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.4px;">note</span>
+                <button
+                  onclick={() => { desktopNoteDraft = openItem!.note ?? ''; desktopNoteEditing = true; }}
+                  style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink2};padding:2px 6px;"
+                >edit</button>
+              </div>
+              <p style="margin:0;font:12px/1.5 {T.sans};color:{T.ink1};white-space:pre-wrap;">{openItem.note}</p>
+            </div>
+          {:else}
+            <div style="margin-top:14px;">
+              <button
+                onclick={() => { desktopNoteDraft = ''; desktopNoteEditing = true; }}
+                style="background:transparent;border:1px dashed {T.bd1};border-radius:3px;padding:6px 10px;cursor:pointer;font:10px/1 {T.mono};color:{T.ink3};"
+              >+ add note</button>
+            </div>
+          {/if}
+
           <div style="margin-top:22px;font:14.5px/1.65 {T.sans};color:{T.ink0};max-width:720px;" class="item-body">
             {#if openItem.bodyHtml}
               {@html sanitizeHtml(openItem.bodyHtml)}
@@ -755,6 +798,15 @@
         >
           <Icon name="star" size={11} color={ci.saved ? T.amber : T.ink2} />
           <span>{ci.saved ? 'Unsave' : 'Save'}</span>
+        </button>
+        <button
+          onclick={() => { desktopNoteDraft = ci.note ?? ''; desktopNoteEditing = true; contextMenu = null; }}
+          style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{T.ink1};cursor:pointer;text-align:left;"
+          onmouseenter={(e) => (e.currentTarget as HTMLElement).style.background = T.bg2}
+          onmouseleave={(e) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+        >
+          <Icon name="edit" size={11} color={T.ink2} />
+          <span>{ci.note ? 'Edit note' : 'Save with note…'}</span>
         </button>
         <button
           onclick={() => { const cur = filteredItems.findIndex(i => i.id === ci.id); const fallback = filteredItems[Math.max(0, cur - 1)]; hideItem(ci.id); openId = (fallback && fallback.id !== ci.id) ? fallback.id : ''; contextMenu = null; }}

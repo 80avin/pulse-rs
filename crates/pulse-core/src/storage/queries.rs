@@ -160,6 +160,7 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
         is_read: is_read_i != 0,
         is_saved: is_saved_i != 0,
         is_hidden: is_hidden_i != 0,
+        note: row.try_get("note").ok(),
         ai_tags,
         signal,
     })
@@ -214,7 +215,7 @@ pub async fn get_timeline(
             json_extract(fi.source_meta, '$.og_image') AS og_image,
             f.id AS feed_id, f.title AS feed_title, f.feed_type, f.url AS feed_url,
             f.group_id, fg.name AS group_name,
-            ist.is_read, ist.is_saved, ist.is_hidden,
+            ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
             COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
             COALESCE(MAX(at.confidence), 0.0) AS signal
          FROM feed_items fi
@@ -356,7 +357,7 @@ pub async fn search_items(
                 json_extract(fi.source_meta, '$.external_url') AS external_url,
                 f.id AS feed_id, f.title AS feed_title, f.feed_type, f.url AS feed_url,
                 f.group_id, fg.name AS group_name,
-                ist.is_read, ist.is_saved, ist.is_hidden,
+                ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
                 COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
                 COALESCE(MAX(at.confidence), 0.0) AS signal
          FROM feed_items_fts

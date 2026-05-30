@@ -378,6 +378,16 @@ async fn update_item_state(
         .map_err(StorageError::Sqlite)?;
     }
 
+    if let Some(n) = &patch.note {
+        sqlx::query("UPDATE item_states SET note = ?, updated_at = ? WHERE item_id = ?")
+            .bind(n.clone())
+            .bind(now)
+            .bind(item_id)
+            .execute(pool)
+            .await
+            .map_err(StorageError::Sqlite)?;
+    }
+
     Ok(())
 }
 

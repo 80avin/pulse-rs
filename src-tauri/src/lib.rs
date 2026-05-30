@@ -91,9 +91,18 @@ fn init_tracing(
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static PENDING_SHARE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 
+/// Represents the initialization state of PulseCore so commands can
+/// distinguish "still loading" from "failed permanently".
+#[derive(Clone)]
+enum InitState {
+    Pending,
+    Ready(Arc<PulseCore>),
+    Failed(String),
+}
+
 pub struct AppState {
-    /// Populated once PulseCore::init completes. Commands await this before proceeding.
-    core_rx: tokio::sync::watch::Receiver<Option<Arc<PulseCore>>>,
+    /// Tracks PulseCore initialization. Commands await this before proceeding.
+    init_rx: tokio::sync::watch::Receiver<InitState>,
     /// Available immediately — before PulseCore is ready. Used by diagnostic commands.
     pub data_dir: std::path::PathBuf,
     pub pending_share: Arc<Mutex<Option<String>>>,
@@ -106,14 +115,19 @@ pub struct AppState {
 impl AppState {
     /// Wait for PulseCore to finish initializing and return a clone of the Arc.
     /// Returns almost instantly on warm calls (watch channel is already set).
-    pub async fn core(&self) -> Arc<PulseCore> {
-        let mut rx = self.core_rx.clone();
+    /// Returns `Err` if initialization failed
+    pub async fn core(&self) -> Result<Arc<PulseCore>, String> {
+        let mut rx = self.init_rx.clone();
         loop {
-            if let Some(c) = rx.borrow().clone() {
-                return c;
+            match rx.borrow().clone() {
+                InitState::Ready(c) => return Ok(c),
+                InitState::Failed(e) => return Err(e),
+                InitState::Pending => {}
             }
             if rx.changed().await.is_err() {
-                panic!("PulseCore init task exited without completing — app cannot continue");
+                let msg = "PulseCore init task exited without completing".to_string();
+                tracing::error!("{msg}");
+                return Err(msg);
             }
         }
     }
@@ -223,11 +237,11 @@ pub fn run() {
                 .with_ai_enabled(ai_enabled);
 
             // Manage AppState immediately so Tauri can start dispatching queued IPC.
-            // Commands await `state.core()` which blocks on core_rx until PulseCore is ready.
-            let (core_tx, core_rx) = tokio::sync::watch::channel::<Option<Arc<PulseCore>>>(None);
+            // Commands await `state.core()` which blocks on init_rx until PulseCore is ready.
+            let (init_tx, init_rx) = tokio::sync::watch::channel(InitState::Pending);
             let pending_share = Arc::new(Mutex::new(None));
             app.manage(AppState {
-                core_rx,
+                init_rx,
                 data_dir,
                 pending_share,
                 log_filter,
@@ -255,12 +269,13 @@ pub fn run() {
                                 tauri::async_runtime::spawn(
                                     async move { core_bg.start_sync().await },
                                 );
-                                let _ = core_tx.send(Some(core));
+                                let _ = init_tx.send(InitState::Ready(core));
                                 tracing::info!("coldstart: PulseCore ready, commands unblocked");
                             }
                             Err(e) => {
-                                tracing::error!("PulseCore init failed: {e}");
-                                // core_tx dropped → channel closed → awaiting commands panic.
+                                let err_msg = format!("PulseCore init failed: {e}");
+                                tracing::error!("{err_msg}");
+                                let _ = init_tx.send(InitState::Failed(err_msg));
                             }
                         }
                     });

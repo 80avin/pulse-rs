@@ -29,6 +29,7 @@ interface BackendItem {
   tags: string[];
   signal: number;
   ogImage: string | null;
+  note: string | null;
 }
 
 interface BackendSource {
@@ -105,6 +106,7 @@ function adaptItem(b: BackendItem): FeedItem {
     saved: b.saved,
     domain: domainOf(b.url),
     ogImage: b.ogImage ?? null,
+    note: b.note ?? undefined,
   };
 }
 
@@ -409,12 +411,13 @@ export function markRead(id: string, read = true) {
   }
 }
 
-export function toggleSaved(id: string) {
+export function toggleSaved(id: string, note?: string) {
   const item = items.find(i => i.id === id);
   if (!item) return;
   item.saved = !item.saved;
+  if (note !== undefined) item.note = note;
   if (IS_TAURI) {
-    tauriInvoke('toggle_saved', { id, saved: item.saved }).catch(e => logger.warn('toggle_saved failed', e));
+    tauriInvoke('toggle_saved', { id, saved: item.saved, note: note ?? item.note }).catch(e => logger.warn('toggle_saved failed', e));
   }
 }
 

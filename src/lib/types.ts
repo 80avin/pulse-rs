@@ -47,6 +47,7 @@ export interface FeedItem {
   dur?: string;
   crossFrom?: string;
   ogImage?: string | null;
+  note?: string;
 }
 
 export type Density = 'dense' | 'normal' | 'roomy';

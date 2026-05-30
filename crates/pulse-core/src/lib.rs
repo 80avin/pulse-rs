@@ -627,11 +627,17 @@ impl PulseCore {
         .await
     }
 
-    pub async fn toggle_saved(&self, item_id: &ItemId, saved: bool) -> Result<(), PulseError> {
+    pub async fn toggle_saved(
+        &self,
+        item_id: &ItemId,
+        saved: bool,
+        note: Option<String>,
+    ) -> Result<(), PulseError> {
         self.update_item_state(
             item_id,
             ItemStatePatch {
                 is_saved: Some(saved),
+                note: Some(note),
                 ..Default::default()
             },
         )

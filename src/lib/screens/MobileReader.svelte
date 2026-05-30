@@ -38,7 +38,7 @@
   let navDir = $state(0);
 
   function onSwipeStart(e: TouchEvent) {
-    if (popoverTag) return;
+    if (popoverTag || noteSheetOpen) return;
     swipeStartX = e.touches[0].clientX;
     swipeStartY = e.touches[0].clientY;
     swipeTracking = true;
@@ -76,6 +76,52 @@
       return () => clearTimeout(timer);
     }
   });
+
+  // Note sheet state
+  let noteSheetOpen = $state(false);
+  let noteDraft = $state('');
+  let saveToast = $state(false);
+  let saveToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Long-press on save button
+  let savePressTimer: ReturnType<typeof setTimeout> | null = null;
+  let saveLongPressed = false;
+
+  function startSavePress() {
+    saveLongPressed = false;
+    savePressTimer = setTimeout(() => {
+      saveLongPressed = true;
+      savePressTimer = null;
+      noteDraft = item?.note ?? '';
+      noteSheetOpen = true;
+    }, 450);
+  }
+  function cancelSavePress() {
+    if (savePressTimer) { clearTimeout(savePressTimer); savePressTimer = null; }
+    saveLongPressed = false;
+  }
+  function endSavePress(e: TouchEvent) {
+    const wasLong = saveLongPressed;
+    cancelSavePress();
+    if (wasLong) {
+      e.preventDefault();
+    } else {
+      toggleSaved(item!.id);
+      showSaveToast();
+    }
+  }
+
+  function showSaveToast() {
+    saveToast = true;
+    if (saveToastTimer) clearTimeout(saveToastTimer);
+    saveToastTimer = setTimeout(() => { saveToast = false; }, 3000);
+  }
+
+  function saveWithNote() {
+    if (!item) return;
+    toggleSaved(item.id, noteDraft.trim() || undefined);
+    noteSheetOpen = false;
+  }
 
   function handleKey(e: KeyboardEvent) {
     // When popover is open, only handle Escape
@@ -177,6 +223,17 @@
         </div>
       </div>
 
+      <!-- Saved note -->
+      {#if item.note}
+        <div style="margin:0 14px;padding:10px 12px;background:{T.bg1};border-left:3px solid {T.amber};border-radius:0 3px 3px 0;font:11px/1.5 {T.mono};color:{T.ink1};white-space:pre-wrap;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <Icon name="bookmark" size={11} color={T.amber} />
+            <span style="font:9px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.4px;">note</span>
+          </div>
+          {item.note}
+        </div>
+      {/if}
+
       <!-- Body -->
       <div style="padding:16px 14px 32px;font:14px/1.6 {T.sans};color:{T.ink0};" class="item-body">
         {#if item.bodyHtml}
@@ -207,26 +264,66 @@
       </div>
     </div>
 
+    <!-- Save toast -->
+    {#if saveToast}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid {T.bd0};background:{T.bg1};font:11px/1 {T.mono};color:{T.ink1};flex-shrink:0;">
+        <span>Saved <span style="color:{T.amber};">{source?.name ?? item.src}</span> post</span>
+        <button
+          onclick={() => { saveToast = false; noteDraft = item?.note ?? ''; noteSheetOpen = true; }}
+          style="background:transparent;border:none;cursor:pointer;font:11px/1 {T.mono};color:{T.cyan};padding:2px 6px;"
+        >
+          add note
+        </button>
+      </div>
+    {/if}
+
     <!-- Action bar -->
     <div style="display:flex;border-top:1px solid {T.bd1};background:{T.bg1};flex-shrink:0;">
-      {#each [
-        { icon: 'check',    label: 'read', key: 'm', active: item.read,  color: T.green, action: () => markRead(item!.id, !item!.read) },
-        { icon: 'bookmark', label: 'save', key: 's', active: item.saved, color: T.amber, action: () => toggleSaved(item!.id) },
-        { icon: 'ext',      label: 'open', key: 'o', active: false,      color: T.cyan,  action: () => item?.url && openExternal(item.url) },
-        { icon: 'eye-off',  label: 'hide', key: 'h', active: false,      color: T.red,   action: () => { hideItem(item!.id); onBack(); } },
-      ] as btn}
-        <button
-          onclick={btn.action}
-          style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{btn.active ? btn.color : T.ink2};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
-          title={btn.icon === 'ext' && item.domain ? `Open https://${item.domain}` : undefined}
-        >
-          <div style="display:flex;align-items:center;gap:4px;">
-            <Icon name={btn.icon} size={16} color={btn.active ? btn.color : T.ink1} />
-            <KeyCap k={btn.key} dim />
-          </div>
-          <span style="text-transform:uppercase;">{btn.label}</span>
-        </button>
-      {/each}
+      <button
+        onclick={() => markRead(item.id, !item.read)}
+        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{item.read ? T.green : T.ink2};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+      >
+        <div style="display:flex;align-items:center;gap:4px;">
+          <Icon name="check" size={16} color={item.read ? T.green : T.ink1} />
+          <KeyCap k="m" dim />
+        </div>
+        <span style="text-transform:uppercase;">{item.read ? 'unread' : 'read'}</span>
+      </button>
+      <button
+        onclick={() => { toggleSaved(item.id); showSaveToast(); }}
+        ontouchstart={startSavePress}
+        ontouchend={endSavePress}
+        ontouchcancel={cancelSavePress}
+        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{item.saved ? T.amber : T.ink2};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+      >
+        <div style="display:flex;align-items:center;gap:4px;">
+          <Icon name="bookmark" size={16} color={item.saved ? T.amber : T.ink1} />
+          {#if item.note}<span style="font:9px/1 {T.mono};color:{T.amber};">*</span>{/if}
+          <KeyCap k="s" dim />
+        </div>
+        <span style="text-transform:uppercase;">{item.saved ? 'saved' : 'save'}</span>
+      </button>
+      <button
+        onclick={() => item.url && openExternal(item.url)}
+        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.ink2};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        title={item.domain ? `Open https://${item.domain}` : undefined}
+      >
+        <div style="display:flex;align-items:center;gap:4px;">
+          <Icon name="ext" size={16} color={T.ink1} />
+          <KeyCap k="o" dim />
+        </div>
+        <span style="text-transform:uppercase;">open</span>
+      </button>
+      <button
+        onclick={() => { hideItem(item.id); onBack(); }}
+        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.red};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+      >
+        <div style="display:flex;align-items:center;gap:4px;">
+          <Icon name="eye-off" size={16} color={T.red} />
+          <KeyCap k="h" dim />
+        </div>
+        <span style="text-transform:uppercase;">hide</span>
+      </button>
     </div>
 
     <!-- Read time strip -->
@@ -270,6 +367,47 @@
           <div style="margin-top:12px;padding-top:10px;border-top:1px solid {T.bd1};display:flex;gap:8px;">
             <button style="flex:1;padding:10px 0;background:transparent;color:{T.ink1};border:1px solid {T.bd2};border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;">flag wrong tag</button>
             <button style="flex:1;padding:10px 0;background:transparent;color:{T.ink1};border:1px solid {T.bd2};border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;">filter out "{popoverTag}"</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Note input sheet -->
+    {#if noteSheetOpen}
+      <div
+        role="button"
+        tabindex="-1"
+        onclick={() => { noteSheetOpen = false; }}
+        onkeydown={(e) => { if (e.key === 'Escape') noteSheetOpen = false; }}
+        style="position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:20;"
+      >
+        <div
+          role="dialog"
+          tabindex="-1"
+          onclick={(e) => e.stopPropagation()}
+          onkeydown={() => {}}
+          style="width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};"
+        >
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.5px;">note</span>
+            <button onclick={() => { noteSheetOpen = false; }} style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
+              <Icon name="x" size={14} />
+            </button>
+          </div>
+          <textarea
+            bind:value={noteDraft}
+            placeholder="Add a note about this post…"
+            style="width:100%;min-height:80px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;padding:10px;font:12px/1.5 {T.sans};color:{T.ink0};resize:vertical;box-sizing:border-box;"
+          ></textarea>
+          <div style="margin-top:12px;display:flex;gap:8px;">
+            <button
+              onclick={() => { noteSheetOpen = false; }}
+              style="flex:1;padding:10px 0;background:transparent;color:{T.ink1};border:1px solid {T.bd2};border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;"
+            >cancel</button>
+            <button
+              onclick={saveWithNote}
+              style="flex:1;padding:10px 0;background:{T.amber};color:{T.bg0};border:none;border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;"
+            >save with note</button>
           </div>
         </div>
       </div>

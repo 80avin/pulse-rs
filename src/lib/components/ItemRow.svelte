@@ -155,7 +155,10 @@
         <span>{item.n}<span style="color:{T.ink3};">c</span></span>
       {/if}
       {#if item.saved}
-        <Icon name="bookmark" size={12} color={T.amber} />
+        <span style="display:inline-flex;align-items:center;gap:1px;">
+          <Icon name="bookmark" size={12} color={T.amber} />
+          {#if item.note}<span style="font:8px/1 {T.mono};color:{T.amber};">*</span>{/if}
+        </span>
       {/if}
       <span style="flex:1;"></span>
       {#if density !== 'dense'}

@@ -39,6 +39,7 @@ pub struct FeedItemDto {
     pub tags: Vec<String>,
     pub og_image: Option<String>,
     pub signal: f64,
+    pub note: Option<String>,
 }
 
 /// Group DTO sent to the frontend
