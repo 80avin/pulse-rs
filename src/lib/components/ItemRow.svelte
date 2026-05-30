@@ -7,14 +7,61 @@
   import SourceGlyph from './SourceGlyph.svelte';
   import Thumb from './Thumb.svelte';
 
-  let { item, source, isFocused = false, density = 'normal', onclick, onTagClick }: {
+  let { item, source, isFocused = false, density = 'normal', onclick, onTagClick, onLongPress }: {
     item: FeedItem;
     source: Source | undefined;
     isFocused?: boolean;
     density?: Density;
     onclick: () => void;
     onTagClick?: (tag: string) => void;
+    onLongPress?: () => void;
   } = $props();
+
+  // Long-press detection (mobile context menu)
+  let pressTimer: ReturnType<typeof setTimeout> | null = null;
+  let longPressed = false;
+  let touchMoved = false;
+  let touchStartX = 0;
+  let touchStartY = 0;
+
+  function startPress(e: TouchEvent) {
+    if (!onLongPress) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchMoved = false;
+    longPressed = false;
+    pressTimer = setTimeout(() => {
+      if (touchMoved) return;
+      longPressed = true;
+      pressTimer = null;
+      onLongPress?.();
+    }, 450);
+  }
+
+  function handleTouchMove(e: TouchEvent) {
+    if (!onLongPress) return;
+    const dx = Math.abs(e.touches[0].clientX - touchStartX);
+    const dy = Math.abs(e.touches[0].clientY - touchStartY);
+    if (dx > 8 || dy > 8) {
+      touchMoved = true;
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    }
+  }
+
+  function cancelPress() {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    touchMoved = false;
+    longPressed = false;
+  }
+
+  function handleTouchEnd(e: TouchEvent) {
+    if (!onLongPress) return;
+    const wasLong = longPressed;
+    cancelPress();
+    if (wasLong) {
+      e.preventDefault();
+    }
+  }
 
   const dim       = $derived(item.read);
   const padY      = $derived(density === 'dense' ? 8 : density === 'roomy' ? 14 : 11);
@@ -27,12 +74,19 @@
   tabindex="0"
   {onclick}
   onkeydown={(e) => { if (e.key === 'Enter') onclick(); }}
+  ontouchstart={startPress}
+  ontouchmove={handleTouchMove}
+  ontouchend={handleTouchEnd}
+  ontouchcancel={cancelPress}
   style="
     position:relative;display:flex;gap:10px;
     padding:{padY}px 12px {padY}px 14px;
     border-bottom:1px solid {T.bd0};cursor:pointer;
     background:{isFocused ? 'rgba(78,205,214,0.05)' : 'transparent'};
     min-height:56px;
+    user-select:none;
+    -webkit-user-select:none;
+    -webkit-touch-callout:none;
   "
 >
   <!-- Unread / focus indicator -->
