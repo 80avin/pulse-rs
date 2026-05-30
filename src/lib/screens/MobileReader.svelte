@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { T, TAG_COLORS } from '$lib/tokens';
   import { items, sources, markRead, toggleSaved, hideItem, aiStatus } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
@@ -24,7 +25,7 @@
 
   let popoverTag = $state<string | null>(null);
 
-  $effect(() => { if (itemId && settings.markReadOn === 'open') markRead(itemId); });
+  $effect(() => { if (itemId && settings.markReadOn === 'open') { untrack(() => markRead(itemId)); } });
 
   function goNext() { if (hasNext) onNavigate(allIds[idx + 1]); }
   function goPrev() { if (hasPrev) onNavigate(allIds[idx - 1]); }
