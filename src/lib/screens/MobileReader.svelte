@@ -29,6 +29,54 @@
   function goNext() { if (hasNext) onNavigate(allIds[idx + 1]); }
   function goPrev() { if (hasPrev) onNavigate(allIds[idx - 1]); }
 
+  // Swipe gesture state
+  let swipeX = $state(0);
+  let swipeTransition = $state(false);
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let swipeTracking = false;
+  let navDir = $state(0);
+
+  function onSwipeStart(e: TouchEvent) {
+    if (popoverTag) return;
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+    swipeTracking = true;
+    swipeTransition = false;
+  }
+
+  function onSwipeMove(e: TouchEvent) {
+    if (!swipeTracking || popoverTag) return;
+    const dx = e.touches[0].clientX - swipeStartX;
+    const dy = e.touches[0].clientY - swipeStartY;
+    if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 8) return;
+    swipeX = dx * 0.5;
+  }
+
+  function onSwipeEnd(e: TouchEvent) {
+    if (!swipeTracking) return;
+    swipeTracking = false;
+    swipeTransition = true;
+    const threshold = 60;
+    const w = typeof window !== 'undefined' ? window.innerWidth : 400;
+    if (swipeX > threshold && hasPrev) {
+      swipeX = w;
+      setTimeout(() => { goPrev(); swipeX = 0; swipeTransition = false; navDir = -1; }, 180);
+    } else if (swipeX < -threshold && hasNext) {
+      swipeX = -w;
+      setTimeout(() => { goNext(); swipeX = 0; swipeTransition = false; navDir = 1; }, 180);
+    } else {
+      swipeX = 0;
+    }
+  }
+
+  $effect(() => {
+    if (navDir !== 0) {
+      const timer = setTimeout(() => { navDir = 0; }, 250);
+      return () => clearTimeout(timer);
+    }
+  });
+
   function handleKey(e: KeyboardEvent) {
     // When popover is open, only handle Escape
     if (popoverTag) {
@@ -70,7 +118,15 @@
     </div>
 
     <!-- Scrollable body -->
-    <div style="flex:1;overflow-y:auto;">
+    <div
+      style="flex:1;overflow-y:auto;touch-action:pan-y;
+        transform: translateX({navDir ? 0 : swipeX}px);
+        transition: transform {swipeTransition && !navDir ? '0.2s ease-out' : 'none'};
+        animation: {navDir > 0 ? 'reader-slide-in-next' : navDir < 0 ? 'reader-slide-in-prev' : 'none'} 0.22s ease-out;"
+      ontouchstart={onSwipeStart}
+      ontouchmove={onSwipeMove}
+      ontouchend={onSwipeEnd}
+    >
       <!-- Header -->
       <div style="padding:12px 14px;border-bottom:1px solid {T.bd0};">
         <div style="display:flex;align-items:center;gap:8px;font:10px/1 {T.mono};color:{T.ink2};">
