@@ -5,10 +5,12 @@
   import Icon from '$lib/components/Icon.svelte';
   import AiPanelContent from '$lib/components/AiPanelContent.svelte';
 
-  let { tab, onTabChange, onTagFilter }: {
+  let { tab, onTabChange, onTagFilter, onItemOpen, onSourceFilter }: {
     tab: string;
     onTabChange: (id: string) => void;
     onTagFilter?: (tag: string) => void;
+    onItemOpen?: (id: string, ids: string[]) => void;
+    onSourceFilter?: (sourceId: string) => void;
   } = $props();
 
   const modeColor = $derived(
@@ -30,7 +32,7 @@
   </div>
 
   <div style="flex:1;overflow-y:auto;padding:12px 10px;">
-    <AiPanelContent compact={false} {onTagFilter} />
+    <AiPanelContent compact={false} {onTagFilter} onItemClick={onItemOpen} {onSourceFilter} />
     <div style="height:12px;"></div>
   </div>
 

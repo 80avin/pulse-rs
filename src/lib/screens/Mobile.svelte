@@ -125,7 +125,7 @@
         onOpen={openItem}
       />
     {:else if tab === 'ai'}
-      <MobileAI {tab} onTabChange={changeTab} onTagFilter={handleTagFilter} />
+      <MobileAI {tab} onTabChange={changeTab} onTagFilter={handleTagFilter} onItemOpen={openItem} onSourceFilter={openSourceFeed} />
     {:else if tab === 'settings'}
       <MobileSettings {tab} onTabChange={changeTab} />
     {:else}

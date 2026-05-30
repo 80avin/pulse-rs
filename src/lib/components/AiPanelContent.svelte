@@ -3,13 +3,12 @@
   import { items, sources, aiStatus, models, taggingProgress, downloadModel, deleteModel, activateModel, retagAll, reloadAiInfo } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
-  import Icon from '$lib/components/Icon.svelte';
   import ScoreBar from '$lib/components/ScoreBar.svelte';
   import TagChip from '$lib/components/TagChip.svelte';
 
   const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
 
-  let { compact = false, onTagFilter }: { compact?: boolean; onTagFilter?: (tag: string) => void } = $props();
+  let { compact = false, onTagFilter, onItemClick, onSourceFilter }: { compact?: boolean; onTagFilter?: (tag: string) => void; onItemClick?: (id: string, ids: string[]) => void; onSourceFilter?: (sourceId: string) => void } = $props();
 
   const taggedItems = $derived(items.filter(i => i.tags.length > 0));
 
@@ -260,16 +259,32 @@
       <div style="display:flex;flex-direction:column;gap:0;">
         {#each highSignal.filter(i => i.aiScore > 0) as item, i}
           {@const source = sources.find(s => s.id === item.src)}
-          <div style="{i > 0 ? `padding-top:10px;margin-top:10px;border-top:1px solid ${T.bd0};` : ''}">
+          {@const signalIds = highSignal.filter(i => i.aiScore > 0).map(i => i.id)}
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <div
+            role="button"
+            tabindex="0"
+            onclick={() => onItemClick?.(item.id, signalIds)}
+            onkeydown={(e) => { if (e.key === 'Enter') onItemClick?.(item.id, signalIds); }}
+            style="{i > 0 ? `padding-top:10px;margin-top:10px;border-top:1px solid ${T.bd0};` : ''}cursor:pointer;"
+          >
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
               <ScoreBar value={item.aiScore} w={28} />
               <span style="font:10px/1 {T.mono};color:{T.amber};font-variant-numeric:tabular-nums;">{item.aiScore.toFixed(2)}</span>
-              {#if source}<span style="font:10px/1 {T.mono};color:{T.ink3};">· {source.name}</span>{/if}
+              {#if source}
+                <button
+                  onclick={(e) => { e.stopPropagation(); onSourceFilter?.(source.id); }}
+                  style="font:10px/1 {T.mono};color:{T.ink3};background:transparent;border:none;cursor:pointer;padding:0;"
+                  title="Filter by {source.name}"
+                >
+                  · {source.name}
+                </button>
+              {/if}
             </div>
             <div style="font:12px/1.3 {T.mono};color:{T.ink0};overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">{item.title}</div>
             {#if item.tags.length > 0}
               <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;">
-                {#each item.tags.slice(0, 3) as tag}<TagChip {tag} size={9} />{/each}
+                {#each item.tags.slice(0, 3) as tag}<TagChip {tag} size={9} onclick={() => onTagFilter?.(tag)} />{/each}
               </div>
             {/if}
           </div>

@@ -665,7 +665,7 @@
           {/if}
 
           <!-- Shared AI content (model status, download, tag distribution) -->
-          <AiPanelContent compact onTagFilter={setActiveTag} />
+          <AiPanelContent compact onTagFilter={setActiveTag} onItemClick={(id, ids) => { openItemAndRead(id); }} onSourceFilter={(id) => { activeSource = activeSource === id ? null : id; showAI = false; }} />
 
         </div>
       </div>
