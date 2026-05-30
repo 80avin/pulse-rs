@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
-  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, createGroup, syncState, aiStatus, taggingProgress, loadingMore, loadMoreItems, searchItems, hasPrecedingItems } from '$lib/store.svelte';
+  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, createGroup, syncState, taggingProgress, loadingMore, loadMoreItems, searchItems, hasPrecedingItems } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, sanitizeHtml } from '$lib/utils';
   import Icon from '$lib/components/Icon.svelte';
@@ -24,13 +24,6 @@
   let dragging       = $state<'left' | 'timeline' | null>(null);
   let dragStartX     = 0;
   let dragStartW     = 0;
-
-  function startDrag(which: 'left' | 'timeline', e: MouseEvent) {
-    dragging = which;
-    dragStartX = e.clientX;
-    dragStartW = which === 'left' ? leftRailWidth : timelineWidth;
-    e.preventDefault();
-  }
 
   function onMouseMove(e: MouseEvent) {
     if (!dragging) return;
@@ -82,10 +75,6 @@
   }
 
   const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
-  async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<T>(cmd, args);
-  }
 
   $effect(() => { activeGroup; activeSource = null; });
 
@@ -574,7 +563,7 @@
 
           <!-- External link for Reddit link posts -->
           {#if openItem.externalUrl}
-            {@const extDomain = (() => { try { return new URL(openItem.externalUrl).hostname.replace(/^www\./, ''); } catch { return openItem.externalUrl; } })()}
+
             <button
               onclick={() => openExternal(openItem!.externalUrl!)}
               style="margin-top:4px;display:block;font:11px/1.4 {T.mono};color:{T.cyan};background:transparent;border:none;cursor:pointer;padding:0;text-align:left;"
@@ -708,7 +697,7 @@
           {/if}
 
           <!-- Shared AI content (model status, download, tag distribution) -->
-          <AiPanelContent compact onTagFilter={setActiveTag} onItemClick={(id, ids) => { openItemAndRead(id); }} onSourceFilter={(id) => { activeSource = activeSource === id ? null : id; showAI = false; }} />
+          <AiPanelContent compact onTagFilter={setActiveTag} onItemClick={(id) => { openItemAndRead(id); }} onSourceFilter={(id) => { activeSource = activeSource === id ? null : id; showAI = false; }} />
 
         </div>
       </div>
@@ -875,7 +864,7 @@
               { k: 'a',       desc: 'AI signal panel'   },
               { k: '?',       desc: 'this cheatsheet'   },
               { k: 'Esc',     desc: 'clear / back'      },
-            ] as sc, i}
+            ] as sc}
               <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid {T.bd0};">
                 <KeyCap k={sc.k} />
                 <span style="font:11px/1 {T.mono};color:{T.ink2};">{sc.desc}</span>

@@ -53,7 +53,7 @@
     swipeX = dx * 0.5;
   }
 
-  function onSwipeEnd(e: TouchEvent) {
+  function onSwipeEnd(_e: TouchEvent) {
     if (!swipeTracking) return;
     swipeTracking = false;
     swipeTransition = true;
