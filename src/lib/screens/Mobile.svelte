@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { T } from '$lib/tokens';
-  import { storeReady } from '$lib/store.svelte';
+  import { storeReady, setFeedFilter, setTagFilter } from '$lib/store.svelte';
   import MobileTimeline from './MobileTimeline.svelte';
   import MobileReader from './MobileReader.svelte';
   import MobileSources from './MobileSources.svelte';
@@ -11,25 +11,22 @@
 
   let tab = $state('timeline');
   let openItemId = $state<string | null>(null);
-  let filterSource = $state<string | null>(null);
   let timelineIds = $state<string[]>([]);
-  let activeTag = $state<string | null>(null);
 
   // ── History-based back navigation ──────────────────────────────────────────
   // Each navigation pushes a browser history entry so the Android system back
   // button unwinds in-app navigation instead of immediately exiting the app.
 
-  type NavState = { tab: string; openItemId: string | null; filterSource: string | null };
+  type NavState = { tab: string; openItemId: string | null };
 
   onMount(() => {
     // Seed the initial history entry so back-from-home exits correctly.
-    history.replaceState({ tab: 'timeline', openItemId: null, filterSource: null } satisfies NavState, '');
+    history.replaceState({ tab: 'timeline', openItemId: null } satisfies NavState, '');
 
     function handlePop(e: PopStateEvent) {
       const s = e.state as NavState | null;
-      tab          = s?.tab          ?? 'timeline';
-      openItemId   = s?.openItemId   ?? null;
-      filterSource = s?.filterSource ?? null;
+      tab        = s?.tab        ?? 'timeline';
+      openItemId = s?.openItemId ?? null;
     }
 
     window.addEventListener('popstate', handlePop);
@@ -37,43 +34,35 @@
   });
 
   function changeTab(newTab: string) {
-    if (newTab === tab && !openItemId && !filterSource) return;
-    history.pushState({ tab: newTab, openItemId: null, filterSource: null } satisfies NavState, '');
+    if (newTab === tab && !openItemId) return;
+    history.pushState({ tab: newTab, openItemId: null } satisfies NavState, '');
     tab = newTab;
     openItemId = null;
-    filterSource = null;
   }
 
   function handleTagFilter(tag: string) {
-    activeTag = activeTag === tag ? null : tag;
+    setTagFilter(tag);
     // Navigate to timeline to show the filtered results
-    history.pushState({ tab: 'timeline', openItemId: null, filterSource: null } satisfies NavState, '');
+    history.pushState({ tab: 'timeline', openItemId: null } satisfies NavState, '');
     tab = 'timeline';
     openItemId = null;
-    filterSource = null;
   }
 
   function openItem(id: string, ids: string[]) {
-    history.pushState({ tab, openItemId: id, filterSource } satisfies NavState, '');
+    history.pushState({ tab, openItemId: id } satisfies NavState, '');
     openItemId = id;
     timelineIds = ids;
   }
 
   function openSourceFeed(sourceId: string) {
-    history.pushState({ tab: 'timeline', openItemId: null, filterSource: sourceId } satisfies NavState, '');
-    filterSource = sourceId;
+    setFeedFilter(sourceId);
+    history.pushState({ tab: 'timeline', openItemId: null } satisfies NavState, '');
     tab = 'timeline';
   }
 
   // Immediate visual update then sync history — popstate will confirm the state
   function goBack() {
     openItemId = null;
-    history.back();
-  }
-
-  // Clear source filter by unwinding to the screen that set it (usually Sources)
-  function clearSourceFilter() {
-    filterSource = null;
     history.back();
   }
 </script>
@@ -104,13 +93,8 @@
     {:else if tab === 'timeline'}
       <MobileTimeline
         {tab}
-        {filterSource}
-        {activeTag}
         onTabChange={changeTab}
         onOpen={openItem}
-        onClearSourceFilter={clearSourceFilter}
-        onClearTagFilter={() => { activeTag = null; }}
-        onTagFilter={handleTagFilter}
       />
     {:else if tab === 'sources'}
       <MobileSources

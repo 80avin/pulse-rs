@@ -156,6 +156,15 @@ export const loadingMore = $state({
 /** True when the items array was trimmed to stay under MAX_CACHED_ITEMS. */
 export const hasPrecedingItems = $state({ value: false });
 
+/** The active server-side filter applied to `items`. All three are sent to
+ *  get_items_page. When a filter changes the cursor is reset and page 1 is
+ *  re-fetched — `items` always reflects exactly this filter. */
+export const timelineFilter = $state<{
+  groupId: string | null;
+  feedId: string | null;
+  tag: string | null;
+}>({ groupId: null, feedId: null, tag: null });
+
 const MAX_CACHED_ITEMS = 500;
 const EVICT_COUNT = 100;
 
@@ -203,9 +212,33 @@ interface BackendPage {
   nextCursor: { publishedAt: number; itemId: string } | null;
 }
 
-// --- Internal reload helpers ---
+// --- Internal helpers ---
+
+/** Build the filter args object for get_items_page. */
+function filterArgs(limit: number, cursor?: { publishedAt: number; itemId: string } | null) {
+  return {
+    groupId: timelineFilter.groupId ?? null,
+    feedId: timelineFilter.feedId ?? null,
+    tag: timelineFilter.tag ?? null,
+    limit,
+    cursor: cursor
+      ? { publishedAt: cursor.publishedAt, itemId: cursor.itemId }
+      : null,
+  };
+}
+
+/** Fetch page 1 with the current timeline filter and replace `items`. */
+async function resetAndFetch(): Promise<void> {
+  if (!IS_TAURI) return;
+  loadingMore.cursor = null;
+  const page = await tauriInvoke<BackendPage>('get_items_page', filterArgs(100));
+  items.splice(0, items.length, ...page.items.map(adaptItem));
+  loadingMore.cursor = page.nextCursor ?? null;
+  hasPrecedingItems.value = false;
+}
+
 async function reloadItems(): Promise<void> {
-  const page = await tauriInvoke<BackendPage>('get_items_page', { limit: 100 });
+  const page = await tauriInvoke<BackendPage>('get_items_page', filterArgs(100));
   items.splice(0, items.length, ...page.items.map(adaptItem));
   loadingMore.cursor = page.nextCursor ?? null;
 }
@@ -362,20 +395,14 @@ export async function doSync(): Promise<void> {
   }
 }
 
-/** Fetch the next page of items and append them to the `items` array.
+/** Fetch the next page matching the current timelineFilter and append to `items`.
  * Evicts the oldest EVICT_COUNT items when the array exceeds MAX_CACHED_ITEMS
  * to keep the JS heap bounded. Use FTS search to find older items. */
-export async function loadMoreItems(groupId?: string): Promise<void> {
+export async function fetchNextPage(): Promise<void> {
   if (!IS_TAURI || !loadingMore.cursor || loadingMore.active) return;
   loadingMore.active = true;
   try {
-    const page = await tauriInvoke<BackendPage>('get_items_page', {
-      groupId: groupId ?? null,
-      limit: 100,
-      cursor: loadingMore.cursor
-        ? { publishedAt: loadingMore.cursor.publishedAt, itemId: loadingMore.cursor.itemId }
-        : null,
-    });
+    const page = await tauriInvoke<BackendPage>('get_items_page', filterArgs(100, loadingMore.cursor));
     items.push(...page.items.map(adaptItem));
     if (items.length > MAX_CACHED_ITEMS) {
       items.splice(0, EVICT_COUNT);
@@ -383,10 +410,34 @@ export async function loadMoreItems(groupId?: string): Promise<void> {
     }
     loadingMore.cursor = page.nextCursor ?? null;
   } catch (e) {
-    logger.warn('loadMoreItems failed', e);
+    logger.warn('fetchNextPage failed', e);
   } finally {
     loadingMore.active = false;
   }
+}
+
+/** ── Filter setters ─────────────────────────────────────────────────────
+ *  Each updates timelineFilter, resets the cursor, and fetches page 1.
+ *  Screens call these instead of filtering items[] client-side. */
+
+/** Show items from a single feed source. Clears group-level filter. */
+export async function setFeedFilter(feedId: string | null): Promise<void> {
+  timelineFilter.feedId = feedId;
+  if (feedId) timelineFilter.groupId = null;
+  await resetAndFetch();
+}
+
+/** Show items from feeds belonging to a group. Clears feed-level filter. */
+export async function setGroupFilter(groupId: string | null): Promise<void> {
+  timelineFilter.groupId = groupId;
+  timelineFilter.feedId = null;
+  await resetAndFetch();
+}
+
+/** Show items tagged with a specific AI tag. Composes with group/feed filters. */
+export async function setTagFilter(tag: string | null): Promise<void> {
+  timelineFilter.tag = tag;
+  await resetAndFetch();
 }
 
 export function markRead(id: string, read = true) {

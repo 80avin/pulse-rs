@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
-  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, createGroup, syncState, taggingProgress, loadingMore, loadMoreItems, searchItems, hasPrecedingItems } from '$lib/store.svelte';
+  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, createGroup, syncState, taggingProgress, loadingMore, fetchNextPage, searchItems, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, sanitizeHtml } from '$lib/utils';
   import Icon from '$lib/components/Icon.svelte';
@@ -74,9 +74,36 @@
     get(listVirtualizer).measureElement(el);
   }
 
-  const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
+  // Infinite scroll: listen for scroll near bottom of listScrollEl.
+  $effect(() => {
+    const el = listScrollEl;
+    if (!el) return;
 
-  $effect(() => { activeGroup; activeSource = null; });
+    function onScroll() {
+      if (!loadingMore.cursor || loadingMore.active) return;
+      const e = el as HTMLElement;
+      const d = e.scrollHeight - e.scrollTop - e.clientHeight;
+      if (d < 300) fetchNextPage();
+    }
+
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  });
+
+  // After the virtualizer layout is done (items populated, count set),
+  // check if the list is too short to scroll — if so, fetch more.
+  $effect(() => {
+    if (filteredItems.length === 0) return;
+    if (!listScrollEl || !loadingMore.cursor || loadingMore.active) return;
+    requestAnimationFrame(() => {
+      if (!listScrollEl || !loadingMore.cursor || loadingMore.active) return;
+      if (listScrollEl.scrollHeight <= listScrollEl.clientHeight + 100) {
+        fetchNextPage();
+      }
+    });
+  });
+
+  const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
 
   // FTS backend search — debounced 300ms, only in Tauri context.
   $effect(() => {
@@ -101,11 +128,6 @@
     if (IS_TAURI && ftsResults !== null && searchQuery.trim()) return ftsResults;
 
     let list = items as typeof items;
-    if (activeGroup !== 'all') {
-      const ids = new Set(sources.filter(s => s.group === activeGroup).map(s => s.id));
-      list = list.filter(i => ids.has(i.src));
-    }
-    if (activeSource) list = list.filter(i => i.src === activeSource);
     if (!IS_TAURI && searchQuery.trim()) {
       // Client-side fallback for browser dev mode only.
       const q = searchQuery.toLowerCase();
@@ -116,26 +138,30 @@
     if (desktopFilter === 'unread') list = list.filter(i => !i.read);
     else if (desktopFilter === 'saved') list = list.filter(i => i.saved);
     else if (desktopFilter === 'signal') list = list.filter(i => i.aiScore >= settings.confidenceThreshold);
-    if (activeTag) list = list.filter(i => i.tags.includes(activeTag!));
     return list;
   });
 
   const openItem    = $derived(items.find(i => i.id === openId));
   const openSource  = $derived(openItem ? sources.find(s => s.id === openItem.src) : undefined);
-  const unreadCount = $derived(filteredItems.filter(i => !i.read).length);
-  const taggedCount = $derived(filteredItems.filter(i => i.tags.length > 0).length);
+  const unreadCount = $derived(items.filter(i => !i.read).length);
+  const taggedCount = $derived(items.filter(i => i.tags.length > 0).length);
 
-  // Top 5 tags by frequency across the current filtered list
+  // Top 5 tags by frequency across loaded items.
   const topTags = $derived.by(() => {
     const tagCounts: Record<string, number> = {};
-    for (const item of filteredItems) {
+    for (const item of items) {
       for (const t of item.tags) tagCounts[t] = (tagCounts[t] ?? 0) + 1;
     }
     return Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t]) => t);
   });
 
-  function selectGroup(id: string) { activeGroup = id; searchQuery = ''; activeTag = null; }
-  function setActiveTag(tag: string) { activeTag = activeTag === tag ? null : tag; showAI = false; }
+  function selectGroup(id: string) { activeGroup = id; activeSource = null; searchQuery = ''; setGroupFilter(id === 'all' ? null : id); }
+  function setActiveTag(tag: string) {
+    const next = activeTag === tag ? null : tag;
+    activeTag = next;
+    setTagFilter(next);
+    showAI = false;
+  }
 
   function openItemAndRead(id: string) {
     openId = id;
@@ -367,7 +393,11 @@
       <div style="flex:1;overflow-y:auto;">
         {#each railSources as s}
           <button
-            onclick={() => { activeSource = activeSource === s.id ? null : s.id; }}
+            onclick={() => {
+              const next = activeSource === s.id ? null : s.id;
+              activeSource = next;
+              setFeedFilter(next);
+            }}
             style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:4px 12px;width:100%;background:{activeSource === s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {activeSource === s.id ? T.cyan : 'transparent'};font:11px/1.2 {T.mono};cursor:pointer;text-align:left;"
             title="{s.name}{s.status === 'error' ? ' — sync error' : s.status === 'stale' ? ' — stale' : ''}{s.failureStreak > 0 ? ` (${s.failureStreak} consecutive failures)` : ''}"
           >
@@ -489,27 +519,9 @@
               {/if}
             {/each}
           </div>
-          {#if hasPrecedingItems.value}
-            <div style="padding:6px 12px;font:9px/1 {T.mono};color:{T.ink3};text-align:center;border-top:1px solid {T.bd0};">
-              older items evicted · use search to find them
-            </div>
-          {/if}
           {#if loadingMore.cursor}
-            <div style="padding:10px 12px 14px;display:flex;justify-content:center;">
-              <button
-                onclick={() => loadMoreItems(activeGroup !== 'all' ? activeGroup : undefined)}
-                disabled={loadingMore.active}
-                style="
-                  padding:6px 20px;
-                  background:{T.bg1};
-                  border:1px solid {T.bd1};
-                  border-radius:3px;
-                  font:10px/1 {T.mono};
-                  color:{loadingMore.active ? T.ink3 : T.ink1};
-                  cursor:{loadingMore.active ? 'default' : 'pointer'};
-                  letter-spacing:0.3px;
-                "
-              >{loadingMore.active ? 'loading…' : 'load more'}</button>
+            <div style="height:36px;display:flex;align-items:center;justify-content:center;font:10px/1 {T.mono};color:{T.ink3};">
+              {loadingMore.active ? 'loading…' : ''}
             </div>
           {/if}
         {/if}
@@ -697,7 +709,7 @@
           {/if}
 
           <!-- Shared AI content (model status, download, tag distribution) -->
-          <AiPanelContent compact onTagFilter={setActiveTag} onItemClick={(id) => { openItemAndRead(id); }} onSourceFilter={(id) => { activeSource = activeSource === id ? null : id; showAI = false; }} />
+          <AiPanelContent compact onTagFilter={setActiveTag} onItemClick={(id) => { openItemAndRead(id); }} onSourceFilter={(id) => { const next = activeSource === id ? null : id; activeSource = next; setFeedFilter(next); showAI = false; }} />
 
         </div>
       </div>

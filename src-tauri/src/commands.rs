@@ -290,6 +290,7 @@ pub async fn update_source(
 
 /// Cursor input from the frontend for paginated timeline requests.
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CursorInput {
     pub published_at: i64,
     pub item_id: String,
