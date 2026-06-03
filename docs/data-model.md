@@ -258,7 +258,7 @@ CREATE TRIGGER feed_items_fts_update AFTER UPDATE OF body_text, title, author ON
 END;
 ```
 
-We use `content=` mode to avoid duplicating data. The triggers keep the FTS index synchronized. Note: `UPDATE` triggers are omitted intentionally — `feed_items` rows are immutable after insert (only `item_states` changes). If body_text ever needs updating (e.g., fetching full article content), an UPDATE trigger must be added.
+We use `content=` mode to avoid duplicating data. FTS inserts are done manually in application code (the INSERT trigger was removed to prevent phantom entries from ignored rows). Only the DELETE trigger keeps the index synchronized. `feed_items` rows are immutable after insert (only `item_states` changes). If body_text ever needs updating (e.g., fetching full article content), an UPDATE trigger must be added.
 
 ## ID Generation
 

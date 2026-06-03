@@ -267,10 +267,8 @@ Key constraints:
 
 ## Known Architecture Risks
 
-1. **SQLite write contention**: Single-writer model. If sync tasks and user actions try to write simultaneously, the `Mutex<Connection>` becomes a bottleneck. Mitigation: WAL mode reduces this significantly. If it remains an issue in benchmarks, consider a dedicated writer task with a command channel.
+1. **SQLite write contention**: Single-writer actor model. All writes go through a dedicated DB writer task via an mpsc command channel. This eliminates contention between sync tasks and user actions. Reads use a separate connection pool and never block writers.
 
-2. **ONNX Runtime size on Android**: The ORT native library is ~6-8MB. This significantly increases APK size. Mitigation: use quantized models (q8 or q4f16), consider dynamic linking to system ORT if available on the device.
+2. **ONNX Runtime size on Android**: The ORT native library is ~6-8MB. This significantly increases APK size. Mitigation: use quantized models, consider dynamic linking to system ORT if available.
 
-3. **Reddit JSON API reliability**: Reddit's unofficial JSON endpoint is not guaranteed to remain available. Mitigation: treat Reddit as a best-effort source; design the feed health system to gracefully handle source instability. OAuth support in Phase 2 provides a fallback.
-
-4. **Background sync on Android**: Tauri 2 on Android provides no first-class equivalent of Android `WorkManager` or `JobScheduler`. Tauri runs as an Activity; when backgrounded, the process can be killed within minutes. **Phase 1-2 sync is foreground-only** — sync runs only while the app (CLI or Tauri) is in the foreground. True background sync on Android requires a Kotlin plugin that registers a `WorkManager` periodic task; this is explicitly planned as a Phase 3 prerequisite and is a significant implementation effort. Mitigation for Phase 1-2: the sync model is fully resumable, so each feed-open triggers a fresh sync, and previously-fetched content is always available offline.
+3. **Reddit JSON API reliability**: Reddit's unofficial JSON endpoint is not guaranteed to remain available. Mitigation: treat Reddit as a best-effort source; the OAuth2 script-app flow provides a fallback; the feed health system handles source instability gracefully.

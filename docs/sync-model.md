@@ -280,18 +280,16 @@ TaggingTask (singleton)
 
 ## Concurrency Model
 
-All DB writes go through a single `Arc<Mutex<Connection>>`. This is intentionally simple.
+All DB writes go through a single-writer actor task (`db_writer_task`). Read operations use a separate connection pool.
 
-Why not a connection pool?
+Why an actor instead of a connection pool?
 - SQLite with WAL allows multiple concurrent readers but only one writer
 - A pool of connections would still serialize on writes
-- The overhead of pool management outweighs any benefit for our workload
-- Single connection eliminates a class of "writer starved by readers" bugs
+- The actor pattern eliminates contention: writes are queued via an mpsc channel
+- Readers never block waiting for writers, and vice versa
 
-Performance concern: if sync tasks + user actions contend on the mutex, the user experiences lag. Mitigation:
-1. All DB calls use `spawn_blocking`, so they don't block the Tokio executor
-2. Individual DB operations are fast (microseconds); the lock isn't held across HTTP fetches
-3. If benchmarks show contention, a separate `WriteQueue` actor pattern can be introduced
+The actor holds the sole write connection; consumers send `DbCommand` messages via mpsc.
+Individual DB operations are fast (microseconds); the actor never holds the connection across HTTP fetches.
 
 ## Sync Error Taxonomy
 

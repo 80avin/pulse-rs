@@ -93,12 +93,11 @@ Tags flow through four layers, executed in order:
 1. **`RuleEngine`** — deterministic structural rules → tags like `show-hn`, `job-posting`, `paywall`, `video`, `low-effort`
 2. **`FastTextTagger`** — 9.6 MB supervised .ftz classifier, <1 ms/item; bundled in the binary and extracted on first run
 3. **`MiniMlTagger`** — MiniLM-L6 ONNX + 201 KB MLP head; semantic classification for nuanced categories
-4. **`OnnxTagger`** (legacy) — DeBERTa NLI cross-encoder (35 MB quantized); zero-shot but slow; kept for compatibility
-5. **`VisionTagger`** — CLIP ViT-B/32 for image-only posts (no text body)
+4. **`VisionTagger`** — CLIP/MobileCLIP for image-only posts (no text body)
 
-Active combination is set by `TextBackend` enum in `PulseConfig`. Default is `HybridFastTextMiniMl`. Models can be hot-reloaded (`reload_*_tagger()`) without restarting the app. FastText + MiniLM MLP head are bundled as `include_bytes!` in `src-tauri/src/lib.rs`; CLIP and full MiniLM ONNX are downloaded on demand.
+Active combination is set by `TextBackend` enum in `PulseConfig`. Default is `HybridFastTextMiniMl`. Models can be hot-reloaded (`reload_*_tagger()`) without restarting the app. FastText + MiniLM MLP head are bundled as `include_bytes!` in `src-tauri/src/lib.rs`; vision and full MiniLM ONNX are downloaded on demand.
 
-**Tag vocabulary (22 tags):**
+**Tag vocabulary (20 tags):**
 
 | Tag | Source | Description |
 |---|---|---|
@@ -209,7 +208,7 @@ Before proposing any fix or change, ask: is this addressing the root cause, or p
 
 ### Research → critique → implement
 
-For non-trivial changes, use subagents to research and critique the approach before writing code. This is especially important for: schema changes, AI pipeline modifications, sync scheduling logic, and Tauri command additions. The workflow is documented in `feedback-workflow.md` memory.
+For non-trivial changes, use subagents to research and critique the approach before writing code. This is especially important for: schema changes, AI pipeline modifications, sync scheduling logic, and Tauri command additions.
 
 ### Tauri command additions
 
