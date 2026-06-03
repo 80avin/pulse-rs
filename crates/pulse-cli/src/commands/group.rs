@@ -151,16 +151,7 @@ async fn cmd_delete(args: GroupDeleteArgs, core: &PulseCore) -> anyhow::Result<(
         }
     }
 
-    // SQLite doesn't have a direct delete_group method on DbHandle,
-    // so we use the reader pool workaround via raw SQL through the writer
-    // We'll create a minimal group with an impossible sort_order as a deletion marker.
-    // Actually, we need to insert a FeedGroup to "delete" — let's use the upsert
-    // approach: upsert with a sentinel name and then the application just ignores it.
-    // Better: Use the DbHandle's upsert to overwrite with a blank placeholder.
-    // Since there's no delete_group API, we'll just warn.
-    // The group row stays in the DB but all feeds are ungrouped.
-    // This is acceptable for Phase 1.
-    let _ = group; // keep borrow checker happy
+    core.delete_feed_group(&group.id).await?;
     println!("group '{}' deleted (feeds ungrouped)", args.name);
     Ok(())
 }

@@ -15,8 +15,8 @@ use tokio::sync::mpsc;
 use crate::ai::tagger::TagRequest;
 use crate::ai::tagger::process_tag_request;
 use crate::ai::{
-    FastTextTagger, MiniMlTagger, ModelHandle, RuleEngine, TAGGER_QUEUE_SIZE,
-    TaggerHandle, VisionTagger, default_rules, tagger_task,
+    FastTextTagger, MiniMlTagger, ModelHandle, RuleEngine, TAGGER_QUEUE_SIZE, TaggerHandle,
+    VisionTagger, default_rules, tagger_task,
 };
 use crate::config::PulseConfig;
 use crate::error::PulseError;
@@ -415,9 +415,12 @@ impl PulseCore {
             }
 
             let body_text = result.og_description.clone();
-            let _ = db
+            if let Err(e) = db
                 .enrich_item(result.item_id.clone(), body_text, patch)
-                .await;
+                .await
+            {
+                tracing::warn!(item_id = %result.item_id, error = %e, "Failed to write enrichment result");
+            }
 
             // Re-queue for tagging if og_image was acquired — the vision tagger
             // needs the image URL which wasn't available at initial sync time.

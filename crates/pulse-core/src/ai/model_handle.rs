@@ -53,16 +53,20 @@ impl<T: Send + Sync + 'static> ModelHandle<T> {
     /// If the model slot is empty, triggers a background reload (once; no double-spawn)
     /// and returns `None` for this call. Subsequent calls will return the loaded model.
     pub fn snapshot(&self) -> Option<Arc<T>> {
-        let model = self.inner.read().unwrap().clone();
+        let model = self.inner.read().ok()?.clone();
         if let Some(arc) = model {
             self.last_used.store(now_secs(), Ordering::Relaxed);
             return Some(arc);
         }
-        // Trigger a background reload if no reload is already in flight.
         if !self.pending_reload.swap(true, Ordering::AcqRel) {
             let handle = self.clone();
             tokio::task::spawn_blocking(move || {
-                if let Some(model) = (handle.loader)() {
+                let loaded = (handle.loader)();
+                if loaded.is_some() && handle.inner.read().is_ok_and(|x| x.is_some()) {
+                    handle.pending_reload.store(false, Ordering::Release);
+                    return;
+                }
+                if let Some(model) = loaded {
                     handle.store(model);
                     tracing::info!("Model reloaded on demand");
                 } else {
@@ -74,36 +78,31 @@ impl<T: Send + Sync + 'static> ModelHandle<T> {
         None
     }
 
-    /// Store a loaded model. Updates `last_used` to prevent immediate idle eviction.
-    /// Called from init background threads and from hot-reload commands.
     pub fn store(&self, model: Arc<T>) {
-        *self.inner.write().unwrap() = Some(model);
+        *self.inner.write().ok().expect("model_handle lock poisoned") = Some(model);
         self.last_used.store(now_secs(), Ordering::Relaxed);
     }
 
-    /// Clear the model from memory without affecting the active-model pointer on disk.
-    /// Call this from `remove_*_model` paths that also delete the files.
     pub fn clear(&self) {
-        *self.inner.write().unwrap() = None;
+        *self.inner.write().ok().expect("model_handle lock poisoned") = None;
     }
 
-    /// Whether a model is currently in memory.
     pub fn is_loaded(&self) -> bool {
-        self.inner.read().unwrap().is_some()
+        self.inner.read().ok().map(|x| x.is_some()).unwrap_or(false)
     }
 
-    /// Evict the model if it has been idle for longer than `threshold`.
-    ///
-    /// Called by the janitor task; does nothing if the slot is already empty.
-    /// Returns `true` if the model was evicted.
     pub fn idle_drop(&self, threshold: Duration) -> bool {
         let last = self.last_used.load(Ordering::Relaxed);
         let now = now_secs();
         if now.saturating_sub(last) < threshold.as_secs() {
             return false;
         }
-        let mut guard = self.inner.write().unwrap();
+        let mut guard = self.inner.write().ok().expect("model_handle lock poisoned");
         if guard.is_none() {
+            return false;
+        }
+        let last = self.last_used.load(Ordering::Relaxed);
+        if now.saturating_sub(last) < threshold.as_secs() {
             return false;
         }
         *guard = None;

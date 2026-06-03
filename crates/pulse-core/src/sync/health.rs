@@ -7,7 +7,7 @@ const MAX_BACKOFF_SECS: u64 = 14400; // 4 hours
 pub fn compute_next_fetch(feed: &Feed) -> i64 {
     let now = chrono::Utc::now().timestamp();
     let base = feed.poll_interval_secs as u64;
-    let streak = feed.failure_streak as u32;
+    let streak = feed.failure_streak.max(0) as u32;
 
     let interval_secs = if streak == 0 {
         base

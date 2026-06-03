@@ -102,7 +102,10 @@ impl SyncScheduler {
 
     pub async fn add_feed(&self, feed_id: FeedId) {
         self.send_command(SyncCommand::AddFeed(feed_id.clone()));
-        self.spawn_feed_task(feed_id).await;
+        let has_task = self.tasks.lock().await.contains_key(&feed_id);
+        if !has_task {
+            self.spawn_feed_task(feed_id).await;
+        }
     }
 
     pub async fn remove_feed(&self, feed_id: &FeedId) {
@@ -172,12 +175,16 @@ async fn feed_sync_task(
 
         tokio::select! {
             _ = tokio::time::sleep(delay) => {
-                let _ = perform_sync(&feed_id, &db, &tagger, &http, reddit_auth.as_deref()).await;
+                if let Err(e) = perform_sync(&feed_id, &db, &tagger, &http, reddit_auth.as_deref()).await {
+                    tracing::warn!(feed_id = %feed_id, error = %e, "Sync failed");
+                }
             }
             cmd = cmd_rx.recv() => {
                 match cmd {
                     Ok(SyncCommand::RefreshFeed(id)) if id == feed_id => {
-                        let _ = perform_sync(&feed_id, &db, &tagger, &http, reddit_auth.as_deref()).await;
+                        if let Err(e) = perform_sync(&feed_id, &db, &tagger, &http, reddit_auth.as_deref()).await {
+                            tracing::warn!(feed_id = %feed_id, error = %e, "Sync refresh failed");
+                        }
                     }
                     Ok(SyncCommand::RemoveFeed(id)) if id == feed_id => break,
                     Ok(SyncCommand::Shutdown) => break,
@@ -228,12 +235,15 @@ pub(crate) async fn perform_sync(
     match result {
         Ok((new_items, was_cached, etag, last_modified, last_item_at, source_config_update)) => {
             if let Some(new_config) = source_config_update {
-                let _ = db
+                if let Err(e) = db
                     .update_feed_source_config(feed_id.clone(), new_config)
-                    .await;
+                    .await
+                {
+                    tracing::warn!(feed_id = %feed_id, error = %e, "Failed to update source config");
+                }
             }
 
-            let _ = db
+            if let Err(e) = db
                 .update_feed_health(
                     feed_id.clone(),
                     true,
@@ -243,7 +253,10 @@ pub(crate) async fn perform_sync(
                     last_modified,
                     last_item_at,
                 )
-                .await;
+                .await
+            {
+                tracing::warn!(feed_id = %feed_id, error = %e, "Failed to update health after successful sync");
+            }
 
             tracing::info!(feed_id = %feed_id, new_items, was_cached, elapsed_ms, "Sync complete");
 
@@ -257,16 +270,21 @@ pub(crate) async fn perform_sync(
                 let mut feed_update = updated_feed;
                 feed_update.next_fetch_at = Some(next_fetch);
                 feed_update.updated_at = chrono::Utc::now().timestamp();
-                let _ = db.upsert_feed(feed_update).await;
+                if let Err(e) = db.upsert_feed(feed_update).await {
+                    tracing::warn!(feed_id = %feed_id, error = %e, "Failed to upsert feed after sync");
+                }
             }
 
             Ok(new_items)
         }
         Err(e) => {
             tracing::warn!(feed_id = %feed_id, error = %e, "Sync failed");
-            let _ = db
+            if let Err(e2) = db
                 .update_feed_health(feed_id.clone(), false, None, 0, None, None, None)
-                .await;
+                .await
+            {
+                tracing::warn!(feed_id = %feed_id, error = %e2, "Failed to update health after sync failure");
+            }
             Err(e)
         }
     }

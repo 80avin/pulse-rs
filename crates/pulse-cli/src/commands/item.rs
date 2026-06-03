@@ -146,7 +146,7 @@ pub async fn run(args: ItemArgs, core: &PulseCore, global_json: bool) -> anyhow:
             .await
         }
         ItemCommand::Tags(a) => cmd_tags(a, core, global_json).await,
-        ItemCommand::Open(a) => cmd_open(a).await,
+        ItemCommand::Open(a) => cmd_open(a, core).await,
     }
 }
 
@@ -305,13 +305,20 @@ async fn cmd_tags(args: ItemTagsArgs, core: &PulseCore, global_json: bool) -> an
     Ok(())
 }
 
-async fn cmd_open(args: ItemIdArgs) -> anyhow::Result<()> {
-    // We don't have a fast way to look up just the URL without the full timeline scan.
-    // Print a message directing to use the URL from item show.
-    print_error(&format!(
-        "use 'pulse item show {}' to get the URL, then open it manually. \
-         Or run: xdg-open $(pulse item show {} --json | jq -r .url)",
-        args.id, args.id
-    ));
+async fn cmd_open(args: ItemIdArgs, core: &PulseCore) -> anyhow::Result<()> {
+    let item = core.get_item(&args.id).await?;
+    let url = item.url.as_deref().unwrap_or("");
+    if url.is_empty() {
+        print_error("item has no URL to open");
+        return Ok(());
+    }
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open").arg(url).spawn()?;
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open").arg(url).spawn()?;
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("cmd")
+        .args(["/c", "start", url])
+        .spawn()?;
     Ok(())
 }
