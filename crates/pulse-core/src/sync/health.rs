@@ -24,27 +24,6 @@ pub fn compute_next_fetch(feed: &Feed) -> i64 {
     now + jittered
 }
 
-/// Update the latency EMA for a feed (α = 0.2).
-/// Returns the new average.
-pub fn update_latency_ema(old_avg: Option<f64>, new_latency_ms: f64) -> f64 {
-    const ALPHA: f64 = 0.2;
-    match old_avg {
-        Some(old) => ALPHA * new_latency_ms + (1.0 - ALPHA) * old,
-        None => new_latency_ms,
-    }
-}
-
-/// Determine if a feed is stale (no new items in > 7 * poll_interval)
-pub fn is_feed_stale(feed: &Feed) -> bool {
-    let now = chrono::Utc::now().timestamp();
-    let threshold = 7 * feed.poll_interval_secs;
-
-    match feed.last_item_at {
-        Some(last_item) => (now - last_item) > threshold,
-        None => false, // never had items = not stale yet (could be new)
-    }
-}
-
 /// Simple pseudo-jitter in range [0.9, 1.1] based on current time
 fn jitter() -> f64 {
     use std::time::{SystemTime, UNIX_EPOCH};

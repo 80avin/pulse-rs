@@ -1,7 +1,5 @@
 use thiserror::Error;
 
-pub type Result<T> = std::result::Result<T, PulseError>;
-
 #[derive(Debug, Error)]
 pub enum StorageError {
     #[error("SQLite error: {0}")]

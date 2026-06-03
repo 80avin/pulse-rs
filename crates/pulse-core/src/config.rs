@@ -23,8 +23,6 @@ pub struct PulseConfig {
     pub max_concurrent_syncs: usize,
     /// Maximum failure streak before a feed is disabled
     pub max_failure_streak: u32,
-    /// Maximum backoff interval in seconds (4 hours)
-    pub max_backoff_secs: u64,
     /// Whether we're running on Android (affects some pragmas and sync behavior)
     pub is_android: bool,
     /// Reddit OAuth2 script-app client ID (from reddit.com/prefs/apps)
@@ -33,8 +31,6 @@ pub struct PulseConfig {
     pub reddit_client_secret: Option<String>,
     /// Which text classification backend to use for tagging
     pub text_backend: TextBackend,
-    /// Whether to supplement model tags with rule engine (always false in new stack)
-    pub use_rules: bool,
     /// Whether AI tagging is enabled (mirrors the user's UI setting). When false,
     /// models are not loaded at startup and the tagger task skips ML inference.
     pub ai_enabled: bool,
@@ -51,12 +47,10 @@ impl PulseConfig {
             data_dir,
             max_concurrent_syncs: 10,
             max_failure_streak: 10,
-            max_backoff_secs: 14400, // 4 hours
             is_android: cfg!(target_os = "android"),
             reddit_client_id: None,
             reddit_client_secret: None,
             text_backend: TextBackend::HybridFastTextMiniMl,
-            use_rules: false,
             ai_enabled: true,
         }
     }

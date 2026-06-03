@@ -421,8 +421,6 @@ pub async fn get_ai_tags(pool: &SqlitePool, item_id: &ItemId) -> Result<Vec<AiTa
 pub struct EnrichCandidate {
     pub id: ItemId,
     pub url: String,
-    pub feed_id: String,
-    pub body_text: Option<String>,
 }
 
 /// Return items that have not yet been enriched (no `enriched_at` in source_meta)
@@ -434,7 +432,7 @@ pub async fn get_pending_enrichment(
 ) -> Result<Vec<EnrichCandidate>, StorageError> {
     let rows = if let Some(fid) = feed_id_filter {
         sqlx::query(
-            "SELECT id, url, feed_id, body_text FROM feed_items
+            "SELECT id, url FROM feed_items
              WHERE url IS NOT NULL
                AND json_extract(source_meta, '$.enriched_at') IS NULL
                AND feed_id = ?
@@ -448,7 +446,7 @@ pub async fn get_pending_enrichment(
         .map_err(StorageError::Sqlite)?
     } else {
         sqlx::query(
-            "SELECT id, url, feed_id, body_text FROM feed_items
+            "SELECT id, url FROM feed_items
              WHERE url IS NOT NULL
                AND json_extract(source_meta, '$.enriched_at') IS NULL
              ORDER BY published_at DESC
@@ -466,8 +464,6 @@ pub async fn get_pending_enrichment(
             Ok(EnrichCandidate {
                 id: r.try_get("id").map_err(StorageError::Sqlite)?,
                 url: r.try_get("url").map_err(StorageError::Sqlite)?,
-                feed_id: r.try_get("feed_id").map_err(StorageError::Sqlite)?,
-                body_text: r.try_get("body_text").map_err(StorageError::Sqlite)?,
             })
         })
         .collect()

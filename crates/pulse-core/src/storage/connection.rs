@@ -1,7 +1,7 @@
 use crate::config::PulseConfig;
 use crate::error::StorageError;
+use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
-use sqlx::{SqliteConnection, SqlitePool};
 use std::path::Path;
 use std::time::Duration;
 
@@ -59,40 +59,4 @@ pub async fn open_reader_pool(
         .connect_with(opts)
         .await
         .map_err(StorageError::Sqlite)
-}
-
-/// Apply required PRAGMAs to a raw connection (for callers that acquire connections directly).
-pub async fn apply_pragmas(
-    conn: &mut SqliteConnection,
-    config: &PulseConfig,
-) -> Result<(), StorageError> {
-    use sqlx::Executor;
-    conn.execute("PRAGMA journal_mode = WAL;")
-        .await
-        .map_err(StorageError::Sqlite)?;
-    let sync = if config.is_android {
-        "PRAGMA synchronous = FULL;"
-    } else {
-        "PRAGMA synchronous = NORMAL;"
-    };
-    conn.execute(sync).await.map_err(StorageError::Sqlite)?;
-    conn.execute("PRAGMA foreign_keys = ON;")
-        .await
-        .map_err(StorageError::Sqlite)?;
-    conn.execute("PRAGMA busy_timeout = 5000;")
-        .await
-        .map_err(StorageError::Sqlite)?;
-    conn.execute("PRAGMA cache_size = -16384;")
-        .await
-        .map_err(StorageError::Sqlite)?;
-    conn.execute("PRAGMA temp_store = MEMORY;")
-        .await
-        .map_err(StorageError::Sqlite)?;
-    let mmap = if config.is_android {
-        "PRAGMA mmap_size = 0;"
-    } else {
-        "PRAGMA mmap_size = 268435456;"
-    };
-    conn.execute(mmap).await.map_err(StorageError::Sqlite)?;
-    Ok(())
 }
