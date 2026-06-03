@@ -463,6 +463,10 @@ fn resolve_model_path(model_dir: &Path) -> Option<std::path::PathBuf> {
 /// ```
 /// Any label not present in the JSON, or if the file is absent/malformed,
 /// defaults to 0.5.
+///
+// TODO: Several labels in miniml_thresholds.json have threshold 0.1 which
+// produces false positives in HybridFastTextMiniMl mode. Recalibrate after
+// gathering more labeled data.
 #[cfg(feature = "ai-miniml")]
 fn load_thresholds(path: &Path, labels: &[String]) -> Vec<f32> {
     let try_load = || -> Option<serde_json::Map<String, serde_json::Value>> {

@@ -563,6 +563,7 @@ async fn update_feed_health(
             .await
             .unwrap_or(0);
 
+        // FIXME: Use config.max_failure_streak instead of hardcoded 10
         if streak >= 10 {
             sqlx::query("UPDATE feeds SET is_enabled = 0, updated_at = ? WHERE id = ?")
                 .bind(now)

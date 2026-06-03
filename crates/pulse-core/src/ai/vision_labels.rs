@@ -15,6 +15,8 @@ pub fn vision_labels() -> &'static [VisionLabel] {
         // These overlap with the text pipeline tag vocabulary so vision and text
         // signals can reinforce each other on mixed-content items (og_image present).
         // Thresholds calibrated for CLIP ViT-B/32 q4f16; calibrate with vision-debug.
+        // FIXME: MobileCLIP is now the default vision model. Recalibrate thresholds
+        // for the MobileCLIP embedding space (it differs from CLIP ViT-B/32).
         VisionLabel {
             tag: "technical",
             description: "a screenshot of code, a technical diagram, or a developer tool interface",
