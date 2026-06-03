@@ -360,7 +360,7 @@ fn load_pmlp(
     use std::io::Read;
 
     let mut f = std::fs::File::open(path)
-        .map_err(|e| TaggingError::Onnx(format!("cannot open mlp_head.pmlp: {e}")))?;
+        .map_err(|e| TaggingError::ModelIo(format!("cannot open mlp_head.pmlp: {e}")))?;
 
     // ── Header ────────────────────────────────────────────────────────────────
     let mut magic = [0u8; 4];

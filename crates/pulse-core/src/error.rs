@@ -84,6 +84,9 @@ pub enum TaggingError {
     #[error("ONNX inference error: {0}")]
     Onnx(String),
 
+    #[error("Model I/O error: {0}")]
+    ModelIo(String),
+
     #[error("Tokenizer error: {0}")]
     Tokenizer(String),
 

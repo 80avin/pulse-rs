@@ -96,7 +96,7 @@ impl FastTextTaggerInner {
 
         let model_path = model_dir.join("fasttext.pftm");
         let mut f = std::fs::File::open(&model_path)
-            .map_err(|e| TaggingError::Onnx(format!("cannot open fasttext.pftm: {e}")))?;
+            .map_err(|e| TaggingError::ModelIo(format!("cannot open fasttext.pftm: {e}")))?;
 
         // ── Header (32 bytes) ─────────────────────────────────────────────────
 

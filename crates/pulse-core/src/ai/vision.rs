@@ -250,7 +250,7 @@ pub fn compute_clip_label_embeddings(model_dir: &Path) -> Result<(), TaggingErro
         }
     }
     std::fs::write(&out_path, &data)
-        .map_err(|e| TaggingError::Onnx(format!("write label_embeddings.bin: {e}")))?;
+        .map_err(|e| TaggingError::ModelIo(format!("write label_embeddings.bin: {e}")))?;
 
     tracing::info!(
         labels = num_labels,
@@ -504,13 +504,15 @@ fn load_label_embeddings(path: &Path) -> Result<Vec<(String, Vec<f32>, f32)>, Ta
     use std::io::Read;
 
     let data = std::fs::read(path)
-        .map_err(|e| TaggingError::Onnx(format!("read label_embeddings.bin: {e}")))?;
+        .map_err(|e| TaggingError::ModelIo(format!("read label_embeddings.bin: {e}")))?;
 
     if data.len() < 12 {
-        return Err(TaggingError::Onnx("label_embeddings.bin too short".into()));
+        return Err(TaggingError::ModelIo(
+            "label_embeddings.bin too short".into(),
+        ));
     }
     if &data[0..4] != b"VLAB" {
-        return Err(TaggingError::Onnx(
+        return Err(TaggingError::ModelIo(
             "label_embeddings.bin has invalid magic bytes".into(),
         ));
     }
@@ -520,7 +522,7 @@ fn load_label_embeddings(path: &Path) -> Result<Vec<(String, Vec<f32>, f32)>, Ta
     let expected_bytes = 12 + num_labels * emb_dim * 4;
 
     if data.len() != expected_bytes {
-        return Err(TaggingError::Onnx(format!(
+        return Err(TaggingError::ModelIo(format!(
             "label_embeddings.bin size mismatch: expected {expected_bytes}, got {} bytes. \
              Delete it and re-run `pulse ai vision-download` to regenerate.",
             data.len()
@@ -529,7 +531,7 @@ fn load_label_embeddings(path: &Path) -> Result<Vec<(String, Vec<f32>, f32)>, Ta
 
     let labels = vision_labels();
     if num_labels != labels.len() {
-        return Err(TaggingError::Onnx(format!(
+        return Err(TaggingError::ModelIo(format!(
             "label_embeddings.bin has {num_labels} labels but vision_labels() defines {} — \
              delete it and re-run `pulse ai vision-download` to regenerate.",
             labels.len()
@@ -545,7 +547,7 @@ fn load_label_embeddings(path: &Path) -> Result<Vec<(String, Vec<f32>, f32)>, Ta
             let mut buf = [0u8; 4];
             cursor
                 .read_exact(&mut buf)
-                .map_err(|e| TaggingError::Onnx(format!("read embedding value: {e}")))?;
+                .map_err(|e| TaggingError::ModelIo(format!("read embedding value: {e}")))?;
             *v = f32::from_le_bytes(buf);
         }
         result.push((label.tag.to_string(), embedding, label.threshold));
