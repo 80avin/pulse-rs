@@ -48,7 +48,7 @@ tracing-appender = "0.2"
 # CLI argument parsing
 clap = { version = "4", features = ["derive", "env"] }
 
-# ONNX Runtime — enabled via ai-onnx feature flag in pulse-core
+# ONNX Runtime — used by ai-vision and ai-miniml features in pulse-core
 # rc.12 upgrades Android binary from ORT 1.23.2 → 1.26.0 (fixes libstdc++ ABI mismatch)
 ort = { version = "2.0.0-rc.12", features = ["download-binaries"] }
 

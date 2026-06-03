@@ -55,11 +55,9 @@ pub struct GroupDto {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiStatusDto {
-    pub model_loaded: bool,
     pub vision_loaded: bool,
     pub fasttext_loaded: bool,
     pub miniml_loaded: bool,
-    pub model_name: Option<String>,
     pub vision_model_name: Option<String>,
     pub fasttext_model_name: Option<String>,
     pub miniml_model_name: Option<String>,

@@ -598,31 +598,25 @@ pub async fn get_db_stats(state: State<'_, AppState>) -> Result<DbStatsDto, Stri
 #[tauri::command]
 pub async fn get_ai_status(state: State<'_, AppState>) -> Result<AiStatusDto, String> {
     let core = state.core().await?;
-    let onnx_loaded = core.onnx_loaded();
-    let vision_loaded = core.vision_loaded();
     let fasttext_loaded = core.fasttext_loaded();
     let miniml_loaded = core.miniml_loaded();
-    let model_name = core.active_model_name();
+    let vision_loaded = core.vision_loaded();
     let vision_model_name = core.active_vision_model_name();
     let fasttext_model_name = core.active_fasttext_model_name();
     let miniml_model_name = core.active_miniml_model_name();
-    let tagging_mode = match (fasttext_loaded, miniml_loaded, onnx_loaded, vision_loaded) {
-        (true, true, _, true) => "fasttext+miniml+vision",
-        (true, true, _, false) => "fasttext+miniml",
-        (true, false, _, true) => "fasttext+vision",
-        (true, false, _, false) => "fasttext",
-        (false, _, true, true) => "onnx+vision",
-        (false, _, true, false) => "onnx",
-        (false, _, false, true) => "vision",
+    let tagging_mode = match (fasttext_loaded, miniml_loaded, vision_loaded) {
+        (true, true, true) => "fasttext+miniml+vision",
+        (true, true, false) => "fasttext+miniml",
+        (true, false, true) => "fasttext+vision",
+        (true, false, false) => "fasttext",
+        (false, _, true) => "vision",
         _ => "none",
     }
     .to_string();
     Ok(AiStatusDto {
-        model_loaded: onnx_loaded,
         vision_loaded,
         fasttext_loaded,
         miniml_loaded,
-        model_name,
         vision_model_name,
         fasttext_model_name,
         miniml_model_name,
@@ -633,7 +627,6 @@ pub async fn get_ai_status(state: State<'_, AppState>) -> Result<AiStatusDto, St
 #[tauri::command]
 pub async fn list_models(state: State<'_, AppState>) -> Result<Vec<ModelInfoDto>, String> {
     let core = state.core().await?;
-    let active_nli = core.active_model_name();
     let active_vision = core.active_vision_model_name();
     let active_fasttext = core.active_fasttext_model_name();
     let active_miniml = core.active_miniml_model_name();
@@ -643,10 +636,6 @@ pub async fn list_models(state: State<'_, AppState>) -> Result<Vec<ModelInfoDto>
         .map(|spec| {
             let model_dir = core.config.models_dir().join(spec.id);
             let downloaded = match spec.kind {
-                "nli" => {
-                    model_dir.join("model_quantized.onnx").exists()
-                        || model_dir.join("model.onnx").exists()
-                }
                 "vision" => {
                     model_dir.join("vision_model_q4f16.onnx").exists()
                         || model_dir.join("vision_model_quantized.onnx").exists()
@@ -658,7 +647,6 @@ pub async fn list_models(state: State<'_, AppState>) -> Result<Vec<ModelInfoDto>
                 _ => false,
             };
             let active = match spec.kind {
-                "nli" => active_nli.as_deref() == Some(spec.id),
                 "vision" => active_vision.as_deref() == Some(spec.id),
                 "fasttext" => active_fasttext.as_deref() == Some(spec.id),
                 "miniml" => active_miniml.as_deref() == Some(spec.id),
@@ -757,13 +745,7 @@ pub async fn download_model(
     );
 
     // Activate + hot-reload the model into memory (best-effort — files are on disk regardless)
-    if spec.kind == "nli" {
-        if let Err(e) = core.set_active_model(spec.id) {
-            tracing::error!(model_id = %model_id, error = %e, "model activation failed after download");
-        } else if let Err(e) = core.reload_onnx_tagger() {
-            tracing::error!(model_id = %model_id, error = %e, "model hot-reload failed after activation");
-        }
-    } else if spec.kind == "vision" {
+    if spec.kind == "vision" {
         // Delete stale label_embeddings.bin so descriptions are always fresh after download.
         let stale = model_dir.join("label_embeddings.bin");
         if stale.exists() {
@@ -799,7 +781,7 @@ pub async fn delete_model(state: State<'_, AppState>, model_id: String) -> Resul
             .remove_miniml_model(&model_id)
             .map_err(|e| e.to_string()),
         // NLI and unknown — fall back to the generic remove_model path
-        _ => core.remove_model(&model_id).map_err(|e| e.to_string()),
+        _ => Err(format!("unknown model kind for deletion: '{}'", model_id)),
     }
 }
 
@@ -813,11 +795,6 @@ pub async fn activate_model(state: State<'_, AppState>, model_id: String) -> Res
         .ok_or_else(|| format!("unknown model '{}'", model_id))?;
 
     match spec.kind {
-        "nli" => {
-            core.set_active_model(&model_id)
-                .map_err(|e| e.to_string())?;
-            core.reload_onnx_tagger().map_err(|e| e.to_string())?;
-        }
         "vision" => {
             core.set_active_vision_model(&model_id)
                 .map_err(|e| e.to_string())?;

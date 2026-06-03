@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 use crate::ai::tagger::TagRequest;
 use crate::ai::tagger::process_tag_request;
 use crate::ai::{
-    FastTextTagger, MiniMlTagger, ModelHandle, OnnxTagger, RuleEngine, TAGGER_QUEUE_SIZE,
+    FastTextTagger, MiniMlTagger, ModelHandle, RuleEngine, TAGGER_QUEUE_SIZE,
     TaggerHandle, VisionTagger, default_rules, tagger_task,
 };
 use crate::config::PulseConfig;
@@ -42,8 +42,6 @@ pub struct PulseCore {
     pub search: SearchService,
     pub config: Arc<PulseConfig>,
     pub rule_engine: Arc<RuleEngine>,
-    /// NLI cross-encoder — idle-unloadable; only loaded when TextBackend::Nli is active.
-    pub onnx_tagger: ModelHandle<OnnxTagger>,
     /// CLIP vision encoder — idle-unloadable; loaded on first image post, dropped when idle.
     pub vision_tagger: ModelHandle<VisionTagger>,
     /// FastText supervised classifier — primary text tagger (<10MB, <1ms/item).
@@ -97,26 +95,6 @@ impl PulseCore {
 
         // Build loader closures — each captures the data_dir and loads from the active-model
         // pointer file. Returning None means "no active model configured"; errors are logged.
-        let make_onnx_loader = {
-            let data_dir = config.data_dir.clone();
-            Arc::new(move || -> Option<Arc<OnnxTagger>> {
-                let name = std::fs::read_to_string(data_dir.join("active_model")).ok()?;
-                let dir = data_dir.join("models").join(name.trim());
-                let t = std::time::Instant::now();
-                match OnnxTagger::load(&dir) {
-                    Ok(tagger) => {
-                        tracing::info!(elapsed_ms = t.elapsed().as_millis(), "ONNX tagger loaded");
-                        Some(Arc::new(tagger))
-                    }
-                    Err(crate::error::TaggingError::ModelNotLoaded) => None,
-                    Err(e) => {
-                        tracing::warn!(error=%e, "ONNX load failed");
-                        None
-                    }
-                }
-            }) as Arc<dyn Fn() -> Option<Arc<OnnxTagger>> + Send + Sync>
-        };
-
         let make_vision_loader = {
             let data_dir = config.data_dir.clone();
             Arc::new(move || -> Option<Arc<VisionTagger>> {
@@ -188,7 +166,6 @@ impl PulseCore {
 
         // Create ModelHandles. snapshot() sets pending_reload=true before spawning so concurrent
         // calls from tagger_task cannot trigger a second load while init is still in flight.
-        let onnx_tagger = ModelHandle::new(make_onnx_loader);
         let vision_tagger = ModelHandle::new(make_vision_loader);
         let fasttext_tagger = ModelHandle::new(make_fasttext_loader);
         let miniml_tagger = ModelHandle::new(make_miniml_loader);
@@ -197,9 +174,6 @@ impl PulseCore {
         // When disabled, models stay unloaded until the user re-enables AI and triggers a retag;
         // snapshot() in run_tagger_direct / tagger_task will load them on demand at that point.
         if config.ai_enabled {
-            if config.text_backend == crate::config::TextBackend::Nli {
-                onnx_tagger.snapshot();
-            }
             fasttext_tagger.snapshot();
             miniml_tagger.snapshot();
             vision_tagger.snapshot();
@@ -211,7 +185,6 @@ impl PulseCore {
         {
             let ft = fasttext_tagger.clone();
             let ml = miniml_tagger.clone();
-            let onnx = onnx_tagger.clone();
             let vis = vision_tagger.clone();
             tokio::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
@@ -220,7 +193,6 @@ impl PulseCore {
                     interval.tick().await;
                     ft.idle_drop(std::time::Duration::from_secs(30 * 60));
                     ml.idle_drop(std::time::Duration::from_secs(10 * 60));
-                    onnx.idle_drop(std::time::Duration::from_secs(5 * 60));
                     vis.idle_drop(std::time::Duration::from_secs(5 * 60));
                 }
             });
@@ -290,7 +262,6 @@ impl PulseCore {
             search,
             config,
             rule_engine,
-            onnx_tagger,
             vision_tagger,
             fasttext_tagger,
             miniml_tagger,
@@ -770,78 +741,6 @@ impl PulseCore {
 
     // ─── AI model management ──────────────────────────────────────────────────
 
-    /// Returns the name of the currently active model, or None if using rules-only.
-    pub fn active_model_name(&self) -> Option<String> {
-        let path = self.config.data_dir.join("active_model");
-        std::fs::read_to_string(path)
-            .ok()
-            .map(|s| s.trim().to_string())
-    }
-
-    /// List all downloaded model names (directories under {data_dir}/models/).
-    pub fn list_models(&self) -> Vec<String> {
-        let models_dir = self.config.data_dir.join("models");
-        std::fs::read_dir(&models_dir)
-            .map(|entries| {
-                entries
-                    .filter_map(|e| e.ok())
-                    .filter(|e| {
-                        let p = e.path();
-                        p.is_dir()
-                            && (p.join("model_quantized.onnx").exists()
-                                || p.join("model.onnx").exists())
-                    })
-                    .filter_map(|e| e.file_name().into_string().ok())
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    /// Set the active model by name. The model directory must contain model_quantized.onnx or model.onnx.
-    pub fn set_active_model(&self, model_name: &str) -> Result<(), PulseError> {
-        let model_dir = self.config.data_dir.join("models").join(model_name);
-        let has_model = model_dir.join("model_quantized.onnx").exists()
-            || model_dir.join("model.onnx").exists();
-        if !has_model {
-            return Err(PulseError::NotFound(format!(
-                "model '{}' not found at {:?} — download model_quantized.onnx (or model.onnx) and tokenizer.json there first",
-                model_name, model_dir
-            )));
-        }
-        let active_file = self.config.data_dir.join("active_model");
-        std::fs::write(&active_file, model_name)
-            .map_err(|e| PulseError::Config(format!("failed to write active_model: {e}")))?;
-        Ok(())
-    }
-
-    /// Remove the active_model pointer (fall back to rules-only).
-    pub fn unset_active_model(&self) -> Result<(), PulseError> {
-        let active_file = self.config.data_dir.join("active_model");
-        if active_file.exists() {
-            std::fs::remove_file(&active_file)
-                .map_err(|e| PulseError::Config(format!("failed to remove active_model: {e}")))?;
-        }
-        Ok(())
-    }
-
-    /// Remove a downloaded model directory.
-    pub fn remove_model(&self, model_name: &str) -> Result<(), PulseError> {
-        let model_dir = self.config.data_dir.join("models").join(model_name);
-        if !model_dir.exists() {
-            return Err(PulseError::NotFound(format!(
-                "model '{}' not found",
-                model_name
-            )));
-        }
-        std::fs::remove_dir_all(&model_dir)
-            .map_err(|e| PulseError::Config(format!("failed to remove model directory: {e}")))?;
-        // If this was the active model, clear the pointer
-        if self.active_model_name().as_deref() == Some(model_name) {
-            let _ = self.unset_active_model();
-        }
-        Ok(())
-    }
-
     /// Return the path where model files should be placed for a given model name.
     pub fn model_dir(&self, model_name: &str) -> std::path::PathBuf {
         self.config.data_dir.join("models").join(model_name)
@@ -891,27 +790,9 @@ impl PulseCore {
 
     // ─── Tagger hot-reload ────────────────────────────────────────────────────
 
-    /// Whether an NLI text tagger is currently loaded.
-    pub fn onnx_loaded(&self) -> bool {
-        self.onnx_tagger.is_loaded()
-    }
-
     /// Whether a CLIP vision tagger is currently loaded.
     pub fn vision_loaded(&self) -> bool {
         self.vision_tagger.is_loaded()
-    }
-
-    /// Reload the NLI tagger from the active_model file. Call after downloading a new model.
-    /// The background tagger task sees the change on its next queued item.
-    pub fn reload_onnx_tagger(&self) -> Result<(), PulseError> {
-        let active_file = self.config.data_dir.join("active_model");
-        let model_name = std::fs::read_to_string(&active_file)
-            .map_err(|e| PulseError::Config(format!("no active model set: {e}")))?;
-        let model_dir = self.config.data_dir.join("models").join(model_name.trim());
-        let tagger = OnnxTagger::load(&model_dir).map_err(PulseError::Tagging)?;
-        self.onnx_tagger.store(Arc::new(tagger));
-        tracing::info!("NLI tagger hot-reloaded from {}", model_dir.display());
-        Ok(())
     }
 
     /// Reload the CLIP vision tagger from the active_vision_model file.

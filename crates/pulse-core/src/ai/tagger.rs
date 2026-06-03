@@ -173,7 +173,6 @@ pub(crate) async fn process_tag_request(
             crate::config::TextBackend::HybridFastTextMiniMl => {
                 hybrid_classify(fasttext, miniml, &text)
             }
-            crate::config::TextBackend::Nli => vec![],
         }
     } else {
         vec![]

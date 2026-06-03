@@ -3,8 +3,6 @@ use std::path::PathBuf;
 /// Which text classification backend is active
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum TextBackend {
-    /// DeBERTa NLI cross-encoder (legacy)
-    Nli,
     /// FastText supervised classifier (2-10MB, <1ms/item)
     FastText,
     /// MiniLM ONNX embedding + MLP classifier head (24MB)

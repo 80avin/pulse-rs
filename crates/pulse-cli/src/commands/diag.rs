@@ -72,8 +72,6 @@ pub async fn run(args: DiagArgs, core: &PulseCore, global_json: bool) -> anyhow:
             },
             "ai": {
                 "tag_count": stats.tag_count,
-                "active_model": core.active_model_name().unwrap_or_else(|| "rule-engine".to_string()),
-                "onnx_loaded": core.onnx_loaded(),
             },
         });
         print_json(&report);
@@ -102,12 +100,6 @@ pub async fn run(args: DiagArgs, core: &PulseCore, global_json: bool) -> anyhow:
     println!("  Saved:   {}", stats.saved_count);
     println!();
     println!("AI Pipeline:");
-    println!(
-        "  Active model:  {}",
-        core.active_model_name()
-            .unwrap_or_else(|| "rule-engine".to_string())
-    );
-    println!("  ONNX loaded:   {}", core.onnx_loaded());
     println!("  Tags applied:  {}", stats.tag_count);
     println!();
 

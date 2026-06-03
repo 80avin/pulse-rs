@@ -7,16 +7,6 @@ use crate::output::{print_error, print_json};
 
 // ── Known model registry ───────────────────────────────────────────────────────
 
-struct ModelSpec {
-    name: &'static str,
-    description: &'static str,
-    hf_owner: &'static str,
-    hf_repo: &'static str,
-    /// (path_in_repo, filename_in_model_dir)
-    files: &'static [(&'static str, &'static str)],
-    size_mb_approx: u32,
-}
-
 struct VisionModelSpec {
     name: &'static str,
     description: &'static str,
@@ -26,33 +16,6 @@ struct VisionModelSpec {
     files: &'static [(&'static str, &'static str)],
     size_mb_approx: u32,
 }
-
-const KNOWN_MODELS: &[ModelSpec] = &[
-    ModelSpec {
-        name: "nli-deberta-v3-xsmall",
-        description: "DeBERTa v3 xsmall NLI cross-encoder — 22M params, ~35 MB quantized (recommended default)",
-        hf_owner: "Xenova",
-        hf_repo: "nli-deberta-v3-xsmall",
-        files: &[
-            ("onnx/model_quantized.onnx", "model_quantized.onnx"),
-            ("tokenizer.json", "tokenizer.json"),
-            ("config.json", "config.json"),
-        ],
-        size_mb_approx: 35,
-    },
-    ModelSpec {
-        name: "nli-deberta-v3-small",
-        description: "DeBERTa v3 small NLI — 44M params, ~68 MB quantized (higher quality, slower)",
-        hf_owner: "Xenova",
-        hf_repo: "nli-deberta-v3-small",
-        files: &[
-            ("onnx/model_quantized.onnx", "model_quantized.onnx"),
-            ("tokenizer.json", "tokenizer.json"),
-            ("config.json", "config.json"),
-        ],
-        size_mb_approx: 68,
-    },
-];
 
 const KNOWN_VISION_MODELS: &[VisionModelSpec] = &[
     VisionModelSpec {
@@ -122,20 +85,14 @@ pub enum AiCommand {
     Run(AiRunArgs),
     /// Show AI pipeline status
     Status(AiStatusArgs),
-    /// Show raw NLI entailment scores for text (threshold calibration)
-    Debug(AiDebugArgs),
     /// Show raw CLIP cosine scores for an image URL (vision threshold calibration)
     VisionDebug(AiVisionDebugArgs),
-    /// Download an NLI text model from HuggingFace and make it active
-    Download(AiDownloadArgs),
     /// Download a CLIP vision model from HuggingFace and make it active
     VisionDownload(AiVisionDownloadArgs),
     /// Label items interactively for supervised training
     Label(AiLabelArgs),
     /// Manage training data
     Train(AiTrainArgs),
-    /// Manage the ONNX inference model
-    Model(AiModelArgs),
     /// Manage tag rules (rule-based fallback)
     Rules(AiRulesArgs),
 }
@@ -198,58 +155,6 @@ pub struct AiTrainExportArgs {
     pub output: Option<std::path::PathBuf>,
 }
 
-// ── Model subcommands ──────────────────────────────────────────────────────────
-
-#[derive(Debug, Args)]
-pub struct AiModelArgs {
-    #[command(subcommand)]
-    pub command: AiModelCommand,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum AiModelCommand {
-    /// List downloaded models
-    List(AiModelListArgs),
-    /// Set the active model (model files must already exist in the model directory)
-    Set(AiModelSetArgs),
-    /// Show where to place model files for a given model name
-    Path(AiModelPathArgs),
-    /// Remove a downloaded model
-    Remove(AiModelRemoveArgs),
-    /// Unset the active model (revert to rules-only tagging)
-    Unset,
-}
-
-#[derive(Debug, Args)]
-pub struct AiModelListArgs {
-    #[arg(long)]
-    pub json: bool,
-}
-
-#[derive(Debug, Args)]
-pub struct AiModelSetArgs {
-    /// Model name (must match a directory under the models path)
-    pub name: String,
-    /// Set as the active FastText text model (instead of the NLI model)
-    #[arg(long)]
-    pub fasttext: bool,
-    /// Set as the active MiniLM text model (instead of the NLI model)
-    #[arg(long)]
-    pub miniml: bool,
-}
-
-#[derive(Debug, Args)]
-pub struct AiModelPathArgs {
-    /// Model name to show the expected path for
-    pub name: String,
-}
-
-#[derive(Debug, Args)]
-pub struct AiModelRemoveArgs {
-    /// Model name to remove
-    pub name: String,
-}
-
 // ── Rules subcommands ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Args)]
@@ -271,27 +176,9 @@ pub struct AiRulesListArgs {
 }
 
 #[derive(Debug, Args)]
-pub struct AiDebugArgs {
-    /// Text to classify (use quotes for multi-word input)
-    pub text: String,
-}
-
-#[derive(Debug, Args)]
 pub struct AiVisionDebugArgs {
     /// Image URL to classify via CLIP
     pub url: String,
-}
-
-#[derive(Debug, Args)]
-pub struct AiDownloadArgs {
-    /// Model name to download (default: nli-deberta-v3-xsmall)
-    pub name: Option<String>,
-    /// Do not set this model as active after downloading
-    #[arg(long)]
-    pub no_activate: bool,
-    /// List available models and exit
-    #[arg(long)]
-    pub list: bool,
 }
 
 #[derive(Debug, Args)]
@@ -310,13 +197,10 @@ pub async fn run(args: AiArgs, core: &PulseCore, global_json: bool) -> anyhow::R
     match args.command {
         AiCommand::Run(a) => cmd_run(a, core).await,
         AiCommand::Status(a) => cmd_status(a, core, global_json).await,
-        AiCommand::Debug(a) => cmd_debug(a, core).await,
         AiCommand::VisionDebug(a) => cmd_vision_debug(a, core).await,
-        AiCommand::Download(a) => cmd_model_download(a, core).await,
         AiCommand::VisionDownload(a) => cmd_vision_download(a, core).await,
         AiCommand::Label(a) => cmd_label(a, core).await,
         AiCommand::Train(a) => cmd_train(a, core).await,
-        AiCommand::Model(a) => cmd_model(a, core, global_json).await,
         AiCommand::Rules(a) => cmd_rules(a, global_json).await,
     }
 }
@@ -341,17 +225,14 @@ async fn cmd_run(args: AiRunArgs, core: &PulseCore) -> anyhow::Result<()> {
     let mode = match (
         core.fasttext_loaded(),
         core.miniml_loaded(),
-        core.onnx_loaded(),
         core.vision_loaded(),
     ) {
-        (true, true, _, true) => "fasttext+miniml+vision",
-        (true, true, _, false) => "fasttext+miniml",
-        (true, false, _, true) => "fasttext+vision",
-        (true, false, _, false) => "fasttext",
-        (false, _, true, true) => "onnx+vision",
-        (false, _, true, false) => "onnx",
-        (false, _, false, true) => "vision",
-        (false, _, false, false) => "rule-engine",
+        (true, true, true) => "fasttext+miniml+vision",
+        (true, true, false) => "fasttext+miniml",
+        (true, false, true) => "fasttext+vision",
+        (true, false, false) => "fasttext",
+        (false, _, true) => "vision",
+        (false, _, false) => "rule-engine",
     };
     if args.force {
         eprintln!("running tagger ({}) — force-retagging ALL items...", mode);
@@ -566,13 +447,11 @@ pub async fn cmd_train(args: AiTrainArgs, core: &PulseCore) -> anyhow::Result<()
 
 #[derive(Debug, serde::Serialize)]
 struct AiStatus {
-    active_model: String,
     active_vision_model: String,
     active_fasttext_model: String,
     active_miniml_model: String,
     tagging_mode: String,
     rule_count: usize,
-    onnx_loaded: bool,
     vision_loaded: bool,
     fasttext_loaded: bool,
     miniml_loaded: bool,
@@ -582,13 +461,9 @@ async fn cmd_status(args: AiStatusArgs, core: &PulseCore, global_json: bool) -> 
     let use_json = args.json || global_json;
     let rules = default_rules();
     let enabled = rules.iter().filter(|r| r.enabled).count();
-    let onnx_loaded = core.onnx_loaded();
     let vision_loaded = core.vision_loaded();
     let fasttext_loaded = core.fasttext_loaded();
     let miniml_loaded = core.miniml_loaded();
-    let active_model = core
-        .active_model_name()
-        .unwrap_or_else(|| "none".to_string());
     let active_vision_model = core
         .active_vision_model_name()
         .unwrap_or_else(|| "none".to_string());
@@ -600,26 +475,22 @@ async fn cmd_status(args: AiStatusArgs, core: &PulseCore, global_json: bool) -> 
         .unwrap_or_else(|| "none".to_string());
     let ft = core.fasttext_loaded();
     let ml = core.miniml_loaded();
-    let tagging_mode = match (ft, ml, onnx_loaded, vision_loaded) {
-        (true, true, _, true) => "fasttext+miniml+vision",
-        (true, true, _, false) => "fasttext+miniml",
-        (true, false, _, true) => "fasttext+vision",
-        (true, false, _, false) => "fasttext",
-        (false, _, true, true) => "onnx+vision",
-        (false, _, true, false) => "onnx",
-        (false, _, false, true) => "vision",
+    let tagging_mode = match (ft, ml, vision_loaded) {
+        (true, true, true) => "fasttext+miniml+vision",
+        (true, true, false) => "fasttext+miniml",
+        (true, false, true) => "fasttext+vision",
+        (true, false, false) => "fasttext",
+        (false, _, true) => "vision",
         _ => "rule-based",
     }
     .to_string();
 
     let status = AiStatus {
-        active_model: active_model.clone(),
         active_vision_model: active_vision_model.clone(),
         active_fasttext_model: active_fasttext_model.clone(),
         active_miniml_model: active_miniml_model.clone(),
         tagging_mode: tagging_mode.clone(),
         rule_count: enabled,
-        onnx_loaded,
         vision_loaded,
         fasttext_loaded,
         miniml_loaded,
@@ -631,7 +502,6 @@ async fn cmd_status(args: AiStatusArgs, core: &PulseCore, global_json: bool) -> 
     }
 
     let stats = core.get_db_stats().await?;
-    println!("Text model:    {}", active_model);
     println!("Vision model:  {}", active_vision_model);
     println!(
         "FastText:      {}",
@@ -650,69 +520,9 @@ async fn cmd_status(args: AiStatusArgs, core: &PulseCore, global_json: bool) -> 
         }
     );
     println!("Tagging mode:  {}", tagging_mode);
-    println!("ONNX loaded:   {}", onnx_loaded);
     println!("Vision loaded: {}", vision_loaded);
     println!("Rules loaded:  {} enabled / {} total", enabled, rules.len());
     println!("Tags in DB:    {}", stats.tag_count);
-    Ok(())
-}
-
-async fn cmd_debug(args: AiDebugArgs, core: &PulseCore) -> anyhow::Result<()> {
-    let mut showed = false;
-
-    // FastText scores
-    let ft = core.fasttext_tagger.snapshot();
-    if let Some(ref ft) = ft {
-        match ft.scores(&args.text) {
-            Ok(scores) => {
-                println!("=== FastText ===");
-                println!("{:<20}  {}", "TAG", "SCORE");
-                println!("{}", "-".repeat(32));
-                for (tag, score) in &scores {
-                    let marker = if *score >= 0.5 { " ✓" } else { "" };
-                    println!("{:<20}  {:.4}{}", tag, score, marker);
-                }
-            }
-            Err(e) => eprintln!("FastText error: {}", e),
-        }
-        showed = true;
-    }
-
-    // MiniLM scores
-    let ml = core.miniml_tagger.snapshot();
-    if let Some(ref ml) = ml {
-        match ml.scores(&args.text) {
-            Ok(scores) => {
-                println!("=== MiniLM ===");
-                println!("{:<20}  {}", "TAG", "SCORE");
-                println!("{}", "-".repeat(32));
-                for (tag, score) in &scores {
-                    let marker = if *score >= 0.5 { " ✓" } else { "" };
-                    println!("{:<20}  {:.4}{}", tag, score, marker);
-                }
-            }
-            Err(e) => eprintln!("MiniLM error: {}", e),
-        }
-        showed = true;
-    }
-
-    // Legacy NLI ONNX scores
-    let tagger = core.onnx_tagger.snapshot();
-    if let Some(ref tagger) = tagger {
-        let sims = tagger.similarities(&args.text)?;
-        println!("=== NLI ONNX ===");
-        println!("{:<20}  {}", "TAG", "SCORE (geom-mean)");
-        println!("{}", "-".repeat(38));
-        for (tag, prob) in &sims {
-            let marker = if *prob >= 0.10 { " ✓" } else { "" };
-            println!("{:<20}  {:.4}{}", tag, prob, marker);
-        }
-        showed = true;
-    }
-
-    if !showed {
-        print_error("no model loaded — run 'pulse ai model set --fasttext <name>' first");
-    }
     Ok(())
 }
 
@@ -742,87 +552,6 @@ async fn cmd_vision_debug(args: AiVisionDebugArgs, core: &PulseCore) -> anyhow::
             print_error(&format!("vision debug failed: {}", e));
         }
     }
-    Ok(())
-}
-
-// ── Download command ───────────────────────────────────────────────────────────
-
-async fn cmd_model_download(args: AiDownloadArgs, core: &PulseCore) -> anyhow::Result<()> {
-    if args.list {
-        println!("{:<30}  {:<8}  {}", "NAME", "SIZE", "DESCRIPTION");
-        for m in KNOWN_MODELS {
-            println!(
-                "{:<30}  ~{:>4} MB  {}",
-                m.name, m.size_mb_approx, m.description
-            );
-        }
-        return Ok(());
-    }
-
-    let model_name = args.name.as_deref().unwrap_or("nli-deberta-v3-xsmall");
-    let spec = match KNOWN_MODELS.iter().find(|m| m.name == model_name) {
-        Some(s) => s,
-        None => {
-            print_error(&format!(
-                "unknown model '{}' — run 'pulse ai download --list' to see options",
-                model_name
-            ));
-            return Ok(());
-        }
-    };
-
-    let model_dir = core.model_dir(spec.name);
-    std::fs::create_dir_all(&model_dir)?;
-
-    eprintln!(
-        "Downloading {} (~{} MB) from huggingface.co/{}/{} ...",
-        spec.name, spec.size_mb_approx, spec.hf_owner, spec.hf_repo
-    );
-
-    let client = Client::builder()
-        .user_agent("Pulse/0.1 model-downloader")
-        .timeout(std::time::Duration::from_secs(300))
-        .build()?;
-
-    for (hf_path, local_name) in spec.files {
-        let url = format!(
-            "https://huggingface.co/{}/{}/resolve/main/{}",
-            spec.hf_owner, spec.hf_repo, hf_path
-        );
-        let dest = model_dir.join(local_name);
-
-        eprint!("  {} ... ", local_name);
-        std::io::Write::flush(&mut std::io::stderr())?;
-
-        let resp = client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| anyhow::anyhow!("network error fetching {}: {}", local_name, e))?;
-
-        if !resp.status().is_success() {
-            anyhow::bail!("HTTP {} for {}: {}", resp.status(), local_name, url);
-        }
-
-        let bytes = resp
-            .bytes()
-            .await
-            .map_err(|e| anyhow::anyhow!("read error for {}: {}", local_name, e))?;
-
-        std::fs::write(&dest, &bytes)?;
-        eprintln!("{:.1} MB", bytes.len() as f64 / 1_048_576.0);
-    }
-
-    eprintln!("Download complete → {}", model_dir.display());
-
-    if !args.no_activate {
-        core.set_active_model(spec.name)?;
-        eprintln!(
-            "Active model set to '{}'. Restart pulse to load it.",
-            spec.name
-        );
-    }
-
     Ok(())
 }
 
@@ -923,95 +652,6 @@ async fn cmd_vision_download(args: AiVisionDownloadArgs, core: &PulseCore) -> an
         }
     }
 
-    Ok(())
-}
-
-// ── Model command handlers ─────────────────────────────────────────────────────
-
-async fn cmd_model(args: AiModelArgs, core: &PulseCore, global_json: bool) -> anyhow::Result<()> {
-    match args.command {
-        AiModelCommand::List(a) => cmd_model_list(a, core, global_json).await,
-        AiModelCommand::Set(a) => cmd_model_set(a, core).await,
-        AiModelCommand::Path(a) => cmd_model_path(a, core).await,
-        AiModelCommand::Remove(a) => cmd_model_remove(a, core).await,
-        AiModelCommand::Unset => cmd_model_unset(core).await,
-    }
-}
-
-async fn cmd_model_list(
-    args: AiModelListArgs,
-    core: &PulseCore,
-    global_json: bool,
-) -> anyhow::Result<()> {
-    let use_json = args.json || global_json;
-    let models = core.list_models();
-    let active = core.active_model_name();
-
-    if use_json {
-        print_json(&serde_json::json!({
-            "models": models,
-            "active": active,
-        }));
-        return Ok(());
-    }
-
-    if models.is_empty() {
-        eprintln!("no models downloaded");
-        eprintln!("use 'pulse ai model path <name>' to see where to place model files");
-        return Ok(());
-    }
-
-    for m in &models {
-        let marker = if active.as_deref() == Some(m.as_str()) {
-            " (active)"
-        } else {
-            ""
-        };
-        println!("{}{}", m, marker);
-    }
-    Ok(())
-}
-
-async fn cmd_model_set(args: AiModelSetArgs, core: &PulseCore) -> anyhow::Result<()> {
-    if args.fasttext {
-        core.set_active_fasttext_model(&args.name)?;
-        eprintln!(
-            "FastText model set to '{}' (restart pulse to apply)",
-            args.name
-        );
-    } else if args.miniml {
-        core.set_active_miniml_model(&args.name)?;
-        eprintln!(
-            "MiniLM model set to '{}' (restart pulse to apply)",
-            args.name
-        );
-    } else {
-        core.set_active_model(&args.name)?;
-        eprintln!(
-            "active model set to '{}' (restart pulse to apply)",
-            args.name
-        );
-    }
-    Ok(())
-}
-
-async fn cmd_model_path(args: AiModelPathArgs, core: &PulseCore) -> anyhow::Result<()> {
-    let dir = core.model_dir(&args.name);
-    println!("{}", dir.display());
-    eprintln!("place model.onnx and tokenizer.json in that directory, then run:");
-    eprintln!("  pulse ai model set {}", args.name);
-    Ok(())
-}
-
-async fn cmd_model_remove(args: AiModelRemoveArgs, core: &PulseCore) -> anyhow::Result<()> {
-    core.remove_model(&args.name)?;
-    eprintln!("model '{}' removed", args.name);
-    Ok(())
-}
-
-async fn cmd_model_unset(core: &PulseCore) -> anyhow::Result<()> {
-    core.unset_active_model()?;
-    eprintln!("active model cleared — tagging will use rules only");
     Ok(())
 }
 
