@@ -4,7 +4,7 @@ use crate::types::{Feed, FeedItem};
 use reqwest::Client;
 use uuid::Uuid;
 
-const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)";
+const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/80avin/pulse-rs; feed-reader)";
 
 /// Result of an RSS/Atom fetch
 pub struct RssFetchResult {

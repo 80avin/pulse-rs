@@ -12,7 +12,7 @@ use crate::storage::queries::{get_feed, get_feeds};
 use crate::sync::health::compute_next_fetch;
 use crate::types::{FeedId, FeedType};
 
-const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)";
+const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/80avin/pulse-rs; feed-reader)";
 
 /// Commands that can be sent to the sync scheduler
 #[derive(Debug, Clone)]

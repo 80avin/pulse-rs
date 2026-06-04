@@ -91,7 +91,7 @@ HN's Firebase API does not support ETags. We store the highest item ID seen per 
 
 All requests use a descriptive User-Agent:
 ```
-Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)
+Pulse/0.1 (+https://github.com/80avin/pulse-rs; feed-reader)
 ```
 
 This is courteous to feed providers and helps them understand traffic sources.

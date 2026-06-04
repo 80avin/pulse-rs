@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 use crate::error::FeedError;
 
 const TOKEN_URL: &str = "https://www.reddit.com/api/v1/access_token";
-const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)";
+const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/80avin/pulse-rs; feed-reader)";
 /// Refresh 5 minutes before the 1-hour expiry to avoid mid-request expiry.
 const TOKEN_LIFETIME: Duration = Duration::from_secs(3300);
 

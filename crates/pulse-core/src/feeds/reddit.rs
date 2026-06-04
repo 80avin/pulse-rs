@@ -6,7 +6,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use uuid::Uuid;
 
-const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)";
+const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/80avin/pulse-rs; feed-reader)";
 const REDDIT_BASE: &str = "https://www.reddit.com";
 const REDDIT_OAUTH_BASE: &str = "https://oauth.reddit.com";
 

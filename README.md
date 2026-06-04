@@ -67,7 +67,7 @@ Pulse aggregates Hacker News, Reddit, and RSS feeds, then uses a hybrid on-devic
 
 ```bash
 # Clone
-git clone https://github.com/avinthakur080/pulse-rs
+git clone https://github.com/80avin/pulse-rs
 cd pulse-rs
 
 # Install frontend deps

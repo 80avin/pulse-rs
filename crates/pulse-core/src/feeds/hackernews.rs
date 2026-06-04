@@ -6,7 +6,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use uuid::Uuid;
 
-const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/avinthakur080/pulse-rs; feed-reader)";
+const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/80avin/pulse-rs; feed-reader)";
 const HN_API_BASE: &str = "https://hacker-news.firebaseio.com/v0";
 const CONCURRENT_ITEM_FETCHES: usize = 10;
 const FIRST_SYNC_LIMIT: usize = 30;
