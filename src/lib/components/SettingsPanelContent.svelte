@@ -22,10 +22,8 @@
 
   const okCount     = $derived(sources.filter(s => s.status === 'ok').length);
   const errCount    = $derived(sources.filter(s => s.status === 'error').length);
-  const unreadCount = $derived(items.filter(i => !i.read).length);
-  const savedCount  = $derived(items.filter(i => i.saved).length);
 
-  let dbSizeKb = $state(0);
+  let dbStats = $state({ totalItems: 0, unreadItems: 0, savedItems: 0, totalSources: 0, dbSizeKb: 0 });
   let clearing = $state(false);
 
   // Diagnostics state
@@ -35,8 +33,8 @@
 
   $effect(() => {
     if (!IS_TAURI) return;
-    tauriInvoke<{ dbSizeKb: number }>('get_db_stats')
-      .then(s => { dbSizeKb = s.dbSizeKb; })
+    tauriInvoke<{ totalItems: number; unreadItems: number; savedItems: number; totalSources: number; dbSizeKb: number }>('get_db_stats')
+      .then(s => { dbStats = s; })
       .catch(() => {});
     if (IS_DESKTOP) {
       tauriInvoke<string>('get_log_path').then(p => { logPath = p; }).catch(() => {});
@@ -47,7 +45,7 @@
     if (!confirm('Delete all cached items? Sources will remain. Re-sync to restore.')) return;
     clearing = true;
     await clearItems();
-    dbSizeKb = 0;
+    dbStats = { totalItems: 0, unreadItems: 0, savedItems: 0, totalSources: 0, dbSizeKb: 0 };
     clearing = false;
   }
 
@@ -112,10 +110,10 @@
   <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">overview</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     {#each [
-      { label: 'cached items', val: String(items.length),           color: T.cyan  },
-      { label: 'unread',       val: String(unreadCount),            color: T.cyan  },
-      { label: 'saved',        val: String(savedCount),             color: T.amber },
-      { label: 'sources ok',   val: `${okCount}/${sources.length}`, color: errCount > 0 ? T.amber : T.green },
+      { label: 'items',       val: String(dbStats.totalItems),   color: T.cyan  },
+      { label: 'unread',      val: String(dbStats.unreadItems),  color: T.cyan  },
+      { label: 'saved',       val: String(dbStats.savedItems),   color: T.amber },
+      { label: 'sources ok',  val: `${okCount}/${sources.length}`, color: errCount > 0 ? T.amber : T.green },
     ] as stat}
       <div style="padding:8px;background:{T.bg0};border:1px solid {T.bd0};border-radius:3px;">
         <div style="font:16px/1 {T.mono};color:{stat.color};font-variant-numeric:tabular-nums;">{stat.val}</div>
@@ -215,8 +213,8 @@
 <!-- Storage + About -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
   <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">storage</div>
-  <div style="font:11px/1.4 {T.mono};color:{T.ink1};">{items.length} items · {sources.length} sources</div>
-  <div style="margin-top:4px;font:10px/1.4 {T.mono};color:{T.ink3};">SQLite WAL{dbSizeKb > 0 ? ` · ${dbSizeKb >= 1024 ? (dbSizeKb/1024).toFixed(1)+' MB' : dbSizeKb+' KB'}` : ''}</div>
+  <div style="font:11px/1.4 {T.mono};color:{T.ink1};">{dbStats.totalItems} items · {sources.length} sources</div>
+  <div style="margin-top:4px;font:10px/1.4 {T.mono};color:{T.ink3};">SQLite WAL{dbStats.dbSizeKb > 0 ? ` · ${dbStats.dbSizeKb >= 1024 ? (dbStats.dbSizeKb/1024).toFixed(1)+' MB' : dbStats.dbSizeKb+' KB'}` : ''}</div>
 </div>
 
 <!-- Diagnostics -->
