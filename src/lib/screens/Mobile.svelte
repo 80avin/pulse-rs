@@ -78,50 +78,51 @@
 <div style="display:flex;flex-direction:column;width:100%;height:100%;background:{T.bg1};overflow:hidden;">
   <div style="height:var(--sat);flex-shrink:0;"></div>
 
-  <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+  <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;position:relative;">
     {#if storeReady.error}
       <div style="flex:1;display:flex;align-items:center;justify-content:center;font:11px/1 {T.mono};color:{T.red};">
         failed to load data — restart the app
       </div>
     {:else}
-      <!-- Tab content — kept mounted (display:none) when reader is open so scroll position survives back-navigation -->
-      <div style="display:{openItemId ? 'none' : 'flex'};flex:1;flex-direction:column;">
-        {#if tab === 'timeline'}
-          <MobileTimeline
-            {tab}
-            onTabChange={changeTab}
-            onOpen={openItem}
-          />
-        {:else if tab === 'sources'}
-          <MobileSources
-            {tab}
-            onTabChange={changeTab}
-            onSourceSelect={openSourceFeed}
-          />
-        {:else if tab === 'search'}
-          <MobileSearch
-            {tab}
-            onTabChange={changeTab}
-            onOpen={openItem}
-          />
-        {:else if tab === 'ai'}
-          <MobileAI {tab} onTabChange={changeTab} onTagFilter={handleTagFilter} onItemOpen={openItem} onSourceFilter={openSourceFeed} />
-        {:else if tab === 'settings'}
-          <MobileSettings {tab} onTabChange={changeTab} />
-        {:else}
-          <div style="flex:1;display:flex;align-items:center;justify-content:center;color:{T.ink3};font:11px/1 {T.mono};">
-            {tab}
-          </div>
-        {/if}
-      </div>
-
-      {#if openItemId}
-        <MobileReader
-          itemId={openItemId}
-          allIds={timelineIds}
-          onBack={goBack}
-          onNavigate={(id) => { openItemId = id; }}
+      <!-- Tab content — always rendered when its tab is active, stays mounted behind reader for scroll preservation -->
+      {#if tab === 'timeline'}
+        <MobileTimeline
+          {tab}
+          onTabChange={changeTab}
+          onOpen={openItem}
         />
+      {:else if tab === 'sources'}
+        <MobileSources
+          {tab}
+          onTabChange={changeTab}
+          onSourceSelect={openSourceFeed}
+        />
+      {:else if tab === 'search'}
+        <MobileSearch
+          {tab}
+          onTabChange={changeTab}
+          onOpen={openItem}
+        />
+      {:else if tab === 'ai'}
+        <MobileAI {tab} onTabChange={changeTab} onTagFilter={handleTagFilter} onItemOpen={openItem} onSourceFilter={openSourceFeed} />
+      {:else if tab === 'settings'}
+        <MobileSettings {tab} onTabChange={changeTab} />
+      {:else}
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;color:{T.ink3};font:11px/1 {T.mono};">
+          {tab}
+        </div>
+      {/if}
+
+      <!-- Reader overlays tab content via absolute positioning — tab underneath stays alive -->
+      {#if openItemId}
+        <div style="position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;">
+          <MobileReader
+            itemId={openItemId}
+            allIds={timelineIds}
+            onBack={goBack}
+            onNavigate={(id) => { openItemId = id; }}
+          />
+        </div>
       {/if}
     {/if}
   </div>
