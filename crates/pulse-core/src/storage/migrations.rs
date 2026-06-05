@@ -72,6 +72,21 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), StorageError> {
         tracing::info!("Applied migration M0003_add_note");
     }
 
+    if !applied.contains(&4) {
+        tracing::info!("Applying migration M0004_add_feed_hue");
+        apply_sql(
+            pool,
+            include_str!("../../migrations/M0004_add_feed_hue.sql"),
+            "M0004",
+        )
+        .await?;
+        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (4, unixepoch())")
+            .execute(pool)
+            .await
+            .map_err(StorageError::Sqlite)?;
+        tracing::info!("Applied migration M0004_add_feed_hue");
+    }
+
     tracing::info!("Database migrations complete");
     Ok(())
 }

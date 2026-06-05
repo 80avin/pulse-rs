@@ -51,6 +51,7 @@ fn row_to_feed(row: &sqlx::sqlite::SqliteRow) -> Result<Feed, StorageError> {
         next_fetch_at: row.try_get("next_fetch_at").map_err(StorageError::Sqlite)?,
         source_config,
         language: row.try_get("language").map_err(StorageError::Sqlite)?,
+        hue: row.try_get("hue").map_err(StorageError::Sqlite)?,
         created_at: row.try_get("created_at").map_err(StorageError::Sqlite)?,
         updated_at: row.try_get("updated_at").map_err(StorageError::Sqlite)?,
     })
@@ -63,7 +64,7 @@ pub async fn get_feeds(pool: &SqlitePool) -> Result<Vec<Feed>, StorageError> {
                 group_id, poll_interval_secs, is_enabled, etag, last_modified,
                 last_fetched_at, last_success_at, last_item_at, failure_streak,
                 total_fetches, total_failures, avg_latency_ms, next_fetch_at,
-                source_config, language, created_at, updated_at
+                source_config, language, hue, created_at, updated_at
          FROM feeds
          ORDER BY created_at ASC",
     )
@@ -81,7 +82,7 @@ pub async fn get_feed(pool: &SqlitePool, feed_id: &FeedId) -> Result<Feed, Stora
                 group_id, poll_interval_secs, is_enabled, etag, last_modified,
                 last_fetched_at, last_success_at, last_item_at, failure_streak,
                 total_fetches, total_failures, avg_latency_ms, next_fetch_at,
-                source_config, language, created_at, updated_at
+                source_config, language, hue, created_at, updated_at
          FROM feeds WHERE id = ?",
     )
     .bind(feed_id)

@@ -17,6 +17,7 @@ export interface Source {
   latencyMs: number;
   group: string;
   failureStreak: number;
+  hue?: number;
 }
 
 export interface Thumb {

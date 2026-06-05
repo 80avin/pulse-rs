@@ -216,6 +216,7 @@ async fn cmd_add(args: FeedAddArgs, core: &PulseCore) -> anyhow::Result<()> {
         next_fetch_at: Some(now),
         source_config: serde_json::json!({}),
         language: None,
+        hue: None,
         created_at: now,
         updated_at: now,
     };

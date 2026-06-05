@@ -44,6 +44,7 @@ interface BackendSource {
   lastSync: string | null;
   enabled: boolean;
   failureStreak: number;
+  hue: number | null;
 }
 
 interface BackendGroup { id: string; name: string; n: number; }
@@ -130,6 +131,7 @@ function adaptSource(b: BackendSource): Source {
     latencyMs: Math.round(b.avgLatencyMs ?? 0),
     group: b.group,
     failureStreak: b.failureStreak,
+    hue: b.hue ?? undefined,
   };
 }
 
@@ -516,11 +518,12 @@ export async function addSource(
   url: string,
   kind: 'hn' | 'reddit' | 'rss',
   group: string,
+  hue?: number,
 ): Promise<string> {
   const id = crypto.randomUUID();
   if (IS_TAURI) {
     await tauriInvoke('add_source', {
-      source: { id, name, url, kind, group, unread: 0, lastSync: null, enabled: true, itemCount: 0, failureStreak: 0 },
+      source: { id, name, url, kind, group, unread: 0, lastSync: null, enabled: true, itemCount: 0, failureStreak: 0, hue: hue ?? null },
     });
     await reloadSources();
   } else {
@@ -534,6 +537,7 @@ export async function addSource(
       latencyMs: 0,
       group,
       failureStreak: 0,
+      hue,
     });
   }
   return id;
@@ -545,9 +549,10 @@ export async function updateSource(
   url: string,
   kind: 'hn' | 'reddit' | 'rss',
   group: string,
+  hue?: number,
 ): Promise<void> {
   if (IS_TAURI) {
-    await tauriInvoke('update_source', { id, name, url, kind, group });
+    await tauriInvoke('update_source', { id, name, url, kind, group, hue: hue ?? null });
     await reloadSources();
   } else {
     const s = sources.find(s => s.id === id);
@@ -557,7 +562,19 @@ export async function updateSource(
       s.kind = kind;
       s.host = domainOf(url);
       s.group = group;
+      if (hue !== undefined) s.hue = hue;
     }
+  }
+}
+
+export interface FeedPreview { name: string; kind: string; }
+
+export async function detectFeed(url: string): Promise<FeedPreview | null> {
+  if (!IS_TAURI) return null;
+  try {
+    return await tauriInvoke<FeedPreview>('detect_feed', { url });
+  } catch {
+    return null;
   }
 }
 

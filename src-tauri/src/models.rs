@@ -15,6 +15,7 @@ pub struct SourceDto {
     pub last_sync: Option<String>,
     pub enabled: bool,
     pub failure_streak: i64,
+    pub hue: Option<i64>,
 }
 
 /// Feed item DTO sent to the frontend

@@ -83,39 +83,46 @@
       <div style="flex:1;display:flex;align-items:center;justify-content:center;font:11px/1 {T.mono};color:{T.red};">
         failed to load data — restart the app
       </div>
-    {:else if openItemId}
-      <MobileReader
-        itemId={openItemId}
-        allIds={timelineIds}
-        onBack={goBack}
-        onNavigate={(id) => { openItemId = id; }}
-      />
-    {:else if tab === 'timeline'}
-      <MobileTimeline
-        {tab}
-        onTabChange={changeTab}
-        onOpen={openItem}
-      />
-    {:else if tab === 'sources'}
-      <MobileSources
-        {tab}
-        onTabChange={changeTab}
-        onSourceSelect={openSourceFeed}
-      />
-    {:else if tab === 'search'}
-      <MobileSearch
-        {tab}
-        onTabChange={changeTab}
-        onOpen={openItem}
-      />
-    {:else if tab === 'ai'}
-      <MobileAI {tab} onTabChange={changeTab} onTagFilter={handleTagFilter} onItemOpen={openItem} onSourceFilter={openSourceFeed} />
-    {:else if tab === 'settings'}
-      <MobileSettings {tab} onTabChange={changeTab} />
     {:else}
-      <div style="flex:1;display:flex;align-items:center;justify-content:center;color:{T.ink3};font:11px/1 {T.mono};">
-        {tab}
+      <!-- Tab content — kept mounted (display:none) when reader is open so scroll position survives back-navigation -->
+      <div style="display:{openItemId ? 'none' : 'flex'};flex:1;flex-direction:column;">
+        {#if tab === 'timeline'}
+          <MobileTimeline
+            {tab}
+            onTabChange={changeTab}
+            onOpen={openItem}
+          />
+        {:else if tab === 'sources'}
+          <MobileSources
+            {tab}
+            onTabChange={changeTab}
+            onSourceSelect={openSourceFeed}
+          />
+        {:else if tab === 'search'}
+          <MobileSearch
+            {tab}
+            onTabChange={changeTab}
+            onOpen={openItem}
+          />
+        {:else if tab === 'ai'}
+          <MobileAI {tab} onTabChange={changeTab} onTagFilter={handleTagFilter} onItemOpen={openItem} onSourceFilter={openSourceFeed} />
+        {:else if tab === 'settings'}
+          <MobileSettings {tab} onTabChange={changeTab} />
+        {:else}
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;color:{T.ink3};font:11px/1 {T.mono};">
+            {tab}
+          </div>
+        {/if}
       </div>
+
+      {#if openItemId}
+        <MobileReader
+          itemId={openItemId}
+          allIds={timelineIds}
+          onBack={goBack}
+          onNavigate={(id) => { openItemId = id; }}
+        />
+      {/if}
     {/if}
   </div>
 </div>

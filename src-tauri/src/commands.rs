@@ -79,6 +79,7 @@ fn adapt_feed(feed: &Feed, unread: i64, item_count: i64) -> SourceDto {
         last_sync,
         enabled: feed.is_enabled,
         failure_streak: feed.failure_streak,
+        hue: feed.hue,
     }
 }
 
@@ -243,6 +244,7 @@ pub async fn add_source(state: State<'_, AppState>, source: SourceDto) -> Result
         next_fetch_at: None,
         source_config: serde_json::json!({}),
         language: None,
+        hue: source.hue,
         created_at: now,
         updated_at: now,
     };
@@ -263,6 +265,7 @@ pub async fn update_source(
     url: String,
     kind: String,
     group: String,
+    hue: Option<i64>,
 ) -> Result<(), String> {
     let core = state.core().await?;
     let existing = core.get_feed(&id).await.map_err(|e| e.to_string())?;
@@ -277,6 +280,7 @@ pub async fn update_source(
         feed_type,
         title: Some(name),
         group_id: Some(group).filter(|g| !g.is_empty() && g != "all"),
+        hue,
         updated_at: now,
         ..existing
     };

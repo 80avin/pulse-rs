@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { sources, groups, items, markAllRead, markSourceRead, addSource as storeAddSource, removeSource as storeRemoveSource, updateSource as storeUpdateSource, doSync as storeSync, syncSource as storeSyncSource, createGroup } from '$lib/store.svelte';
+  import { sources, groups, items, markAllRead, markSourceRead, addSource as storeAddSource, removeSource as storeRemoveSource, updateSource as storeUpdateSource, doSync as storeSync, syncSource as storeSyncSource, createGroup, detectFeed } from '$lib/store.svelte';
   import { logger } from '$lib/logger';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import StatusDot from '$lib/components/StatusDot.svelte';
@@ -58,6 +58,8 @@
   let editName = $state('');
   let editKind = $state<'rss'|'hn'|'reddit'>('rss');
   let editGroup = $state('all');
+  let editHue  = $state<number | undefined>(undefined);
+  let fetchingTitle = $state(false);
 
   function openEditSheet(id: string) {
     const s = sources.find(s => s.id === id);
@@ -67,13 +69,27 @@
     editName  = s.name;
     editKind  = s.kind;
     editGroup = s.group;
+    editHue   = s.hue;
     actionSheet = null;
+  }
+
+  async function fetchTitleForUrl(url: string) {
+    if (!url) return;
+    fetchingTitle = true;
+    try {
+      const preview = await detectFeed(url);
+      if (preview?.name) {
+        editName = preview.name;
+      }
+    } finally {
+      fetchingTitle = false;
+    }
   }
 
   async function submitEditSource() {
     if (!editingSourceId) return;
     const { url: normUrl } = inferSourceMeta(editUrl.trim());
-    await storeUpdateSource(editingSourceId, editName.trim() || normUrl, normUrl, editKind, editGroup);
+    await storeUpdateSource(editingSourceId, editName.trim() || normUrl, normUrl, editKind, editGroup, editHue);
     editingSourceId = null;
   }
 
@@ -479,7 +495,14 @@
       </div>
 
       <div style="display:flex;flex-direction:column;gap:6px;">
-        <label for="edit-name" style="font:10px/1 {T.mono};color:{T.ink3};">NAME</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <label for="edit-name" style="font:10px/1 {T.mono};color:{T.ink3};">NAME</label>
+          <button
+            onclick={() => fetchTitleForUrl(editUrl)}
+            disabled={fetchingTitle}
+            style="background:transparent;border:1px solid {T.bd1};border-radius:3px;padding:2px 8px;font:9px/1 {T.mono};color:{fetchingTitle ? T.ink3 : T.cyan};cursor:{fetchingTitle ? 'default' : 'pointer'};"
+          >{fetchingTitle ? 'fetching…' : 'fetch title'}</button>
+        </div>
         <input
           id="edit-name"
           bind:value={editName}
@@ -508,6 +531,33 @@
           >
             {#each groups as g}<option value={g.id}>{g.name}</option>{/each}
           </select>
+        </div>
+      </div>
+
+      <!-- Hue color picker -->
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <label style="font:10px/1 {T.mono};color:{T.ink3};">COLOUR</label>
+          {#if editHue != null}
+            <button
+              onclick={() => editHue = undefined}
+              style="background:transparent;border:none;color:{T.ink3};font:9px/1 {T.mono};cursor:pointer;padding:0;"
+            >reset</button>
+          {/if}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input
+            type="range"
+            min="0" max="360"
+            value={editHue ?? 200}
+            oninput={(e) => editHue = parseInt((e.target as HTMLInputElement).value)}
+            style="flex:1;accent-color:{T.cyan};height:6px;"
+          />
+          <div style="
+            width:28px;height:28px;border-radius:3px;flex-shrink:0;
+            background:{editHue != null ? `oklch(0.45 0.14 ${editHue})` : T.ink4};
+            border:1px solid {T.bd1};
+          "></div>
         </div>
       </div>
 

@@ -70,6 +70,7 @@ pub struct Feed {
     pub next_fetch_at: Option<i64>,
     pub source_config: serde_json::Value,
     pub language: Option<String>,
+    pub hue: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
 }

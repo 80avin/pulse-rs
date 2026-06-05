@@ -67,7 +67,7 @@
   // Source pill
   const sk          = $derived(SOURCE_KIND[source?.kind ?? 'rss'] ?? SOURCE_KIND.rss);
   const pillLabel   = $derived(source ? sourcePillLabel(source.name) : '??');
-  const pillHue     = $derived(source ? sourcePillHue(source.id) : 200);
+  const pillHue     = $derived(source ? (source.hue ?? sourcePillHue(source.id)) : 200);
   const pillSize    = $derived(isDense ? 20 : 28);
   const pillRadius  = $derived(source?.kind === 'reddit' ? '50%' : '3px');
   const pillBg      = $derived(`oklch(0.45 0.14 ${pillHue})`);

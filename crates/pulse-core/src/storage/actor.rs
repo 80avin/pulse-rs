@@ -399,8 +399,8 @@ async fn upsert_feed(pool: &SqlitePool, feed: &Feed) -> DbResult<()> {
          (id, url, feed_type, title, description, site_url, icon_url, group_id,
           poll_interval_secs, is_enabled, etag, last_modified, last_fetched_at,
           last_success_at, last_item_at, failure_streak, total_fetches, total_failures,
-          avg_latency_ms, next_fetch_at, source_config, language, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          avg_latency_ms, next_fetch_at, source_config, language, hue, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
              title = excluded.title,
              description = excluded.description,
@@ -412,6 +412,7 @@ async fn upsert_feed(pool: &SqlitePool, feed: &Feed) -> DbResult<()> {
              etag = excluded.etag,
              last_modified = excluded.last_modified,
              language = excluded.language,
+             hue = excluded.hue,
              next_fetch_at = excluded.next_fetch_at,
              updated_at = excluded.updated_at",
     )
@@ -437,6 +438,7 @@ async fn upsert_feed(pool: &SqlitePool, feed: &Feed) -> DbResult<()> {
     .bind(feed.next_fetch_at)
     .bind(&source_config)
     .bind(&feed.language)
+    .bind(feed.hue)
     .bind(feed.created_at)
     .bind(feed.updated_at)
     .execute(pool)
