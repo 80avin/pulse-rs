@@ -47,8 +47,20 @@ export const TAG_COLORS: Record<string, { fg: string; bg: string; bd: string }> 
   noise:        { fg: T.ink3,   bg: 'rgba(69,77,91,0.10)',    bd: 'rgba(69,77,91,0.30)'    },
 };
 
-export const SOURCE_KIND: Record<string, { glyph: string; color: string }> = {
-  rss:    { glyph: 'rss', color: T.amber  },
-  hn:     { glyph: 'hn',  color: T.orange },
-  reddit: { glyph: 'r/',  color: T.cyan   },
+export const SOURCE_KIND: Record<string, { glyph: string; color: string; accent: string; spine: string }> = {
+  rss:    { glyph: 'rss', color: T.amber,  accent: T.amber,  spine: '#1a73e8' },
+  hn:     { glyph: 'hn',  color: T.orange, accent: T.orange, spine: '#ff6600' },
+  reddit: { glyph: 'r/',  color: T.cyan,   accent: T.cyan,   spine: '#ff4500' },
 };
+
+export function sourcePillLabel(name: string): string {
+  const parts = name.split(/[\s/]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+export function sourcePillHue(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+  return Math.abs(h) % 360;
+}
