@@ -234,13 +234,12 @@ pub(crate) async fn perform_sync(
 
     match result {
         Ok((new_items, was_cached, etag, last_modified, last_item_at, source_config_update)) => {
-            if let Some(new_config) = source_config_update {
-                if let Err(e) = db
+            if let Some(new_config) = source_config_update
+                && let Err(e) = db
                     .update_feed_source_config(feed_id.clone(), new_config)
                     .await
-                {
-                    tracing::warn!(feed_id = %feed_id, error = %e, "Failed to update source config");
-                }
+            {
+                tracing::warn!(feed_id = %feed_id, error = %e, "Failed to update source config");
             }
 
             if let Err(e) = db

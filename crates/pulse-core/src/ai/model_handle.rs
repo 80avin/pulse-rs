@@ -79,12 +79,12 @@ impl<T: Send + Sync + 'static> ModelHandle<T> {
     }
 
     pub fn store(&self, model: Arc<T>) {
-        *self.inner.write().ok().expect("model_handle lock poisoned") = Some(model);
+        *self.inner.write().expect("model_handle lock poisoned") = Some(model);
         self.last_used.store(now_secs(), Ordering::Relaxed);
     }
 
     pub fn clear(&self) {
-        *self.inner.write().ok().expect("model_handle lock poisoned") = None;
+        *self.inner.write().expect("model_handle lock poisoned") = None;
     }
 
     pub fn is_loaded(&self) -> bool {
@@ -97,7 +97,7 @@ impl<T: Send + Sync + 'static> ModelHandle<T> {
         if now.saturating_sub(last) < threshold.as_secs() {
             return false;
         }
-        let mut guard = self.inner.write().ok().expect("model_handle lock poisoned");
+        let mut guard = self.inner.write().expect("model_handle lock poisoned");
         if guard.is_none() {
             return false;
         }
