@@ -173,6 +173,7 @@
       ontouchstart={onSwipeStart}
       ontouchmove={onSwipeMove}
       ontouchend={onSwipeEnd}
+      role="feed"
     >
       <!-- Header -->
       <div style="padding:12px 14px;border-bottom:1px solid {T.bd0};">

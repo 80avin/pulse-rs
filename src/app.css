@@ -41,6 +41,14 @@ input::placeholder { color: #454d5b; }
 @keyframes reader-slide-in-next { from { transform: translateX(30px); opacity: 0.6; } }
 @keyframes reader-slide-in-prev { from { transform: translateX(-30px); opacity: 0.6; } }
 
+/* Override default link color inside article content for dark bg contrast */
+.item-body a {
+  color: #4ecdd6;
+}
+.item-body a:visited {
+  color: #2a7a82;
+}
+
 /* Safe-area CSS custom properties — populated by env() with 0 fallback */
 :root {
   --sat: env(safe-area-inset-top, 0px);
