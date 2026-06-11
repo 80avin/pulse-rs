@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
-  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, createGroup, syncState, taggingProgress, loadingMore, fetchNextPage, searchItems, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter } from '$lib/store.svelte';
+  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, createGroup, syncState, taggingProgress, loadingMore, fetchNextPage, searchItems, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, pageCounts, dbStats, aiStats } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, sanitizeHtml } from '$lib/utils';
   import Icon from '$lib/components/Icon.svelte';
@@ -15,8 +15,8 @@
   import { createVirtualizer } from '@tanstack/svelte-virtual';
   import { get } from 'svelte/store';
 
-  let activeGroup  = $state('all');
-  let activeSource = $state<string | null>(null);
+  let activeGroup  = $derived(timelineFilter.groupId ?? 'all');
+  let activeSource = $derived(timelineFilter.feedId ?? null);
 
   // Resizable pane widths (clamped in the template)
   let leftRailWidth  = $state(232);
@@ -36,7 +36,7 @@
 
   let openId       = $state('');
   let desktopFilter = $state<'all'|'unread'|'saved'|'signal'>('all');
-  let activeTag    = $state<string | null>(null);
+  let activeTag    = $derived(timelineFilter.tag ?? null);
   const density    = $derived(settings.density);
   let searchQuery  = $state('');
   let ftsResults   = $state<import('$lib/types').FeedItem[] | null>(null);
@@ -143,22 +143,17 @@
 
   const openItem    = $derived(items.find(i => i.id === openId));
   const openSource  = $derived(openItem ? sources.find(s => s.id === openItem.src) : undefined);
-  const unreadCount = $derived(items.filter(i => !i.read).length);
-  const taggedCount = $derived(items.filter(i => i.tags.length > 0).length);
+  const unreadCount = $derived(pageCounts.unread);
+  const taggedCount = $derived(dbStats.tagCount);
 
-  // Top 5 tags by frequency across loaded items.
-  const topTags = $derived.by(() => {
-    const tagCounts: Record<string, number> = {};
-    for (const item of items) {
-      for (const t of item.tags) tagCounts[t] = (tagCounts[t] ?? 0) + 1;
-    }
-    return Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t]) => t);
-  });
+  // Top 5 tags from global AI stats.
+  const topTags = $derived(
+    aiStats.tagCounts.slice(0, 5).map(([tag]) => tag)
+  );
 
-  function selectGroup(id: string) { activeGroup = id; activeSource = null; searchQuery = ''; setGroupFilter(id === 'all' ? null : id); }
+  function selectGroup(id: string) { searchQuery = ''; setGroupFilter(id === 'all' ? null : id); }
   function setActiveTag(tag: string) {
     const next = activeTag === tag ? null : tag;
-    activeTag = next;
     setTagFilter(next);
     showAI = false;
   }
@@ -342,7 +337,7 @@
           <input
             bind:this={searchInputEl}
             bind:value={searchQuery}
-            placeholder="search {items.length} items"
+            placeholder="search {dbStats.totalItems} items"
             style="flex:1;font:11px/1 {T.mono};"
           />
           <KeyCap k="/" dim />
@@ -395,7 +390,6 @@
           <button
             onclick={() => {
               const next = activeSource === s.id ? null : s.id;
-              activeSource = next;
               setFeedFilter(next);
             }}
             style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:4px 12px;width:100%;background:{activeSource === s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {activeSource === s.id ? T.cyan : 'transparent'};font:11px/1.2 {T.mono};cursor:pointer;text-align:left;"
@@ -461,7 +455,7 @@
             {#if activeTag}
               {@const tc = TAG_COLORS[activeTag] ?? { fg: T.cyan, bg: 'rgba(78,205,214,0.10)', bd: 'rgba(78,205,214,0.30)' }}
               <button
-                onclick={() => { activeTag = null; }}
+                onclick={() => { setTagFilter(null); }}
                 style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;background:{tc.bg};border:1px solid {tc.bd};border-radius:2px;font:9px/1 {T.mono};color:{tc.fg};cursor:pointer;letter-spacing:0.2px;white-space:nowrap;"
               >
                 <span style="color:{T.ink3};">tag:</span>{activeTag} ×
@@ -709,7 +703,7 @@
           {/if}
 
           <!-- Shared AI content (model status, download, tag distribution) -->
-          <AiPanelContent compact onTagFilter={setActiveTag} onItemClick={(id) => { openItemAndRead(id); }} onSourceFilter={(id) => { const next = activeSource === id ? null : id; activeSource = next; setFeedFilter(next); showAI = false; }} />
+          <AiPanelContent compact onTagFilter={setActiveTag} onItemClick={(id) => { openItemAndRead(id); }} onSourceFilter={(id) => { const next = activeSource === id ? null : id; setFeedFilter(next); showAI = false; }} />
 
         </div>
       </div>
@@ -895,7 +889,7 @@
     <span><span style="color:{T.ink3};">group:</span> {activeGroupLabel}</span>
     {#if activeSource}<span style="color:{T.ink4};">·</span><span><span style="color:{T.ink3};">src:</span> {sources.find(s => s.id === activeSource)?.name}</span>{/if}
     <span style="color:{T.ink4};">·</span>
-    <span title="{filteredItems.length} items in view · {items.length} total loaded"><span style="color:{T.ink3};">items:</span> <span style="color:{T.ink0};">{filteredItems.length}</span> / {items.length}</span>
+    <span title="{filteredItems.length} items in view · {pageCounts.total} total matching filter"><span style="color:{T.ink3};">items:</span> <span style="color:{T.ink0};">{filteredItems.length}</span> / {pageCounts.total}</span>
     <span style="color:{T.ink4};">·</span>
     <span title="{unreadCount} unread in current view"><span style="color:{T.ink3};">unread:</span> <span style="color:{unreadCount > 0 ? T.cyan : T.ink3};">{unreadCount}</span></span>
     <span style="color:{T.ink4};">·</span>

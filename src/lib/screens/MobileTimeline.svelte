@@ -1,7 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import type { FeedItem } from '$lib/types';
-  import { groups, sources, items, storeReady, markAllRead, markRead, toggleSaved, hideItem, doSync as storeSync, syncState, loadingMore, fetchNextPage, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter } from '$lib/store.svelte';
+  import { groups, sources, items, storeReady, markAllRead, markRead, toggleSaved, hideItem, doSync as storeSync, syncState, loadingMore, fetchNextPage, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, pageCounts, aiStats } from '$lib/store.svelte';
   import { openExternal } from '$lib/utils';
   import { settings } from '$lib/settings.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
@@ -18,7 +18,7 @@
     onOpen: (id: string, ids: string[]) => void;
   } = $props();
 
-  let activeGroup = $state('all');
+  let activeGroup = $derived(timelineFilter.groupId ?? 'all');
   let filter = $state('all');
   let sort = $state('time');
   let syncing = $state(false);
@@ -36,24 +36,20 @@
     return list;
   });
 
-  // Counts from the loaded items (server-filtered, before client toggles).
+  // Counts from the backend (accurate, not derived from paginated items).
   const counts = $derived({
-    all:    items.length,
-    unread: items.filter(i => !i.read).length,
-    saved:  items.filter(i => i.saved).length,
-    signal: items.filter(i => i.aiScore >= settings.confidenceThreshold).length,
+    all:    pageCounts.total,
+    unread: pageCounts.unread,
+    saved:  pageCounts.saved,
+    signal: pageCounts.signal,
   });
 
-  const unread = $derived(items.filter(i => !i.read).length);
+  const unread = $derived(pageCounts.unread);
 
-  // Top 5 tags by frequency across loaded items.
-  const topTags = $derived.by(() => {
-    const tagCounts: Record<string, number> = {};
-    for (const item of items) {
-      for (const t of item.tags) tagCounts[t] = (tagCounts[t] ?? 0) + 1;
-    }
-    return Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t]) => t);
-  });
+  // Top 5 tags from global AI stats (accurate, not from paginated items).
+  const topTags = $derived(
+    aiStats.tagCounts.slice(0, 5).map(([tag]) => tag)
+  );
 
   function handleTagClick(tag: string) {
     setTagFilter(timelineFilter.tag === tag ? null : tag);
@@ -178,7 +174,7 @@
     </div>
   {:else}
     <!-- Group tabs -->
-    <GroupTabs {groups} active={activeGroup} onSelect={(id) => { activeGroup = id; filter = 'all'; setGroupFilter(id === 'all' ? null : id); }} />
+    <GroupTabs {groups} active={activeGroup} onSelect={(id) => { filter = 'all'; setGroupFilter(id === 'all' ? null : id); }} />
   {/if}
 
   <!-- Tag filter banner -->

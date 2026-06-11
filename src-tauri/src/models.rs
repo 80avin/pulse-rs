@@ -65,6 +65,16 @@ pub struct AiStatusDto {
     pub tagging_mode: String,
 }
 
+/// AI stats DTO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiStatsDto {
+    pub tagged_count: i64,
+    pub avg_score: f64,
+    pub tag_counts: Vec<(String, i64)>,
+    pub high_signal: Vec<FeedItemDto>,
+}
+
 /// Known downloadable model info
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -194,10 +204,21 @@ pub struct CursorDto {
     pub item_id: String,
 }
 
+/// Counts for a timeline view
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineCountsDto {
+    pub total: i64,
+    pub unread: i64,
+    pub saved: i64,
+    pub signal: i64,
+}
+
 /// Paginated timeline response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemPageDto {
     pub items: Vec<FeedItemDto>,
     pub next_cursor: Option<CursorDto>,
+    pub counts: TimelineCountsDto,
 }

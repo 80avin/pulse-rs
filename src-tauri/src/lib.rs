@@ -327,6 +327,7 @@ pub fn run() {
             commands::search_items,
             // AI management
             commands::get_ai_status,
+            commands::get_ai_stats,
             commands::list_models,
             commands::download_model,
             commands::delete_model,

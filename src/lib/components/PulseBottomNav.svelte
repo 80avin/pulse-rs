@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { items, taggingProgress, groups } from '$lib/store.svelte';
+  import { taggingProgress, groups, dbStats } from '$lib/store.svelte';
   import Icon from './Icon.svelte';
 
   let { active, onChange }: {
@@ -8,7 +8,7 @@
     onChange: (id: string) => void;
   } = $props();
 
-  const totalUnread = $derived(groups.find(g => g.id === 'all')?.n ?? items.filter(i => !i.read).length);
+  const totalUnread = $derived(groups.find(g => g.id === 'all')?.n ?? dbStats.unreadItems);
 
   const tabs = [
     { id: 'timeline', label: 'feed',     icon: 'list'   },

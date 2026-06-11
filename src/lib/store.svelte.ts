@@ -1,6 +1,7 @@
 import { ITEMS as MOCK_ITEMS, SOURCES as MOCK_SOURCES, GROUPS as MOCK_GROUPS } from './mock-data';
 import type { FeedItem, Source, Group, AiStatus, ModelInfo } from './types';
 import { logger } from './logger';
+import { settings } from './settings.svelte';
 
 const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
 
@@ -187,6 +188,15 @@ export interface ColdstartTiming {
 /** Populated once initStore completes. Null until then. */
 export const coldstartTiming = $state<{ data: ColdstartTiming | null }>({ data: null });
 
+/** Counts for the current timeline view (from backend, not derived from items). */
+export const pageCounts = $state({ total: 0, unread: 0, saved: 0, signal: 0 });
+
+/** Global DB stats (from backend). */
+export const dbStats = $state({ totalItems: 0, unreadItems: 0, savedItems: 0, totalSources: 0, dbSizeKb: 0, tagCount: 0 });
+
+/** Global AI stats (from backend). */
+export const aiStats = $state({ taggedCount: 0, avgScore: 0, tagCounts: [] as [string, number][], highSignal: [] as FeedItem[] });
+
 /** Call once from layout to wire the global tagging-progress event listener. */
 export async function setupTaggingListener(): Promise<() => void> {
   if (!IS_TAURI) return () => {};
@@ -212,6 +222,15 @@ export async function setupTaggingListener(): Promise<() => void> {
 interface BackendPage {
   items: BackendItem[];
   nextCursor: { publishedAt: number; itemId: string } | null;
+  counts: { total: number; unread: number; saved: number; signal: number };
+}
+
+// --- Backend AI stats type ---
+interface BackendAiStats {
+  taggedCount: number;
+  avgScore: number;
+  tagCounts: [string, number][];
+  highSignal: BackendItem[];
 }
 
 // --- Internal helpers ---
@@ -222,6 +241,7 @@ function filterArgs(limit: number, cursor?: { publishedAt: number; itemId: strin
     groupId: timelineFilter.groupId ?? null,
     feedId: timelineFilter.feedId ?? null,
     tag: timelineFilter.tag ?? null,
+    signalThreshold: settings.confidenceThreshold,
     limit,
     cursor: cursor
       ? { publishedAt: cursor.publishedAt, itemId: cursor.itemId }
@@ -237,12 +257,25 @@ async function resetAndFetch(): Promise<void> {
   items.splice(0, items.length, ...page.items.map(adaptItem));
   loadingMore.cursor = page.nextCursor ?? null;
   hasPrecedingItems.value = false;
+  if (page.counts) {
+    pageCounts.total = page.counts.total;
+    pageCounts.unread = page.counts.unread;
+    pageCounts.saved = page.counts.saved;
+    pageCounts.signal = page.counts.signal;
+  }
 }
 
 async function reloadItems(): Promise<void> {
   const page = await tauriInvoke<BackendPage>('get_items_page', filterArgs(100));
   items.splice(0, items.length, ...page.items.map(adaptItem));
   loadingMore.cursor = page.nextCursor ?? null;
+  hasPrecedingItems.value = false;
+  if (page.counts) {
+    pageCounts.total = page.counts.total;
+    pageCounts.unread = page.counts.unread;
+    pageCounts.saved = page.counts.saved;
+    pageCounts.signal = page.counts.signal;
+  }
 }
 
 async function reloadSources(): Promise<void> {
@@ -266,6 +299,26 @@ async function reloadAiStatus(): Promise<void> {
   aiStatus.fasttextModelName = s.fasttextModelName;
   aiStatus.minimlModelName  = s.minimlModelName;
   aiStatus.taggingMode      = s.taggingMode;
+}
+
+async function reloadDbStats(): Promise<void> {
+  if (!IS_TAURI) return;
+  const s = await tauriInvoke<{ totalItems: number; unreadItems: number; savedItems: number; totalSources: number; dbSizeKb: number; tagCount: number }>('get_db_stats');
+  dbStats.totalItems = s.totalItems;
+  dbStats.unreadItems = s.unreadItems;
+  dbStats.savedItems = s.savedItems;
+  dbStats.totalSources = s.totalSources;
+  dbStats.dbSizeKb = s.dbSizeKb;
+  dbStats.tagCount = s.tagCount;
+}
+
+async function reloadAiStats(): Promise<void> {
+  if (!IS_TAURI) return;
+  const s = await tauriInvoke<BackendAiStats>('get_ai_stats', { signalThreshold: settings.confidenceThreshold });
+  aiStats.taggedCount = s.taggedCount;
+  aiStats.avgScore = s.avgScore;
+  aiStats.tagCounts = s.tagCounts;
+  aiStats.highSignal = s.highSignal.map(adaptItem);
 }
 
 async function reloadModelsInternal(): Promise<void> {
@@ -321,6 +374,12 @@ export async function initStore(): Promise<void> {
       loadingMore.cursor = page.nextCursor ?? null;
       sources.splice(0, sources.length, ...bs.map(adaptSource));
       groups.splice(0, groups.length, ...bg);
+      if (page.counts) {
+        pageCounts.total = page.counts.total;
+        pageCounts.unread = page.counts.unread;
+        pageCounts.saved = page.counts.saved;
+        pageCounts.signal = page.counts.signal;
+      }
       const tAdaptDone = performance.now();
       storeReady.loading = false;
       storeReady.error = false;
@@ -338,6 +397,8 @@ export async function initStore(): Promise<void> {
       logger.info('coldstart: initStore complete', timing);
       reloadAiStatus().catch(e => logger.warn('ai status failed', e));
       reloadModelsInternal().catch(e => logger.warn('list_models failed', e));
+      reloadDbStats().catch(e => logger.warn('db stats failed', e));
+      reloadAiStats().catch(e => logger.warn('ai stats failed', e));
       return;
     } catch (e) {
       logger.warn(`coldstart: initStore attempt ${attempt + 1} failed after ${Math.round(performance.now() - tAttempt)}ms`, e);
@@ -375,7 +436,7 @@ export async function doSync(): Promise<void> {
   try {
     if (IS_TAURI) {
       const result = await tauriInvoke<{ newCount: number; error: string | null }>('sync_all');
-      await Promise.all([reloadItems(), reloadSources(), reloadGroups()]);
+      await Promise.all([reloadItems(), reloadSources(), reloadGroups(), reloadDbStats(), reloadAiStats()]);
       const t = new Date(); syncState.lastSyncAt = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
       syncState.lastNewCount = result.newCount;
     } else {
@@ -411,6 +472,12 @@ export async function fetchNextPage(): Promise<void> {
       hasPrecedingItems.value = true;
     }
     loadingMore.cursor = page.nextCursor ?? null;
+    if (page.counts) {
+      pageCounts.total = page.counts.total;
+      pageCounts.unread = page.counts.unread;
+      pageCounts.saved = page.counts.saved;
+      pageCounts.signal = page.counts.signal;
+    }
   } catch (e) {
     logger.warn('fetchNextPage failed', e);
   } finally {
@@ -442,43 +509,124 @@ export async function setTagFilter(tag: string | null): Promise<void> {
   await resetAndFetch();
 }
 
-export function markRead(id: string, read = true) {
+export async function markRead(id: string, read = true) {
   const item = items.find(i => i.id === id);
-  if (!item) return;
-  const wasRead = item.read;
-  item.read = read;
-  const src = sources.find(s => s.id === item.src);
-  if (src) {
-    const delta = !wasRead && read ? -1 : wasRead && !read ? 1 : 0;
-    if (delta !== 0) {
-      src.unread = Math.max(0, src.unread + delta);
-      for (const g of groups) {
-        if (g.id === 'all' || g.id === src.group) {
-          g.n = Math.max(0, g.n + delta);
+  const wasRead = item?.read;
+  // Optimistic update if item is in local cache
+  if (item) {
+    item.read = read;
+    const src = sources.find(s => s.id === item.src);
+    if (src) {
+      const delta = !wasRead && read ? -1 : wasRead && !read ? 1 : 0;
+      if (delta !== 0) {
+        src.unread = Math.max(0, src.unread + delta);
+        for (const g of groups) {
+          if (g.id === 'all' || g.id === src.group) {
+            g.n = Math.max(0, g.n + delta);
+          }
         }
       }
     }
   }
   if (IS_TAURI) {
-    tauriInvoke('mark_items_read', { ids: [id], read }).catch(e => logger.warn('mark_items_read failed', e));
+    try {
+      await tauriInvoke('mark_items_read', { ids: [id], read });
+    } catch (e) {
+      logger.warn('mark_items_read failed', e);
+      // Rollback optimistic update — backend mutation failed
+      if (item && wasRead !== undefined) {
+        item.read = wasRead;
+        const src = sources.find(s => s.id === item.src);
+        if (src) {
+          const delta = !wasRead && read ? -1 : wasRead && !read ? 1 : 0;
+          if (delta !== 0) {
+            src.unread = Math.max(0, src.unread - delta);
+            for (const g of groups) {
+              if (g.id === 'all' || g.id === src.group) {
+                g.n = Math.max(0, g.n - delta);
+              }
+            }
+          }
+        }
+      }
+      return;
+    }
+    // Backend mutation succeeded — refresh local state (best-effort, no rollback)
+    try {
+      await Promise.all([reloadDbStats(), reloadItems(), reloadSources(), reloadGroups()]);
+    } catch (e) {
+      logger.warn('reload after mark_read failed', e);
+    }
   }
 }
 
-export function toggleSaved(id: string, note?: string) {
+export async function toggleSaved(id: string, note?: string) {
   const item = items.find(i => i.id === id);
-  if (!item) return;
+  if (!item) {
+    // Still call backend even if item not in local cache
+    if (IS_TAURI) {
+      try {
+        await tauriInvoke('toggle_saved', { id, saved: true, note: note ?? null });
+        await Promise.all([reloadDbStats(), reloadItems()]);
+      } catch (e) {
+        logger.warn('toggle_saved failed', e);
+      }
+    }
+    return;
+  }
+  const wasSaved = item.saved;
+  const wasNote = item.note;
   item.saved = !item.saved;
   if (note !== undefined) item.note = note;
   if (IS_TAURI) {
-    tauriInvoke('toggle_saved', { id, saved: item.saved, note: note ?? item.note }).catch(e => logger.warn('toggle_saved failed', e));
+    try {
+      await tauriInvoke('toggle_saved', { id, saved: item.saved, note: note ?? item.note });
+    } catch (e) {
+      logger.warn('toggle_saved failed', e);
+      // Rollback optimistic update — backend mutation failed
+      item.saved = wasSaved;
+      item.note = wasNote;
+      return;
+    }
+    // Backend mutation succeeded — refresh local state (best-effort, no rollback)
+    try {
+      await Promise.all([reloadDbStats(), reloadItems()]);
+    } catch (e) {
+      logger.warn('reload after toggle_saved failed', e);
+    }
   }
 }
 
-export function markAllRead(ids: string[]) {
-  for (const id of ids) markRead(id, true);
+export async function markAllRead(ids: string[]) {
+  // Optimistic update: mark all items in local cache as read
+  for (const id of ids) {
+    const item = items.find(i => i.id === id);
+    if (item && !item.read) {
+      item.read = true;
+      const src = sources.find(s => s.id === item.src);
+      if (src) {
+        src.unread = Math.max(0, src.unread - 1);
+        for (const g of groups) {
+          if (g.id === 'all' || g.id === src.group) {
+            g.n = Math.max(0, g.n - 1);
+          }
+        }
+      }
+    }
+  }
+  if (IS_TAURI) {
+    try {
+      await tauriInvoke('mark_items_read', { ids, read: true });
+      await Promise.all([reloadDbStats(), reloadItems(), reloadSources(), reloadGroups()]);
+    } catch (e) {
+      logger.warn('mark_items_read batch failed', e);
+      // Rollback: reload from backend to restore correct state
+      await Promise.all([reloadItems(), reloadSources(), reloadGroups()]);
+    }
+  }
 }
 
-export function markSourceRead(sourceId: string) {
+export async function markSourceRead(sourceId: string) {
   let markedCount = 0;
   for (const item of items) {
     if (item.src === sourceId && !item.read) {
@@ -487,8 +635,8 @@ export function markSourceRead(sourceId: string) {
     }
   }
   const src = sources.find(s => s.id === sourceId);
+  const prevUnread = src?.unread ?? 0;
   if (src) {
-    const prevUnread = src.unread;
     src.unread = 0;
     if (prevUnread > 0) {
       for (const g of groups) {
@@ -499,16 +647,44 @@ export function markSourceRead(sourceId: string) {
     }
   }
   if (IS_TAURI) {
-    tauriInvoke('mark_source_read', { sourceId }).catch(e => logger.warn('mark_source_read failed', e));
+    try {
+      await tauriInvoke('mark_source_read', { sourceId });
+    } catch (e) {
+      logger.warn('mark_source_read failed', e);
+      // Rollback optimistic update — backend mutation failed
+      for (const item of items) {
+        if (item.src === sourceId) item.read = false;
+      }
+      if (src) {
+        src.unread = prevUnread;
+        for (const g of groups) {
+          if (g.id === 'all' || g.id === src.group) {
+            g.n = Math.max(0, g.n + prevUnread);
+          }
+        }
+      }
+      return;
+    }
+    // Backend mutation succeeded — refresh local state (best-effort, no rollback)
+    try {
+      await Promise.all([reloadDbStats(), reloadItems(), reloadSources(), reloadGroups()]);
+    } catch (e) {
+      logger.warn('reload after mark_source_read failed', e);
+    }
   }
 }
 
-export function hideItem(id: string) {
+export async function hideItem(id: string) {
   const idx = items.findIndex(i => i.id === id);
   if (idx !== -1) {
     items.splice(idx, 1);
-    if (IS_TAURI) {
-      tauriInvoke('hide_item', { id }).catch(e => logger.warn('hide_item failed', e));
+  }
+  if (IS_TAURI) {
+    try {
+      await tauriInvoke('hide_item', { id });
+      await Promise.all([reloadDbStats(), reloadItems(), reloadSources(), reloadGroups()]);
+    } catch (e) {
+      logger.warn('hide_item failed', e);
     }
   }
 }
@@ -553,7 +729,7 @@ export async function updateSource(
 ): Promise<void> {
   if (IS_TAURI) {
     await tauriInvoke('update_source', { id, name, url, kind, group, hue: hue ?? null });
-    await reloadSources();
+    await Promise.all([reloadSources(), reloadGroups()]);
   } else {
     const s = sources.find(s => s.id === id);
     if (s) {
@@ -584,7 +760,7 @@ export async function removeSource(id: string): Promise<void> {
     for (let i = items.length - 1; i >= 0; i--) {
       if (items[i].src === id) items.splice(i, 1);
     }
-    await Promise.all([reloadSources(), reloadGroups()]);
+    await Promise.all([reloadSources(), reloadGroups(), reloadDbStats()]);
   } else {
     const idx = sources.findIndex(s => s.id === id);
     if (idx !== -1) {
@@ -600,7 +776,7 @@ export async function syncSource(sourceId: string): Promise<void> {
   if (IS_TAURI) {
     try {
       await tauriInvoke('sync_source', { sourceId });
-      await Promise.all([reloadItems(), reloadSources(), reloadGroups()]);
+      await Promise.all([reloadItems(), reloadSources(), reloadGroups(), reloadDbStats(), reloadAiStats()]);
     } catch (e) {
       logger.error('sync_source failed', e);
     }
@@ -613,6 +789,7 @@ export async function clearItems(): Promise<void> {
   if (IS_TAURI) {
     await tauriInvoke('clear_items');
     items.splice(0, items.length);
+    await Promise.all([reloadSources(), reloadGroups(), reloadDbStats(), reloadAiStats()]);
   } else {
     items.splice(0, items.length);
   }
@@ -689,7 +866,7 @@ export async function deleteModel(modelId: string): Promise<void> {
 export async function retagAll(): Promise<number> {
   if (!IS_TAURI) return 0;
   const count = await tauriInvoke<number>('retag_all');
-  await Promise.all([reloadItems(), reloadAiStatus()]);
+  await Promise.all([reloadItems(), reloadAiStatus(), reloadAiStats()]);
   return count;
 }
 

@@ -940,4 +940,16 @@ impl PulseCore {
             .await
             .map_err(PulseError::Storage)
     }
+
+    pub async fn get_ai_stats(
+        &self,
+        signal_threshold: f64,
+    ) -> Result<storage::queries::AiStats, PulseError> {
+        self.db
+            .with_reader(|pool| async move {
+                storage::queries::get_ai_stats(&pool, signal_threshold).await
+            })
+            .await
+            .map_err(PulseError::Storage)
+    }
 }

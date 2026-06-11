@@ -17,8 +17,9 @@
   let showNewInput = $state(false);
   let renamingId = $state<string | null>(null);
   let renameVal = $state('');
+  $inspect({groups, counts});
 
-  function startPress(id: string) {
+  function startPress(_id: string) {
     pressTimer = setTimeout(() => { pressTimer = null; editing = true; }, 480);
   }
   function cancelPress() {

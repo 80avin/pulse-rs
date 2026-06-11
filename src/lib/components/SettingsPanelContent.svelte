@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { items, sources, clearItems, loadMockData, aiStatus, coldstartTiming } from '$lib/store.svelte';
+  import { items, sources, clearItems, loadMockData, aiStatus, coldstartTiming, dbStats } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
   import Icon from '$lib/components/Icon.svelte';
@@ -23,7 +23,6 @@
   const okCount     = $derived(sources.filter(s => s.status === 'ok').length);
   const errCount    = $derived(sources.filter(s => s.status === 'error').length);
 
-  let dbStats = $state({ totalItems: 0, unreadItems: 0, savedItems: 0, totalSources: 0, dbSizeKb: 0 });
   let clearing = $state(false);
 
   // Diagnostics state
@@ -33,9 +32,6 @@
 
   $effect(() => {
     if (!IS_TAURI) return;
-    tauriInvoke<{ totalItems: number; unreadItems: number; savedItems: number; totalSources: number; dbSizeKb: number }>('get_db_stats')
-      .then(s => { dbStats = s; })
-      .catch(() => {});
     if (IS_DESKTOP) {
       tauriInvoke<string>('get_log_path').then(p => { logPath = p; }).catch(() => {});
     }
@@ -45,7 +41,6 @@
     if (!confirm('Delete all cached items? Sources will remain. Re-sync to restore.')) return;
     clearing = true;
     await clearItems();
-    dbStats = { totalItems: 0, unreadItems: 0, savedItems: 0, totalSources: 0, dbSizeKb: 0 };
     clearing = false;
   }
 

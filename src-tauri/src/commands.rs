@@ -308,6 +308,7 @@ pub async fn get_items_page(
     group_id: Option<String>,
     feed_id: Option<String>,
     tag: Option<String>,
+    signal_threshold: Option<f64>,
     limit: Option<usize>,
     cursor: Option<CursorInput>,
 ) -> Result<ItemPageDto, String> {
@@ -317,6 +318,7 @@ pub async fn get_items_page(
         group_id: group_id.filter(|g| g != "all"),
         feed_id,
         tag,
+        signal_threshold,
         ..Default::default()
     };
     let tauri_cursor = cursor.map(|c| TimelineCursor {
@@ -333,6 +335,12 @@ pub async fn get_items_page(
             published_at: c.published_at,
             item_id: c.id,
         }),
+        counts: TimelineCountsDto {
+            total: page.counts.total,
+            unread: page.counts.unread,
+            saved: page.counts.saved,
+            signal: page.counts.signal,
+        },
     })
 }
 
@@ -402,9 +410,12 @@ pub async fn get_groups(state: State<'_, AppState>) -> Result<Vec<GroupDto>, Str
     let feeds = core.get_feeds().await.map_err(|e| e.to_string())?;
     let mut group_unread: HashMap<String, i64> = HashMap::new();
     for feed in &feeds {
-        let g = feed.group_id.as_deref().unwrap_or("all").to_string();
         let n = *unread_map.get(&feed.id).unwrap_or(&0);
-        *group_unread.entry(g).or_default() += n;
+        // Add to the feed's specific group (if it has one)
+        if let Some(gid) = &feed.group_id {
+            *group_unread.entry(gid.clone()).or_default() += n;
+        }
+        // Every feed contributes to the "all" pseudo-group
         *group_unread.entry("all".to_string()).or_default() += n;
     }
 
@@ -626,6 +637,24 @@ pub async fn get_ai_status(state: State<'_, AppState>) -> Result<AiStatusDto, St
         fasttext_model_name,
         miniml_model_name,
         tagging_mode,
+    })
+}
+
+#[tauri::command]
+pub async fn get_ai_stats(
+    state: State<'_, AppState>,
+    signal_threshold: f64,
+) -> Result<AiStatsDto, String> {
+    let core = state.core().await?;
+    let stats = core
+        .get_ai_stats(signal_threshold)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(AiStatsDto {
+        tagged_count: stats.tagged_count,
+        avg_score: stats.avg_score,
+        tag_counts: stats.tag_counts,
+        high_signal: stats.high_signal.iter().map(adapt_item).collect(),
     })
 }
 

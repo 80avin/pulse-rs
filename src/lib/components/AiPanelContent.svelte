@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
-  import { items, sources, aiStatus, models, taggingProgress, downloadModel, deleteModel, activateModel, retagAll, reloadAiInfo } from '$lib/store.svelte';
+  import { items, sources, aiStatus, models, taggingProgress, downloadModel, deleteModel, activateModel, retagAll, reloadAiInfo, aiStats } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
   import ScoreBar from '$lib/components/ScoreBar.svelte';
@@ -10,24 +10,11 @@
 
   let { compact = false, onTagFilter, onItemClick, onSourceFilter }: { compact?: boolean; onTagFilter?: (tag: string) => void; onItemClick?: (id: string, ids: string[]) => void; onSourceFilter?: (sourceId: string) => void } = $props();
 
-  const taggedItems = $derived(items.filter(i => i.tags.length > 0));
-
-  const avgScore = $derived.by(() => {
-    if (!taggedItems.length) return 0;
-    return taggedItems.reduce((s, i) => s + i.aiScore, 0) / taggedItems.length;
-  });
-
-  const tagCounts = $derived.by(() => {
-    const counts: Record<string, number> = {};
-    for (const item of taggedItems) {
-      for (const tag of item.tags) counts[tag] = (counts[tag] ?? 0) + 1;
-    }
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
-  });
-
-  const highSignal = $derived(
-    [...items].sort((a, b) => b.aiScore - a.aiScore).slice(0, 5)
-  );
+  // Use global AI stats from backend instead of deriving from paginated items
+  const taggedCount = $derived(aiStats.taggedCount);
+  const avgScore = $derived(aiStats.avgScore);
+  const tagCounts = $derived(aiStats.tagCounts);
+  const highSignal = $derived(aiStats.highSignal);
 
   let downloadProgress = $state<Record<string, { pct: number; file: string }>>({});
   let downloading = $state<Set<string>>(new Set());
@@ -136,8 +123,8 @@
     <!-- Stats grid -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
       {#each [
-        { label: 'tagged',    val: String(taggedItems.length),                       color: T.cyan  },
-        { label: 'avg score', val: taggedItems.length ? avgScore.toFixed(2) : '—',   color: T.amber },
+        { label: 'tagged',    val: String(taggedCount),                       color: T.cyan  },
+        { label: 'avg score', val: taggedCount > 0 ? avgScore.toFixed(2) : '—',   color: T.amber },
         { label: 'tags',      val: String(tagCounts.length),                         color: T.ink1  },
       ] as stat}
         <div style="padding:8px;background:{T.bg0};border:1px solid {T.bd0};border-radius:3px;text-align:center;">

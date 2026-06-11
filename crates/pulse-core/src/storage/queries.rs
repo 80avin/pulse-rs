@@ -1,7 +1,7 @@
 use crate::error::StorageError;
 use crate::types::{
     AiTag, DbStats, Feed, FeedGroup, FeedId, FeedItem, FeedItemView, FeedType, ItemId,
-    TaggerSource, TimelineCursor, TimelineFilter, TimelinePage,
+    TaggerSource, TimelineCounts, TimelineCursor, TimelineFilter, TimelinePage,
 };
 use sqlx::SqlitePool;
 use std::str::FromStr;
@@ -167,6 +167,82 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
     })
 }
 
+/// Fetch counts for timeline items matching the filter
+pub async fn get_timeline_counts(
+    pool: &SqlitePool,
+    filter: &TimelineFilter,
+) -> Result<TimelineCounts, StorageError> {
+    use sqlx::Row;
+    let mut conditions = vec!["ist.is_hidden = 0".to_string()];
+
+    if filter.group_id.is_some() {
+        conditions.push("f.group_id = ?".to_string());
+    }
+    if filter.feed_id.is_some() {
+        conditions.push("fi.feed_id = ?".to_string());
+    }
+    if filter.is_read.is_some() {
+        conditions.push("ist.is_read = ?".to_string());
+    }
+    if filter.is_saved.is_some() {
+        conditions.push("ist.is_saved = ?".to_string());
+    }
+    if filter.tag.is_some() {
+        conditions.push(
+            "EXISTS (SELECT 1 FROM ai_tags _tf WHERE _tf.item_id = fi.id AND _tf.tag = ?)"
+                .to_string(),
+        );
+    }
+
+    let where_clause = conditions.join(" AND ");
+
+    let threshold = filter.signal_threshold.unwrap_or(0.5);
+    let sql = format!(
+        "SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN ist.is_read = 0 THEN 1 ELSE 0 END) as unread,
+            SUM(CASE WHEN ist.is_saved = 1 THEN 1 ELSE 0 END) as saved,
+            SUM(CASE WHEN COALESCE(at_signal.max_confidence, 0.0) >= ? THEN 1 ELSE 0 END) as signal
+         FROM feed_items fi
+         JOIN feeds f ON fi.feed_id = f.id
+         JOIN item_states ist ON ist.item_id = fi.id
+         LEFT JOIN (
+             SELECT item_id, MAX(confidence) as max_confidence
+             FROM ai_tags
+             GROUP BY item_id
+         ) at_signal ON at_signal.item_id = fi.id
+         WHERE {where_clause}"
+    );
+
+    let mut query = sqlx::query(&sql);
+    query = query.bind(threshold);
+
+    if let Some(ref g) = filter.group_id {
+        query = query.bind(g.as_str());
+    }
+    if let Some(ref f) = filter.feed_id {
+        query = query.bind(f.as_str());
+    }
+    if let Some(r) = filter.is_read {
+        query = query.bind(r as i64);
+    }
+    if let Some(s) = filter.is_saved {
+        query = query.bind(s as i64);
+    }
+    if let Some(ref t) = filter.tag {
+        query = query.bind(t.as_str());
+    }
+
+    let row = query.fetch_one(pool).await.map_err(StorageError::Sqlite)?;
+
+    Ok(TimelineCounts {
+        total: row.try_get("total").unwrap_or(0),
+        unread: row.try_get("unread").unwrap_or(0),
+        saved: row.try_get("saved").unwrap_or(0),
+        signal: row.try_get("signal").unwrap_or(0),
+    })
+}
+
 /// Fetch a page of timeline items
 pub async fn get_timeline(
     pool: &SqlitePool,
@@ -274,10 +350,14 @@ pub async fn get_timeline(
         None
     };
 
+    // Fetch counts in parallel
+    let counts = get_timeline_counts(pool, filter).await.unwrap_or_default();
+
     Ok(TimelinePage {
         items,
         next_cursor,
         has_more,
+        counts,
     })
 }
 
@@ -591,5 +671,107 @@ pub async fn get_db_stats(pool: &SqlitePool) -> Result<DbStats, StorageError> {
         saved_count,
         tag_count,
         db_size_bytes,
+    })
+}
+
+/// AI stats for the AI panel
+#[derive(Debug, Clone, Default)]
+pub struct AiStats {
+    pub tagged_count: i64,
+    pub avg_score: f64,
+    pub tag_counts: Vec<(String, i64)>,
+    pub high_signal: Vec<FeedItemView>,
+}
+
+/// Fetch AI stats for the AI panel
+pub async fn get_ai_stats(
+    pool: &SqlitePool,
+    signal_threshold: f64,
+) -> Result<AiStats, StorageError> {
+    use sqlx::Row;
+
+    // Count of tagged items (items with at least one AI tag)
+    let tagged_count: i64 = sqlx::query_scalar("SELECT COUNT(DISTINCT item_id) FROM ai_tags")
+        .fetch_one(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
+
+    // Average signal score across all items with tags (using derived table)
+    let avg_score: f64 = sqlx::query_scalar(
+        "SELECT COALESCE(AVG(max_confidence), 0.0)
+         FROM (
+             SELECT item_id, MAX(confidence) as max_confidence
+             FROM ai_tags
+             GROUP BY item_id
+         )",
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(StorageError::Sqlite)?;
+
+    // Tag distribution
+    let tag_rows = sqlx::query(
+        "SELECT tag, COUNT(DISTINCT item_id) as count
+         FROM ai_tags
+         GROUP BY tag
+         ORDER BY count DESC",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(StorageError::Sqlite)?;
+
+    let mut tag_counts = Vec::new();
+    for row in &tag_rows {
+        let tag: String = row.try_get("tag").map_err(StorageError::Sqlite)?;
+        let count: i64 = row.try_get("count").map_err(StorageError::Sqlite)?;
+        tag_counts.push((tag, count));
+    }
+
+    // Top 5 high signal items (pre-filter high signal items using CTE)
+    let high_signal_rows = sqlx::query(
+        "WITH high_signal_items AS (
+            SELECT item_id, MAX(confidence) as signal
+            FROM ai_tags
+            GROUP BY item_id
+            HAVING signal >= ?
+        )
+        SELECT
+            fi.id, fi.title, fi.url, fi.author, fi.published_at, fi.fetched_at,
+            fi.word_count, fi.score, fi.comment_count, fi.comment_url, fi.body_text, fi.body_html,
+            json_extract(fi.source_meta, '$.external_url') AS external_url,
+            json_extract(fi.source_meta, '$.og_image') AS og_image,
+            f.id AS feed_id, f.title AS feed_title, f.feed_type, f.url AS feed_url,
+            f.group_id, fg.name AS group_name,
+            ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
+            COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
+            hi.signal AS signal
+         FROM high_signal_items hi
+         JOIN feed_items fi ON fi.id = hi.item_id
+         JOIN feeds f ON fi.feed_id = f.id
+         LEFT JOIN feed_groups fg ON f.group_id = fg.id
+         JOIN item_states ist ON ist.item_id = fi.id
+         LEFT JOIN ai_tags at ON at.item_id = fi.id
+         WHERE ist.is_hidden = 0
+         GROUP BY fi.id
+         ORDER BY hi.signal DESC, fi.published_at DESC
+         LIMIT 5"
+    )
+    .bind(signal_threshold)
+    .fetch_all(pool)
+    .await
+    .map_err(StorageError::Sqlite)?;
+
+    let mut high_signal = Vec::new();
+    for row in &high_signal_rows {
+        if let Ok(item) = row_to_feed_item_view(row) {
+            high_signal.push(item);
+        }
+    }
+
+    Ok(AiStats {
+        tagged_count,
+        avg_score,
+        tag_counts,
+        high_signal,
     })
 }

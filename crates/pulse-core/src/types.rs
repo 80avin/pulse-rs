@@ -242,6 +242,16 @@ pub struct TimelineFilter {
     pub is_read: Option<bool>,
     pub is_saved: Option<bool>,
     pub tag: Option<String>,
+    pub signal_threshold: Option<f64>,
+}
+
+/// Counts for a timeline view
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TimelineCounts {
+    pub total: i64,
+    pub unread: i64,
+    pub saved: i64,
+    pub signal: i64,
 }
 
 /// A page of timeline results
@@ -250,6 +260,7 @@ pub struct TimelinePage {
     pub items: Vec<FeedItemView>,
     pub next_cursor: Option<TimelineCursor>,
     pub has_more: bool,
+    pub counts: TimelineCounts,
 }
 
 /// Result of a sync operation for a feed
@@ -260,6 +271,15 @@ pub struct SyncResult {
     pub skipped_items: usize,
     pub fetch_latency_ms: u64,
     pub was_cached: bool,
+}
+
+/// AI statistics for the AI panel
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiStats {
+    pub tagged_count: i64,
+    pub avg_score: f64,
+    pub tag_counts: Vec<(String, i64)>,
+    pub high_signal: Vec<FeedItemView>,
 }
 
 /// DB statistics

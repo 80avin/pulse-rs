@@ -54,6 +54,7 @@ pub async fn run(args: TimelineArgs, core: &PulseCore, global_json: bool) -> any
         is_read: if args.unread { Some(false) } else { None },
         is_saved: if args.saved { Some(true) } else { None },
         tag: args.tag,
+        ..Default::default()
     };
 
     let page = core.get_timeline_page(filter, None, args.limit).await?;
