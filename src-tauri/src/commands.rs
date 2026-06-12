@@ -308,6 +308,8 @@ pub async fn get_items_page(
     group_id: Option<String>,
     feed_id: Option<String>,
     tag: Option<String>,
+    is_read: Option<bool>,
+    is_saved: Option<bool>,
     signal_threshold: Option<f64>,
     limit: Option<usize>,
     cursor: Option<CursorInput>,
@@ -318,8 +320,9 @@ pub async fn get_items_page(
         group_id: group_id.filter(|g| g != "all"),
         feed_id,
         tag,
+        is_read,
+        is_saved,
         signal_threshold,
-        ..Default::default()
     };
     let tauri_cursor = cursor.map(|c| TimelineCursor {
         published_at: c.published_at,

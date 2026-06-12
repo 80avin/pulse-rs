@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
-  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, createGroup, syncState, taggingProgress, loadingMore, fetchNextPage, searchItems, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, pageCounts, dbStats, aiStats } from '$lib/store.svelte';
+  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, createGroup, syncState, taggingProgress, loadingMore, fetchNextPage, searchItems, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts, dbStats, aiStats } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, sanitizeHtml } from '$lib/utils';
   import Icon from '$lib/components/Icon.svelte';
@@ -35,7 +35,12 @@
   function stopDrag() { dragging = null; }
 
   let openId       = $state('');
-  let desktopFilter = $state<'all'|'unread'|'saved'|'signal'>('all');
+  let signalActive  = $state(false);
+  const desktopFilter = $derived<'all'|'unread'|'saved'|'signal'>(
+    signalActive ? 'signal' :
+    timelineFilter.isRead === false ? 'unread' :
+    timelineFilter.isSaved === true ? 'saved' : 'all'
+  );
   let activeTag    = $derived(timelineFilter.tag ?? null);
   const density    = $derived(settings.density);
   let searchQuery  = $state('');
@@ -65,7 +70,7 @@
     overscan: 10,
   });
   $effect(() => {
-    get(listVirtualizer).setOptions({ count: filteredItems.length });
+    get(listVirtualizer).setOptions({ count: displayItems.length });
   });
 
   // Action: called when each virtual item wrapper mounts; reports actual height to the
@@ -93,7 +98,7 @@
   // After the virtualizer layout is done (items populated, count set),
   // check if the list is too short to scroll — if so, fetch more.
   $effect(() => {
-    if (filteredItems.length === 0) return;
+    if (displayItems.length === 0) return;
     if (!listScrollEl || !loadingMore.cursor || loadingMore.active) return;
     requestAnimationFrame(() => {
       if (!listScrollEl || !loadingMore.cursor || loadingMore.active) return;
@@ -123,7 +128,7 @@
     activeGroup === 'all' ? sources : sources.filter(s => s.group === activeGroup)
   );
 
-  const filteredItems = $derived.by(() => {
+  const displayItems = $derived.by(() => {
     // When Tauri FTS results are ready, use them directly (full-DB search).
     if (IS_TAURI && ftsResults !== null && searchQuery.trim()) return ftsResults;
 
@@ -135,9 +140,8 @@
         i.title.toLowerCase().includes(q) || (i.snippet?.toLowerCase().includes(q) ?? false)
       );
     }
-    if (desktopFilter === 'unread') list = list.filter(i => !i.read);
-    else if (desktopFilter === 'saved') list = list.filter(i => i.saved);
-    else if (desktopFilter === 'signal') list = list.filter(i => i.aiScore >= settings.confidenceThreshold);
+    // Signal filtering remains client-side (TODO: move to backend)
+    if (signalActive) list = list.filter(i => i.aiScore >= settings.confidenceThreshold);
     return list;
   });
 
@@ -219,15 +223,15 @@
 
       switch (e.key) {
         case 'j': case 'ArrowDown': {
-          const cur = filteredItems.findIndex(i => i.id === openId);
-          const next = filteredItems[Math.min(cur + 1, filteredItems.length - 1)];
+          const cur = displayItems.findIndex(i => i.id === openId);
+          const next = displayItems[Math.min(cur + 1, displayItems.length - 1)];
           if (next) openItemAndRead(next.id);
           break;
         }
         case 'k': case 'ArrowUp': {
-          const cur = filteredItems.findIndex(i => i.id === openId);
+          const cur = displayItems.findIndex(i => i.id === openId);
           if (cur <= 0) break;
-          const prev = filteredItems[cur - 1];
+          const prev = displayItems[cur - 1];
           if (prev) openItemAndRead(prev.id);
           break;
         }
@@ -243,8 +247,8 @@
         case 'h':
         case 'x': {
           if (!openItem) break;
-          const cur = filteredItems.findIndex(i => i.id === openItem!.id);
-          const fallback = filteredItems[Math.max(0, cur - 1)];
+          const cur = displayItems.findIndex(i => i.id === openItem!.id);
+          const fallback = displayItems[Math.max(0, cur - 1)];
           hideItem(openItem.id);
           openId = (fallback && fallback.id !== openItem!.id) ? fallback.id : '';
           break;
@@ -293,7 +297,7 @@
     <div style="width:18px;"></div>
     <span style="font:600 11px/1 {T.mono};color:{T.ink0};letter-spacing:1px;">PULSE<span style="color:{T.cyan};">.</span></span>
     <span style="font:11px/1 {T.mono};color:{T.ink3};">—</span>
-    <span style="font:11px/1 {T.mono};color:{T.ink2};">{activeGroupLabel} · {filteredItems.length} items</span>
+    <span style="font:11px/1 {T.mono};color:{T.ink2};">{activeGroupLabel} · {displayItems.length} items</span>
     <span style="flex:1;"></span>
     <button onclick={() => searchInputEl?.focus()} style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" title="Search (/)">
       <Icon name="search" size={13} color={T.ink1} />
@@ -428,7 +432,7 @@
           <span style="flex:1;"></span>
           {#if unreadCount > 0}
             <button
-              onclick={() => markAllRead(filteredItems.map(i => i.id))}
+              onclick={() => markAllRead(displayItems.map(i => i.id))}
               style="background:transparent;border:none;cursor:pointer;font:9px/1 {T.mono};color:{T.ink2};letter-spacing:0.3px;"
               title="Mark all read in current view"
             >mark all read</button>
@@ -436,16 +440,16 @@
         </div>
         <!-- Filter strip -->
         <div style="display:flex;gap:2px;padding:0 6px 6px;">
-          {#each ([['all','all'],['unread','unread'],['saved','saved'],['signal','signal']] as const) as [id, label]}
+          {#each ([['all',()=>{setReadFilter(null);setSavedFilter(null);signalActive=false}],['unread',()=>{setReadFilter(false);setSavedFilter(null);signalActive=false}],['saved',()=>{setReadFilter(null);setSavedFilter(true);signalActive=false}],['signal',()=>{setReadFilter(null);setSavedFilter(null);signalActive=true}]] as const) as [id, action]}
             <button
-              onclick={() => { desktopFilter = id; }}
+              onclick={action}
               style="
                 padding:3px 10px;border-radius:2px;border:none;cursor:pointer;
                 font:9px/1 {T.mono};letter-spacing:0.4px;text-transform:uppercase;
                 background:{desktopFilter === id ? T.bg3 : 'transparent'};
                 color:{desktopFilter === id ? T.cyan : T.ink3};
               "
-            >{label}</button>
+            >{id}</button>
           {/each}
         </div>
 
@@ -485,14 +489,14 @@
       </div>
 
       <div bind:this={listScrollEl} style="flex:1;overflow-y:auto;position:relative;">
-        {#if filteredItems.length === 0 && !storeReady.loading}
+        {#if displayItems.length === 0 && !storeReady.loading}
           <div style="padding:32px;text-align:center;font:11px/1.6 {T.mono};color:{T.ink3};">
             {searchQuery ? `no results for "${searchQuery}"` : 'no items in this view'}
           </div>
         {:else}
           <div style="height:{$listVirtualizer.getTotalSize()}px;position:relative;">
             {#each $listVirtualizer.getVirtualItems() as vItem (vItem.key)}
-              {@const item = filteredItems[vItem.index]}
+              {@const item = displayItems[vItem.index]}
               {#if item}
                 {@const source = sources.find(s => s.id === item.src)}
                 <div
@@ -804,7 +808,7 @@
           <span>{ci.note ? 'Edit note' : 'Save with note…'}</span>
         </button>
         <button
-          onclick={() => { const cur = filteredItems.findIndex(i => i.id === ci.id); const fallback = filteredItems[Math.max(0, cur - 1)]; hideItem(ci.id); openId = (fallback && fallback.id !== ci.id) ? fallback.id : ''; contextMenu = null; }}
+          onclick={() => { const cur = displayItems.findIndex(i => i.id === ci.id); const fallback = displayItems[Math.max(0, cur - 1)]; hideItem(ci.id); openId = (fallback && fallback.id !== ci.id) ? fallback.id : ''; contextMenu = null; }}
           style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.red};cursor:pointer;text-align:left;"
           onmouseenter={(e) => (e.currentTarget as HTMLElement).style.background = T.bg2}
           onmouseleave={(e) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
@@ -889,7 +893,7 @@
     <span><span style="color:{T.ink3};">group:</span> {activeGroupLabel}</span>
     {#if activeSource}<span style="color:{T.ink4};">·</span><span><span style="color:{T.ink3};">src:</span> {sources.find(s => s.id === activeSource)?.name}</span>{/if}
     <span style="color:{T.ink4};">·</span>
-    <span title="{filteredItems.length} items in view · {pageCounts.total} total matching filter"><span style="color:{T.ink3};">items:</span> <span style="color:{T.ink0};">{filteredItems.length}</span> / {pageCounts.total}</span>
+    <span title="{displayItems.length} items in view · {pageCounts.total} total matching filter"><span style="color:{T.ink3};">items:</span> <span style="color:{T.ink0};">{displayItems.length}</span> / {pageCounts.total}</span>
     <span style="color:{T.ink4};">·</span>
     <span title="{unreadCount} unread in current view"><span style="color:{T.ink3};">unread:</span> <span style="color:{unreadCount > 0 ? T.cyan : T.ink3};">{unreadCount}</span></span>
     <span style="color:{T.ink4};">·</span>

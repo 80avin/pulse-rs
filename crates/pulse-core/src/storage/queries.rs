@@ -350,8 +350,13 @@ pub async fn get_timeline(
         None
     };
 
-    // Fetch counts in parallel
-    let counts = get_timeline_counts(pool, filter).await.unwrap_or_default();
+    // Fetch counts without read/saved filter so tab badges stay global (scoped by group/feed/tag only)
+    let count_filter = TimelineFilter {
+        is_read: None,
+        is_saved: None,
+        ..filter.clone()
+    };
+    let counts = get_timeline_counts(pool, &count_filter).await.unwrap_or_default();
 
     Ok(TimelinePage {
         items,

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import type { FeedItem } from '$lib/types';
-  import { groups, sources, items, storeReady, markAllRead, markRead, toggleSaved, hideItem, doSync as storeSync, syncState, loadingMore, fetchNextPage, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, pageCounts, aiStats } from '$lib/store.svelte';
+  import { groups, sources, items, storeReady, markAllRead, markRead, toggleSaved, hideItem, doSync as storeSync, syncState, loadingMore, fetchNextPage, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts, aiStats } from '$lib/store.svelte';
   import { openExternal } from '$lib/utils';
   import { settings } from '$lib/settings.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
@@ -19,22 +19,28 @@
   } = $props();
 
   let activeGroup = $derived(timelineFilter.groupId ?? 'all');
-  let filter = $state('all');
   let sort = $state('time');
   let syncing = $state(false);
   let showFilter = $state(true);
   let actionSheetItem = $state<FeedItem | null>(null);
+  let signalActive = $state(false);
 
-  // Items filtered only by client-side toggles (read/saved/signal/sort).
-  // Group, source, and tag are already applied server-side in `items`.
-  const filteredItems = $derived.by(() => {
+  // Group, feed, tag, read, and saved filters are applied server-side in `items`.
+  // Signal filtering is client-side for now (TODO: move to server-side).
+  const displayItems = $derived.by(() => {
     let list = items as typeof items;
-    if (filter === 'unread') list = list.filter(i => !i.read);
-    else if (filter === 'saved') list = list.filter(i => i.saved);
-    else if (filter === 'signal') list = list.filter(i => i.aiScore >= settings.confidenceThreshold);
+    if (signalActive) list = list.filter(i => i.aiScore >= settings.confidenceThreshold);
     if (sort === 'score') list = [...list].sort((a, b) => b.aiScore - a.aiScore);
     return list;
   });
+
+  // Which tab is highlighted in FilterStrip — derived from server-side filter state.
+  const filter = $derived(
+    signalActive ? 'signal' :
+    timelineFilter.isRead === false ? 'unread' :
+    timelineFilter.isSaved === true ? 'saved' :
+    'all'
+  );
 
   // Counts from the backend (accurate, not derived from paginated items).
   const counts = $derived({
@@ -43,8 +49,6 @@
     saved:  pageCounts.saved,
     signal: pageCounts.signal,
   });
-
-  const unread = $derived(pageCounts.unread);
 
   // Top 5 tags from global AI stats (accurate, not from paginated items).
   const topTags = $derived(
@@ -72,7 +76,7 @@
     overscan: 10,
   });
   $effect(() => {
-    get(listVirtualizer).setOptions({ count: filteredItems.length });
+    get(listVirtualizer).setOptions({ count: displayItems.length });
   });
 
   function measureItem(el: HTMLElement) {
@@ -98,7 +102,7 @@
   // After the virtualizer layout is done (items populated, count set),
   // check if the list is too short to scroll — if so, fetch more.
   $effect(() => {
-    if (filteredItems.length === 0) return;
+    if (displayItems.length === 0) return;
     if (!listScrollEl || !loadingMore.cursor || loadingMore.active) return;
     // Let the virtualizer finish layout before measuring
     requestAnimationFrame(() => {
@@ -154,7 +158,7 @@
     <div style="display:flex;align-items:center;gap:8px;">
       <span><span style="color:{T.ink3};">ai</span> <span style="color:{settings.aiTagging ? T.amber : T.ink3};">{settings.aiTagging ? 'on' : 'off'}</span></span>
       <span style="color:{T.ink3};">·</span>
-      <span style="color:{T.ink1};">{unread}</span>
+      <span style="color:{T.ink1};">{pageCounts.unread}</span>
       <span style="color:{T.ink3};">unread</span>
     </div>
   </div>
@@ -174,7 +178,7 @@
     </div>
   {:else}
     <!-- Group tabs -->
-    <GroupTabs {groups} active={activeGroup} onSelect={(id) => { filter = 'all'; setGroupFilter(id === 'all' ? null : id); }} />
+    <GroupTabs {groups} active={activeGroup} onSelect={(id) => { setReadFilter(null); setSavedFilter(null); signalActive = false; setGroupFilter(id === 'all' ? null : id); }} />
   {/if}
 
   <!-- Tag filter banner -->
@@ -194,14 +198,14 @@
 
   <!-- Timeline list -->
   <div bind:this={listScrollEl} style="flex:1;overflow-y:auto;overflow-x:hidden;position:relative;">
-    {#if filteredItems.length === 0 && !storeReady.loading}
+    {#if displayItems.length === 0 && !storeReady.loading}
       <div style="padding:32px;text-align:center;font:11px/1.6 {T.mono};color:{T.ink3};">
         {timelineFilter.feedId || timelineFilter.tag ? 'no matching items' : filter !== 'all' ? `no ${filter} items in this view` : 'no items'}
       </div>
     {:else}
       <div style="height:{$listVirtualizer.getTotalSize()}px;position:relative;">
         {#each $listVirtualizer.getVirtualItems() as vItem (vItem.key)}
-          {@const item = filteredItems[vItem.index]}
+          {@const item = displayItems[vItem.index]}
           {#if item}
             {@const source = sources.find(s => s.id === item.src)}
             <div
@@ -214,7 +218,7 @@
                 {source}
                 isFocused={false}
                 density={settings.density}
-                onclick={() => onOpen(item.id, filteredItems.map(i => i.id))}
+                onclick={() => onOpen(item.id, displayItems.map(i => i.id))}
                 onTagClick={handleTagClick}
                 onLongPress={() => { window.getSelection()?.removeAllRanges(); actionSheetItem = item; }}
               />
@@ -233,10 +237,15 @@
   <!-- Filter strip (toggleable) -->
   {#if showFilter}
     <FilterStrip
-      {filter} onFilter={(f) => { filter = f; }}
+      {filter} onFilter={(f) => {
+        if (f === 'unread') { setReadFilter(false); setSavedFilter(null); signalActive = false; }
+        else if (f === 'saved') { setReadFilter(null); setSavedFilter(true); signalActive = false; }
+        else if (f === 'signal') { setReadFilter(null); setSavedFilter(null); signalActive = true; }
+        else { setReadFilter(null); setSavedFilter(null); signalActive = false; }
+      }}
       {sort} onSort={(s) => { sort = s; }}
       {counts}
-      onMarkAllRead={() => markAllRead(filteredItems.map(i => i.id))}
+      onMarkAllRead={() => markAllRead(displayItems.map(i => i.id))}
       activeTag={timelineFilter.tag}
       onClearTagFilter={() => setTagFilter(null)}
       {topTags}
@@ -327,7 +336,7 @@
       <div style="height:1px;background:{T.bd0};margin:4px 0;"></div>
 
       <button
-        onclick={() => { onOpen(ci.id, filteredItems.map(i => i.id)); actionSheetItem = null; }}
+        onclick={() => { onOpen(ci.id, displayItems.map(i => i.id)); actionSheetItem = null; }}
         style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;color:{T.ink1};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
       >
         <Icon name="cpu" size={13} color={T.ink2} />

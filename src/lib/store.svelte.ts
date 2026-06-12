@@ -159,14 +159,16 @@ export const loadingMore = $state({
 /** True when the items array was trimmed to stay under MAX_CACHED_ITEMS. */
 export const hasPrecedingItems = $state({ value: false });
 
-/** The active server-side filter applied to `items`. All three are sent to
+/** The active server-side filter applied to `items`. All five fields are sent to
  *  get_items_page. When a filter changes the cursor is reset and page 1 is
  *  re-fetched — `items` always reflects exactly this filter. */
 export const timelineFilter = $state<{
   groupId: string | null;
   feedId: string | null;
   tag: string | null;
-}>({ groupId: null, feedId: null, tag: null });
+  isRead: boolean | null;
+  isSaved: boolean | null;
+}>({ groupId: null, feedId: null, tag: null, isRead: null, isSaved: null });
 
 const MAX_CACHED_ITEMS = 500;
 const EVICT_COUNT = 100;
@@ -241,6 +243,8 @@ function filterArgs(limit: number, cursor?: { publishedAt: number; itemId: strin
     groupId: timelineFilter.groupId ?? null,
     feedId: timelineFilter.feedId ?? null,
     tag: timelineFilter.tag ?? null,
+    isRead: timelineFilter.isRead,
+    isSaved: timelineFilter.isSaved,
     signalThreshold: settings.confidenceThreshold,
     limit,
     cursor: cursor
@@ -509,6 +513,29 @@ export async function setTagFilter(tag: string | null): Promise<void> {
   await resetAndFetch();
 }
 
+/** Filter to read/unread items only. Resets pagination and fetches from backend. */
+export async function setReadFilter(isRead: boolean | null): Promise<void> {
+  timelineFilter.isRead = isRead;
+  await resetAndFetch();
+}
+
+/** Filter to saved/unsaved items only. Resets pagination and fetches from backend. */
+export async function setSavedFilter(isSaved: boolean | null): Promise<void> {
+  timelineFilter.isSaved = isSaved;
+  await resetAndFetch();
+}
+
+/** Remove a single item from `items[]` if it no longer matches the active read/saved filter. */
+function evictNonMatching(id: string): void {
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  const { isRead, isSaved } = timelineFilter;
+  if ((isRead !== null && item.read !== isRead) || (isSaved !== null && item.saved !== isSaved)) {
+    const idx = items.indexOf(item);
+    if (idx !== -1) items.splice(idx, 1);
+  }
+}
+
 export async function markRead(id: string, read = true) {
   const item = items.find(i => i.id === id);
   const wasRead = item?.read;
@@ -551,9 +578,10 @@ export async function markRead(id: string, read = true) {
       }
       return;
     }
-    // Backend mutation succeeded — refresh local state (best-effort, no rollback)
+    // Backend mutation succeeded — evict from cache if filter excludes it, refresh counts
+    evictNonMatching(id);
     try {
-      await Promise.all([reloadDbStats(), reloadItems(), reloadSources(), reloadGroups()]);
+      await Promise.all([reloadDbStats(), reloadSources(), reloadGroups()]);
     } catch (e) {
       logger.warn('reload after mark_read failed', e);
     }
@@ -563,11 +591,11 @@ export async function markRead(id: string, read = true) {
 export async function toggleSaved(id: string, note?: string) {
   const item = items.find(i => i.id === id);
   if (!item) {
-    // Still call backend even if item not in local cache
+    // Item not in local cache — call backend directly (no optimistic toggle possible)
     if (IS_TAURI) {
       try {
-        await tauriInvoke('toggle_saved', { id, saved: true, note: note ?? null });
-        await Promise.all([reloadDbStats(), reloadItems()]);
+        await tauriInvoke('toggle_saved', { id, saved: true, note: note ?? undefined });
+        await Promise.all([reloadDbStats()]);
       } catch (e) {
         logger.warn('toggle_saved failed', e);
       }
@@ -588,9 +616,10 @@ export async function toggleSaved(id: string, note?: string) {
       item.note = wasNote;
       return;
     }
-    // Backend mutation succeeded — refresh local state (best-effort, no rollback)
+    // Backend mutation succeeded — evict from cache if filter excludes it, refresh counts
+    evictNonMatching(id);
     try {
-      await Promise.all([reloadDbStats(), reloadItems()]);
+      await Promise.all([reloadDbStats(), reloadSources()]);
     } catch (e) {
       logger.warn('reload after toggle_saved failed', e);
     }
@@ -617,21 +646,35 @@ export async function markAllRead(ids: string[]) {
   if (IS_TAURI) {
     try {
       await tauriInvoke('mark_items_read', { ids, read: true });
-      await Promise.all([reloadDbStats(), reloadItems(), reloadSources(), reloadGroups()]);
     } catch (e) {
       logger.warn('mark_items_read batch failed', e);
       // Rollback: reload from backend to restore correct state
       await Promise.all([reloadItems(), reloadSources(), reloadGroups()]);
+      return;
+    }
+    // Backend succeeded — evict items that no longer match filter, refresh counts
+    if (timelineFilter.isRead !== null) {
+      const idSet = new Set(ids);
+      for (let i = items.length - 1; i >= 0; i--) {
+        if (idSet.has(items[i].id) && items[i].read !== timelineFilter.isRead) {
+          items.splice(i, 1);
+        }
+      }
+    }
+    try {
+      await Promise.all([reloadDbStats(), reloadSources(), reloadGroups()]);
+    } catch (e) {
+      logger.warn('reload after mark_all_read failed', e);
     }
   }
 }
 
 export async function markSourceRead(sourceId: string) {
-  let markedCount = 0;
+  const markedIds: string[] = [];
   for (const item of items) {
     if (item.src === sourceId && !item.read) {
       item.read = true;
-      markedCount++;
+      markedIds.push(item.id);
     }
   }
   const src = sources.find(s => s.id === sourceId);
@@ -651,9 +694,10 @@ export async function markSourceRead(sourceId: string) {
       await tauriInvoke('mark_source_read', { sourceId });
     } catch (e) {
       logger.warn('mark_source_read failed', e);
-      // Rollback optimistic update — backend mutation failed
+      // Rollback only the items that were optimistically marked read
+      const idSet = new Set(markedIds);
       for (const item of items) {
-        if (item.src === sourceId) item.read = false;
+        if (idSet.has(item.id)) item.read = false;
       }
       if (src) {
         src.unread = prevUnread;
@@ -665,9 +709,16 @@ export async function markSourceRead(sourceId: string) {
       }
       return;
     }
-    // Backend mutation succeeded — refresh local state (best-effort, no rollback)
+    // Backend succeeded — evict items that no longer match filter, refresh counts
+    if (timelineFilter.isRead !== null) {
+      for (let i = items.length - 1; i >= 0; i--) {
+        if (items[i].src === sourceId && items[i].read !== timelineFilter.isRead) {
+          items.splice(i, 1);
+        }
+      }
+    }
     try {
-      await Promise.all([reloadDbStats(), reloadItems(), reloadSources(), reloadGroups()]);
+      await Promise.all([reloadDbStats(), reloadSources(), reloadGroups()]);
     } catch (e) {
       logger.warn('reload after mark_source_read failed', e);
     }
@@ -682,7 +733,7 @@ export async function hideItem(id: string) {
   if (IS_TAURI) {
     try {
       await tauriInvoke('hide_item', { id });
-      await Promise.all([reloadDbStats(), reloadItems(), reloadSources(), reloadGroups()]);
+      await Promise.all([reloadDbStats(), reloadSources(), reloadGroups()]);
     } catch (e) {
       logger.warn('hide_item failed', e);
     }
@@ -808,18 +859,32 @@ export async function createGroup(name: string): Promise<void> {
 
 export async function renameGroup(id: string, name: string): Promise<void> {
   const g = groups.find(g => g.id === id);
+  const oldName = g?.name;
   if (g) g.name = name;
   if (IS_TAURI) {
-    tauriInvoke('rename_group', { id, name }).catch(e => logger.warn('rename_group failed', e));
+    try {
+      await tauriInvoke('rename_group', { id, name });
+    } catch (e) {
+      logger.warn('rename_group failed', e);
+      if (g) g.name = oldName ?? name;
+    }
   }
 }
 
 export async function deleteGroup(id: string): Promise<void> {
   if (id === 'all') return;
+  const oldGroups = new Map(sources.filter(s => s.group === id).map(s => [s.id, s.group]));
   for (const s of sources) { if (s.group === id) s.group = 'all'; }
   if (IS_TAURI) {
-    await tauriInvoke('delete_group', { id });
-    await reloadGroups();
+    try {
+      await tauriInvoke('delete_group', { id });
+      await reloadGroups();
+    } catch (e) {
+      logger.warn('delete_group failed', e);
+      for (const s of sources) {
+        if (oldGroups.has(s.id)) s.group = oldGroups.get(s.id)!;
+      }
+    }
   } else {
     const idx = groups.findIndex(g => g.id === id);
     if (idx !== -1) groups.splice(idx, 1);
