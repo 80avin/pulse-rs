@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { items, sources, clearItems, loadMockData, aiStatus, coldstartTiming, dbStats } from '$lib/store.svelte';
+  import { sources, clearItems, loadMockData, aiStatus, coldstartTiming, dbStats, addSource } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
   import Icon from '$lib/components/Icon.svelte';
@@ -73,6 +73,75 @@
       setTimeout(() => { shareStatus = 'idle'; }, 2500);
     } finally {
       sharingLogs = false;
+    }
+  }
+
+  // ── Advanced: import/export sources ──────────────────────────────────
+  let showAdvanced = $state(false);
+  let sourceJson = $state('');
+  let importStatus = $state<'idle' | 'loading' | 'done' | 'error'>('idle');
+  let importMsg = $state('');
+  const importPlaceholder = '[{"name":"Hacker News","url":"https://...","kind":"hn","group":"all"}]';
+
+  function exportSources() {
+    const data = sources.map(s => ({
+      name: s.name,
+      url: s.url,
+      kind: s.kind,
+      group: s.group,
+    }));
+    sourceJson = JSON.stringify(data, null, 2);
+  }
+
+  async function handleCopyExport() {
+    if (!sourceJson) exportSources();
+    try {
+      await navigator.clipboard.writeText(sourceJson);
+    } catch (e) {
+      logger.warn('clipboard write failed', e);
+    }
+  }
+
+  async function handleShareExport() {
+    if (!sourceJson) exportSources();
+    const navAny = navigator as any;
+    if (typeof navAny?.share === 'function') {
+      try {
+        await navAny.share({ title: 'Pulse sources', text: sourceJson });
+      } catch (e) {
+        // user cancelled — ignore
+      }
+    } else {
+      await handleCopyExport();
+    }
+  }
+
+  async function handleImport() {
+    if (!sourceJson.trim()) return;
+    importStatus = 'loading';
+    importMsg = '';
+    try {
+      const parsed = JSON.parse(sourceJson);
+      if (!Array.isArray(parsed)) throw new Error('Expected a JSON array of sources');
+      let added = 0;
+      for (const entry of parsed) {
+        if (!entry.url || !entry.name) continue;
+        const kind = (['rss', 'hn', 'reddit'].includes(entry.kind) ? entry.kind : 'rss') as 'rss' | 'hn' | 'reddit';
+        const group = entry.group || 'all';
+        try {
+          await addSource(entry.name, entry.url, kind, group);
+          added++;
+        } catch (e) {
+          logger.warn(`import: failed to add "${entry.name}"`, e);
+        }
+      }
+      importMsg = `Imported ${added} source${added !== 1 ? 's' : ''}.`;
+      importStatus = 'done';
+      setTimeout(() => { importStatus = 'idle'; importMsg = ''; }, 4000);
+    } catch (e: any) {
+      importMsg = e?.message ?? 'Invalid JSON';
+      importStatus = 'error';
+      setTimeout(() => { importStatus = 'idle'; importMsg = ''; }, 4000);
     }
   }
 </script>
@@ -306,6 +375,52 @@
     </button>
   </div>
   <div style="margin-top:10px;font:9px/1.4 {T.mono};color:{T.ink3};">No telemetry. All data stays on your device.</div>
+</div>
+
+<!-- Advanced -->
+<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
+  <button
+    onclick={() => { showAdvanced = !showAdvanced; if (showAdvanced) exportSources(); }}
+    style="display:flex;align-items:center;gap:6px;width:100%;background:transparent;border:none;cursor:pointer;padding:0;text-align:left;"
+  >
+    <Icon name={showAdvanced ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
+    <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">advanced</div>
+  </button>
+
+  {#if showAdvanced}
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+      <div style="font:9px/1.4 {T.mono};color:{T.ink3};">Export your sources as JSON to back them up or share them. Paste JSON below to import.</div>
+
+      <textarea
+        bind:value={sourceJson}
+        placeholder={importPlaceholder}
+        rows={6}
+        style="width:100%;padding:8px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:10px/1.4 {T.mono};color:{T.ink1};resize:vertical;outline:none;box-sizing:border-box;"
+      ></textarea>
+
+      <div style="display:flex;gap:8px;">
+        <button
+          onclick={handleCopyExport}
+          style="flex:1;padding:8px;background:transparent;border:1px solid {T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{T.ink1};cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"
+        >
+          <Icon name="share" size={11} color={T.ink2} />
+          share
+        </button>
+        <button
+          onclick={handleImport}
+          disabled={importStatus === 'loading'}
+          style="flex:1;padding:8px;background:{importStatus === 'loading' ? T.bg0 : 'transparent'};border:1px solid {T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{importStatus === 'loading' ? T.ink3 : T.ink1};cursor:{importStatus === 'loading' ? 'default' : 'pointer'};display:flex;align-items:center;justify-content:center;gap:6px;"
+        >
+          <Icon name="import" size={11} color={importStatus === 'loading' ? T.ink3 : T.ink2} />
+          {importStatus === 'loading' ? 'importing…' : 'import'}
+        </button>
+      </div>
+
+      {#if importMsg}
+        <div style="font:9px/1 {T.mono};color:{importStatus === 'error' ? T.red : T.green};">{importMsg}</div>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <!-- Actions -->

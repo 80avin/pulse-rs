@@ -81,4 +81,8 @@
   <svg viewBox="0 0 24 24" style={S()}><path style={p()} d="M12 19V5M5 12l7-7 7 7"/></svg>
 {:else if name === 'arrow-dn'}
   <svg viewBox="0 0 24 24" style={S()}><path style={p()} d="M12 5v14M5 12l7 7 7-7"/></svg>
+{:else if name === 'share'}
+  <svg viewBox="0 0 24 24" style={S()}><circle style={p()} cx="18" cy="6" r="3"/><circle style={p()} cx="6" cy="12" r="3"/><circle style={p()} cx="18" cy="18" r="3"/><path style={p()} d="M8.7 10.7L15.3 7.3M8.7 13.3L15.3 16.7"/></svg>
+{:else if name === 'import'}
+  <svg viewBox="0 0 24 24" style={S()}><path style={p()} d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
 {/if}
