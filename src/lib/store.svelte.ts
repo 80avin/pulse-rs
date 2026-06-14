@@ -255,7 +255,7 @@ function filterArgs(limit: number, cursor?: { publishedAt: number; itemId: strin
 
 /** Fetch page 1 with the current timeline filter and replace `items`. */
 async function resetAndFetch(): Promise<void> {
-  if (!IS_TAURI) return;
+  if (!IS_TAURI || storeReady.loading) return;
   loadingMore.cursor = null;
   const page = await tauriInvoke<BackendPage>('get_items_page', filterArgs(100));
   items.splice(0, items.length, ...page.items.map(adaptItem));
@@ -435,7 +435,7 @@ let idCounter   = 0;
 // --- Public mutations ---
 
 export async function doSync(): Promise<void> {
-  if (syncState.syncing) return;
+  if (syncState.syncing || storeReady.loading) return;
   syncState.syncing = true;
   try {
     if (IS_TAURI) {
@@ -466,7 +466,7 @@ export async function doSync(): Promise<void> {
  * Evicts the oldest EVICT_COUNT items when the array exceeds MAX_CACHED_ITEMS
  * to keep the JS heap bounded. Use FTS search to find older items. */
 export async function fetchNextPage(): Promise<void> {
-  if (!IS_TAURI || !loadingMore.cursor || loadingMore.active) return;
+  if (!IS_TAURI || !loadingMore.cursor || loadingMore.active || storeReady.loading) return;
   loadingMore.active = true;
   try {
     const page = await tauriInvoke<BackendPage>('get_items_page', filterArgs(100, loadingMore.cursor));
@@ -495,6 +495,7 @@ export async function fetchNextPage(): Promise<void> {
 
 /** Show items from a single feed source. Clears group-level filter. */
 export async function setFeedFilter(feedId: string | null): Promise<void> {
+  if (storeReady.loading) return;
   timelineFilter.feedId = feedId;
   if (feedId) timelineFilter.groupId = null;
   await resetAndFetch();
@@ -502,6 +503,7 @@ export async function setFeedFilter(feedId: string | null): Promise<void> {
 
 /** Show items from feeds belonging to a group. Clears feed-level filter. */
 export async function setGroupFilter(groupId: string | null): Promise<void> {
+  if (storeReady.loading) return;
   timelineFilter.groupId = groupId;
   timelineFilter.feedId = null;
   await resetAndFetch();
@@ -509,18 +511,21 @@ export async function setGroupFilter(groupId: string | null): Promise<void> {
 
 /** Show items tagged with a specific AI tag. Composes with group/feed filters. */
 export async function setTagFilter(tag: string | null): Promise<void> {
+  if (storeReady.loading) return;
   timelineFilter.tag = tag;
   await resetAndFetch();
 }
 
 /** Filter to read/unread items only. Resets pagination and fetches from backend. */
 export async function setReadFilter(isRead: boolean | null): Promise<void> {
+  if (storeReady.loading) return;
   timelineFilter.isRead = isRead;
   await resetAndFetch();
 }
 
 /** Filter to saved/unsaved items only. Resets pagination and fetches from backend. */
 export async function setSavedFilter(isSaved: boolean | null): Promise<void> {
+  if (storeReady.loading) return;
   timelineFilter.isSaved = isSaved;
   await resetAndFetch();
 }
@@ -727,6 +732,7 @@ export async function markSourceRead(sourceId: string) {
 
 export async function hideItem(id: string) {
   const idx = items.findIndex(i => i.id === id);
+  const removed = idx !== -1 ? items[idx] : null;
   if (idx !== -1) {
     items.splice(idx, 1);
   }
@@ -736,6 +742,7 @@ export async function hideItem(id: string) {
       await Promise.all([reloadDbStats(), reloadSources(), reloadGroups()]);
     } catch (e) {
       logger.warn('hide_item failed', e);
+      if (removed) items.splice(idx, 0, removed);
     }
   }
 }
@@ -749,10 +756,14 @@ export async function addSource(
 ): Promise<string> {
   const id = crypto.randomUUID();
   if (IS_TAURI) {
-    await tauriInvoke('add_source', {
-      source: { id, name, url, kind, group, unread: 0, lastSync: null, enabled: true, itemCount: 0, failureStreak: 0, hue: hue ?? null },
-    });
-    await reloadSources();
+    try {
+      await tauriInvoke('add_source', {
+        source: { id, name, url, kind, group, unread: 0, lastSync: null, enabled: true, itemCount: 0, failureStreak: 0, hue: hue ?? null },
+      });
+      await Promise.all([reloadSources(), reloadGroups(), reloadDbStats()]);
+    } catch (e) {
+      logger.error('add_source failed', e);
+    }
   } else {
     sources.push({
       id, kind, name,
@@ -779,8 +790,12 @@ export async function updateSource(
   hue?: number,
 ): Promise<void> {
   if (IS_TAURI) {
-    await tauriInvoke('update_source', { id, name, url, kind, group, hue: hue ?? null });
-    await Promise.all([reloadSources(), reloadGroups()]);
+    try {
+      await tauriInvoke('update_source', { id, name, url, kind, group, hue: hue ?? null });
+      await Promise.all([reloadSources(), reloadGroups()]);
+    } catch (e) {
+      logger.error('update_source failed', e);
+    }
   } else {
     const s = sources.find(s => s.id === id);
     if (s) {
@@ -807,11 +822,15 @@ export async function detectFeed(url: string): Promise<FeedPreview | null> {
 
 export async function removeSource(id: string): Promise<void> {
   if (IS_TAURI) {
-    await tauriInvoke('delete_source', { id });
-    for (let i = items.length - 1; i >= 0; i--) {
-      if (items[i].src === id) items.splice(i, 1);
+    try {
+      await tauriInvoke('delete_source', { id });
+      for (let i = items.length - 1; i >= 0; i--) {
+        if (items[i].src === id) items.splice(i, 1);
+      }
+      await Promise.all([reloadSources(), reloadGroups(), reloadDbStats()]);
+    } catch (e) {
+      logger.error('delete_source failed', e);
     }
-    await Promise.all([reloadSources(), reloadGroups(), reloadDbStats()]);
   } else {
     const idx = sources.findIndex(s => s.id === id);
     if (idx !== -1) {
@@ -838,9 +857,13 @@ export async function syncSource(sourceId: string): Promise<void> {
 
 export async function clearItems(): Promise<void> {
   if (IS_TAURI) {
-    await tauriInvoke('clear_items');
-    items.splice(0, items.length);
-    await Promise.all([reloadSources(), reloadGroups(), reloadDbStats(), reloadAiStats()]);
+    try {
+      await tauriInvoke('clear_items');
+      items.splice(0, items.length);
+      await Promise.all([reloadSources(), reloadGroups(), reloadDbStats(), reloadAiStats()]);
+    } catch (e) {
+      logger.error('clear_items failed', e);
+    }
   } else {
     items.splice(0, items.length);
   }
@@ -850,8 +873,12 @@ export async function createGroup(name: string): Promise<void> {
   const id = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   if (!id) return;
   if (IS_TAURI) {
-    await tauriInvoke('add_group', { id, name });
-    await reloadGroups();
+    try {
+      await tauriInvoke('add_group', { id, name });
+      await reloadGroups();
+    } catch (e) {
+      logger.error('add_group failed', e);
+    }
   } else {
     if (!groups.find(g => g.id === id)) groups.push({ id, name, n: 0 });
   }
@@ -878,7 +905,7 @@ export async function deleteGroup(id: string): Promise<void> {
   if (IS_TAURI) {
     try {
       await tauriInvoke('delete_group', { id });
-      await reloadGroups();
+      await Promise.all([reloadSources(), reloadGroups()]);
     } catch (e) {
       logger.warn('delete_group failed', e);
       for (const s of sources) {
