@@ -33,7 +33,7 @@ pulse-core = { path = "../crates/pulse-core", features = ["ai-vision", "ai-fastt
 # Force bundled SQLite so Android doesn't need a system libsqlite3
 libsqlite3-sys = { version = "0.28", features = ["bundled"] }
 
-# reqwest for model download (rustls-tls = Android compatible)
+# reqwest for HTTP (rustls-tls-native-roots = OS cert store)
 reqwest = { workspace = true }
 
 # UUID generation for new feed IDs

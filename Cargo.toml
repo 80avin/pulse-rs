@@ -30,8 +30,8 @@ uuid = { version = "1", features = ["v4", "v5"] }
 # Time
 chrono = { version = "0.4", features = ["serde"] }
 
-# HTTP — rustls-tls required for Android (no system OpenSSL); stream for incremental download progress
-reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+# HTTP — rustls-tls-native-roots uses OS certificate store (proxy CA support); stream for incremental download progress
+reqwest = { version = "0.12", features = ["json", "rustls-tls-native-roots", "stream"], default-features = false }
 
 # Feed parsing
 feed-rs = "1"
