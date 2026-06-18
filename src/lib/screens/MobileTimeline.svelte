@@ -1,16 +1,15 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
+  import { createDialog, melt } from '@melt-ui/svelte';
   import type { FeedItem } from '$lib/types';
-  import { groups, sources, items, storeReady, markAllRead, markRead, toggleSaved, hideItem, doSync as storeSync, syncState, loadingMore, fetchNextPage, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts, aiStats } from '$lib/store.svelte';
+  import { groups, sources, items, markAllRead, markRead, toggleSaved, hideItem, doSync as storeSync, syncState, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts, aiStats } from '$lib/store.svelte';
   import { openExternal } from '$lib/utils';
   import { settings } from '$lib/settings.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import FilterStrip from '$lib/components/FilterStrip.svelte';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
-  import ItemRow from '$lib/components/ItemRow.svelte';
   import Icon from '$lib/components/Icon.svelte';
-  import { createVirtualizer } from '@tanstack/svelte-virtual';
-  import { get } from 'svelte/store';
+  import TimelineList from '$lib/components/TimelineList.svelte';
 
   let { tab, onTabChange, onOpen }: {
     tab: string;
@@ -24,6 +23,13 @@
   let showFilter = $state(true);
   let actionSheetItem = $state<FeedItem | null>(null);
   let signalActive = $state(false);
+
+  const actionDlg = createDialog({
+    defaultOpen: true,
+    preventScroll: false,
+    onOpenChange: ({ next }) => { if (!next) actionSheetItem = null; return next; },
+  });
+  const { overlay: actOverlay, content: actContent, close: actClose } = actionDlg.elements;
 
   // Group, feed, tag, read, and saved filters are applied server-side in `items`.
   // Signal filtering is client-side for now (TODO: move to server-side).
@@ -66,52 +72,6 @@
     await storeSync();
     syncing = false;
   }
-
-  // Virtual list.
-  let listScrollEl: HTMLElement | null = $state(null);
-  const listVirtualizer = createVirtualizer({
-    count: 0,
-    getScrollElement: () => listScrollEl,
-    estimateSize: () => (settings.density === 'dense' ? 52 : 82),
-    overscan: 10,
-  });
-  $effect(() => {
-    get(listVirtualizer).setOptions({ count: displayItems.length });
-  });
-
-  function measureItem(el: HTMLElement) {
-    get(listVirtualizer).measureElement(el);
-  }
-
-  // Infinite scroll: listen for scroll near bottom of listScrollEl.
-  $effect(() => {
-    const el = listScrollEl;
-    if (!el) return;
-
-    function onScroll() {
-      if (!loadingMore.cursor || loadingMore.active) return;
-      const e = el as HTMLElement;
-      const d = e.scrollHeight - e.scrollTop - e.clientHeight;
-      if (d < 300) fetchNextPage();
-    }
-
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  });
-
-  // After the virtualizer layout is done (items populated, count set),
-  // check if the list is too short to scroll — if so, fetch more.
-  $effect(() => {
-    if (displayItems.length === 0) return;
-    if (!listScrollEl || !loadingMore.cursor || loadingMore.active) return;
-    // Let the virtualizer finish layout before measuring
-    requestAnimationFrame(() => {
-      if (!listScrollEl || !loadingMore.cursor || loadingMore.active) return;
-      if (listScrollEl.scrollHeight <= listScrollEl.clientHeight + 100) {
-        fetchNextPage();
-      }
-    });
-  });
 
   const feedFilterName = $derived(sources.find(s => s.id === timelineFilter.feedId)?.name ?? timelineFilter.feedId);
 </script>
@@ -197,42 +157,13 @@
   {/if}
 
   <!-- Timeline list -->
-  <div bind:this={listScrollEl} style="flex:1;overflow-y:auto;overflow-x:hidden;position:relative;">
-    {#if displayItems.length === 0 && !storeReady.loading}
-      <div style="padding:32px;text-align:center;font:11px/1.6 {T.mono};color:{T.ink3};">
-        {timelineFilter.feedId || timelineFilter.tag ? 'no matching items' : filter !== 'all' ? `no ${filter} items in this view` : 'no items'}
-      </div>
-    {:else}
-      <div style="height:{$listVirtualizer.getTotalSize()}px;position:relative;">
-        {#each $listVirtualizer.getVirtualItems() as vItem (vItem.key)}
-          {@const item = displayItems[vItem.index]}
-          {#if item}
-            {@const source = sources.find(s => s.id === item.src)}
-            <div
-              data-index={vItem.index}
-              use:measureItem
-              style="position:absolute;top:0;left:0;width:100%;transform:translateY({vItem.start}px);"
-            >
-              <ItemRow
-                {item}
-                {source}
-                isFocused={false}
-                density={settings.density}
-                onclick={() => onOpen(item.id, displayItems.map(i => i.id))}
-                onTagClick={handleTagClick}
-                onLongPress={() => { window.getSelection()?.removeAllRanges(); actionSheetItem = item; }}
-              />
-            </div>
-          {/if}
-        {/each}
-      </div>
-      {#if loadingMore.cursor}
-        <div style="height:40px;display:flex;align-items:center;justify-content:center;font:10px/1 {T.mono};color:{T.ink3};">
-          {loadingMore.active ? 'loading…' : ''}
-        </div>
-      {/if}
-    {/if}
-  </div>
+  <TimelineList
+    items={displayItems}
+    emptyMessage={timelineFilter.feedId || timelineFilter.tag ? 'no matching items' : filter !== 'all' ? `no ${filter} items in this view` : 'no items'}
+    onItemClick={(id, allIds) => onOpen(id, allIds)}
+    onTagClick={handleTagClick}
+    onLongPress={(item) => { window.getSelection()?.removeAllRanges(); actionSheetItem = item; }}
+  />
 
   <!-- Filter strip (toggleable) -->
   {#if showFilter}
@@ -261,24 +192,12 @@
 {#if actionSheetItem}
   {@const ci = actionSheetItem}
   {@const isHnSelf = ci.url?.includes('news.ycombinator.com/item') ?? false}
-  <div
-    role="button"
-    tabindex="-1"
-    onclick={() => { actionSheetItem = null; }}
-    onkeydown={(e) => { if (e.key === 'Escape') actionSheetItem = null; }}
-    style="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:100;"
-  >
-    <div
-      role="dialog"
-      tabindex="-1"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={() => {}}
-      ontouchstart={(e) => e.preventDefault()}
-      style="width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};max-height:70vh;overflow-y:auto;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;"
+  <div {...$actOverlay} use:melt={$actOverlay} style="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:100;">
+    <div {...$actContent} use:melt={$actContent} style="width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};max-height:70vh;overflow-y:auto;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;"
     >
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.5px;">actions</span>
-        <button onclick={() => { actionSheetItem = null; }} style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
+        <button use:melt={$actClose} style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
           <Icon name="x" size={14} />
         </button>
       </div>

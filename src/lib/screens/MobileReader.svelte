@@ -1,14 +1,13 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { T, TAG_COLORS } from '$lib/tokens';
-  import { items, sources, markRead, toggleSaved, hideItem, aiStatus } from '$lib/store.svelte';
+  import { T } from '$lib/tokens';
+  import { createDialog, melt } from '@melt-ui/svelte';
+  import { items, sources, markRead, toggleSaved, hideItem } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
-  import { openExternal, sanitizeHtml, TAG_EVIDENCE } from '$lib/utils';
-  import TagChip from '$lib/components/TagChip.svelte';
-  import ScoreBar from '$lib/components/ScoreBar.svelte';
-  import SourceGlyph from '$lib/components/SourceGlyph.svelte';
+  import { openExternal, shareItem } from '$lib/utils';
   import KeyCap from '$lib/components/KeyCap.svelte';
   import Icon from '$lib/components/Icon.svelte';
+  import ReaderView from '$lib/components/ReaderView.svelte';
 
   let { itemId, allIds, onBack, onNavigate }: {
     itemId: string;
@@ -23,8 +22,6 @@
   const hasPrev = $derived(idx > 0);
   const hasNext = $derived(idx < allIds.length - 1);
 
-  let popoverTag = $state<string | null>(null);
-
   $effect(() => { if (itemId && settings.markReadOn === 'open') { untrack(() => markRead(itemId)); } });
 
   function goNext() { if (hasNext) onNavigate(allIds[idx + 1]); }
@@ -37,9 +34,17 @@
   let swipeStartY = 0;
   let swipeTracking = false;
   let navDir = $state(0);
+  let popoverOpen = $state(false);
+
+  const noteSheetDialog = createDialog({
+    defaultOpen: true,
+    preventScroll: false,
+    onOpenChange: ({ next }) => { if (!next) noteSheetOpen = false; return next; },
+  });
+  const { overlay: noteOverlay, content: noteContent, close: noteClose } = noteSheetDialog.elements;
 
   function onSwipeStart(e: TouchEvent) {
-    if (popoverTag || noteSheetOpen) return;
+    if (noteSheetOpen || popoverOpen) return;
     swipeStartX = e.touches[0].clientX;
     swipeStartY = e.touches[0].clientY;
     swipeTracking = true;
@@ -47,7 +52,7 @@
   }
 
   function onSwipeMove(e: TouchEvent) {
-    if (!swipeTracking || popoverTag) return;
+    if (!swipeTracking || popoverOpen) return;
     const dx = e.touches[0].clientX - swipeStartX;
     const dy = e.touches[0].clientY - swipeStartY;
     if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 8) return;
@@ -125,11 +130,7 @@
   }
 
   function handleKey(e: KeyboardEvent) {
-    // When popover is open, only handle Escape
-    if (popoverTag) {
-      if (e.key === 'Escape') { e.preventDefault(); popoverTag = null; }
-      return;
-    }
+    if (popoverOpen) return;
     switch (e.key) {
       case 'j': case 'ArrowDown': goNext(); break;
       case 'k': case 'ArrowUp':   goPrev(); break;
@@ -139,6 +140,7 @@
       case 'Escape': onBack(); break;
     }
   }
+
 </script>
 
 <svelte:window onkeydown={handleKey} />
@@ -175,95 +177,7 @@
       ontouchend={onSwipeEnd}
       role="feed"
     >
-      <!-- Header -->
-      <div style="padding:12px 14px;border-bottom:1px solid {T.bd0};">
-        <div style="display:flex;align-items:center;gap:8px;font:10px/1 {T.mono};color:{T.ink2};">
-          {#if source}
-            <SourceGlyph kind={source.kind} />
-            <span style="color:{T.ink1};">{source.name}</span>
-            <span style="color:{T.ink3};">·</span>
-          {/if}
-          <span>{item.author}</span>
-          <span style="color:{T.ink3};">·</span>
-          <span>{item.age}</span>
-          {#if item.score > 0}
-            <span style="color:{T.ink3};">·</span>
-            <span style="color:{T.amber};">▲{item.score}</span>
-          {/if}
-          <span style="flex:1;"></span>
-          {#if item.n > 0}<span style="color:{T.ink3};">{item.n}c</span>{/if}
-        </div>
-
-        <h1 style="margin:8px 0 0;font:600 18px/1.25 {T.sans};color:{T.ink0};letter-spacing:-0.2px;">{item.title}</h1>
-
-        {#if item.url}
-          <button
-            onclick={() => openExternal(item.url!)}
-            style="margin-top:7px;display:inline-flex;align-items:center;gap:6px;background:transparent;border:none;cursor:pointer;padding:0;font:10px/1 {T.mono};color:{T.ink2};"
-          >
-            <Icon name="ext" size={11} color={T.ink2} />
-            <span style="text-decoration:underline;text-underline-offset:2px;text-decoration-color:{T.bd2};">{new URL(item.url).hostname.replace(/^www\./, '')}</span>
-          </button>
-        {/if}
-        {#if item.externalUrl}
-          <button
-            onclick={() => openExternal(item.externalUrl!)}
-            style="margin-top:3px;display:block;font:10px/1.4 {T.mono};color:{T.cyan};background:transparent;border:none;cursor:pointer;padding:0;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-          >
-            <Icon name="ext" size={10} color={T.cyan} />
-            <span style="margin-left:3px;">{item.externalUrl}</span>
-          </button>
-        {/if}
-
-        <div style="margin-top:9px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
-          {#each item.tags as tag}
-            <TagChip {tag} size={10} onclick={() => { popoverTag = tag; }} />
-          {/each}
-          <span style="flex:1;"></span>
-          <span style="font:10px/1 {T.mono};color:{T.ink3};margin-right:6px;">signal</span>
-          <ScoreBar value={item.aiScore} w={28} />
-        </div>
-      </div>
-
-      <!-- Saved note -->
-      {#if item.note}
-        <div style="margin:0 14px;padding:10px 12px;background:{T.bg1};border-left:3px solid {T.amber};border-radius:0 3px 3px 0;font:11px/1.5 {T.mono};color:{T.ink1};white-space:pre-wrap;">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-            <Icon name="bookmark" size={11} color={T.amber} />
-            <span style="font:9px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.4px;">note</span>
-          </div>
-          {item.note}
-        </div>
-      {/if}
-
-      <!-- Body -->
-      <div style="padding:16px 14px 32px;font:14px/1.6 {T.sans};color:{T.ink0};" class="item-body">
-        {#if item.bodyHtml}
-          {@html sanitizeHtml(item.bodyHtml)}
-        {:else if item.body}
-          <p style="margin:0;white-space:pre-line;">{item.body}</p>
-        {/if}
-        {#if item.url}
-          <div style="margin-top:20px;padding-top:14px;border-top:1px solid {T.bd0};display:flex;gap:8px;flex-wrap:wrap;">
-            <button
-              onclick={() => openExternal(item.url!)}
-              style="display:inline-flex;align-items:center;gap:8px;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;padding:10px 14px;cursor:pointer;font:12px/1 {T.mono};color:{T.cyan};"
-            >
-              <Icon name="ext" size={13} color={T.cyan} />
-              <span>open post</span>
-            </button>
-            {#if item.externalUrl}
-              <button
-                onclick={() => openExternal(item.externalUrl!)}
-                style="display:inline-flex;align-items:center;gap:8px;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;padding:10px 14px;cursor:pointer;font:12px/1 {T.mono};color:{T.ink1};"
-              >
-                <Icon name="ext" size={13} color={T.ink2} />
-                <span>open link</span>
-              </button>
-            {/if}
-          </div>
-        {/if}
-      </div>
+      <ReaderView itemId={itemId} noteMode="sheet" onPopoverChange={(open) => { popoverOpen = open; }} />
     </div>
 
     <!-- Save toast -->
@@ -317,6 +231,15 @@
         <span style="text-transform:uppercase;">open</span>
       </button>
       <button
+        onclick={() => shareItem(item.title, item.url ?? item.externalUrl)}
+        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.ink2};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+      >
+        <div style="display:flex;align-items:center;gap:4px;">
+          <Icon name="share" size={16} color={T.ink1} />
+        </div>
+        <span style="text-transform:uppercase;">share</span>
+      </button>
+      <button
         onclick={() => { hideItem(item.id); onBack(); }}
         style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.red};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
       >
@@ -328,71 +251,14 @@
       </button>
     </div>
 
-    <!-- Read time strip -->
-    <div style="display:flex;align-items:center;justify-content:flex-end;padding:5px 10px;border-top:1px solid {T.bd0};background:{T.bg1};font:10px/1 {T.mono};color:{T.ink2};flex-shrink:0;">
-      <span>~{Math.max(1, Math.round((item.body || '').split(/\s+/).filter(Boolean).length / 238))}min read</span>
-    </div>
-
-    <!-- Explain popover (bottom sheet) -->
-    {#if popoverTag}
-      {@const c = TAG_COLORS[popoverTag] ?? TAG_COLORS['low-effort']}
-      {@const evidence = TAG_EVIDENCE[popoverTag] ?? ['title-token match', 'body-token match']}
-      <div
-        role="button"
-        tabindex="-1"
-        onclick={() => { popoverTag = null; }}
-        onkeydown={(e) => { if (e.key === 'Escape') popoverTag = null; }}
-        style="position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:20;"
-      >
-        <div
-          role="button"
-          tabindex="-1"
-          onclick={(e) => e.stopPropagation()}
-          onkeydown={() => {}}
-          style="width:100%;background:{T.bg2};border-top:1px solid {c.bd};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};"
-        >
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <TagChip tag={popoverTag} size={11} />
-              <span style="font:10px/1 {T.mono};color:{T.ink3};">tagged by {aiStatus.modelName ?? aiStatus.taggingMode} · {Math.round((item.aiScore ?? 0.8) * 100)}% conf</span>
-            </div>
-            <button onclick={() => { popoverTag = null; }} style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
-              <Icon name="x" size={14} />
-            </button>
-          </div>
-          <div style="color:{T.ink1};margin-bottom:8px;">Why tagged <b style="color:{c.fg};">{popoverTag}</b>:</div>
-          <ul style="margin:0;padding:0 0 0 14px;color:{T.ink1};font:12px/1.55 {T.sans};">
-            {#each evidence as ev}
-              <li style="margin-bottom:2px;">{ev}</li>
-            {/each}
-          </ul>
-          <div style="margin-top:12px;padding-top:10px;border-top:1px solid {T.bd1};display:flex;gap:8px;">
-            <button style="flex:1;padding:10px 0;background:transparent;color:{T.ink1};border:1px solid {T.bd2};border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;">flag wrong tag</button>
-            <button style="flex:1;padding:10px 0;background:transparent;color:{T.ink1};border:1px solid {T.bd2};border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;">filter out "{popoverTag}"</button>
-          </div>
-        </div>
-      </div>
-    {/if}
-
     <!-- Note input sheet -->
     {#if noteSheetOpen}
-      <div
-        role="button"
-        tabindex="-1"
-        onclick={() => { noteSheetOpen = false; }}
-        onkeydown={(e) => { if (e.key === 'Escape') noteSheetOpen = false; }}
-        style="position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:20;"
-      >
-        <div
-          role="dialog"
-          tabindex="-1"
-          onclick={(e) => e.stopPropagation()}
-          onkeydown={() => {}}
-          style="width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};"
+      <div {...$noteOverlay} use:melt={$noteOverlay} style="position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:20;">
+        <div {...$noteContent} use:melt={$noteContent} style="width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};"
         >
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
             <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.5px;">note</span>
-            <button onclick={() => { noteSheetOpen = false; }} style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
+            <button use:melt={$noteClose} style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
               <Icon name="x" size={14} />
             </button>
           </div>
@@ -403,7 +269,7 @@
           ></textarea>
           <div style="margin-top:12px;display:flex;gap:8px;">
             <button
-              onclick={() => { noteSheetOpen = false; }}
+              use:melt={$noteClose}
               style="flex:1;padding:10px 0;background:transparent;color:{T.ink1};border:1px solid {T.bd2};border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;"
             >cancel</button>
             <button

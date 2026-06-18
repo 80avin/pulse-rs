@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Desktop from '$lib/screens/Desktop.svelte';
-  import Mobile from '$lib/screens/Mobile.svelte';
+  import DesktopShell from '$lib/screens/DesktopShell.svelte';
+  import MobileShell from '$lib/screens/MobileShell.svelte';
 
   // null until onMount determines the viewport — prevents Desktop from
   // mounting and tearing down immediately on Android.
@@ -16,7 +16,7 @@
 </script>
 
 {#if isMobile === true}
-  <Mobile />
+  <MobileShell />
 {:else if isMobile === false}
-  <Desktop />
+  <DesktopShell />
 {/if}

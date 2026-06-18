@@ -39,6 +39,8 @@
   <svg viewBox="0 0 24 24" style={S()}><path style={p()} d="M19 12H5M12 19l-7-7 7-7"/></svg>
 {:else if name === 'arrow-r'}
   <svg viewBox="0 0 24 24" style={S()}><path style={p()} d="M5 12h14M12 5l7 7-7 7"/></svg>
+{:else if name === 'chev-l'}
+  <svg viewBox="0 0 24 24" style={S()}><path style={p()} d="M15 6l-6 6 6 6"/></svg>
 {:else if name === 'chev-r'}
   <svg viewBox="0 0 24 24" style={S()}><path style={p()} d="M9 6l6 6-6 6"/></svg>
 {:else if name === 'chev-dn'}

@@ -32,6 +32,7 @@
       {@const a = tab.id === filter}
       <button
         onclick={() => onFilter(tab.id)}
+        aria-pressed={a}
         style="
           flex-shrink:0;padding:10px 12px;
           background:{a ? T.bg3 : 'transparent'};

@@ -4,6 +4,7 @@
 // See: https://v2.tauri.app/start/frontend/sveltekit/ for more info
 import adapter from "@sveltejs/adapter-static";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
+import { preprocessMeltUI, sequence } from "@melt-ui/pp";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
@@ -11,7 +12,7 @@ const pkg = require("./package.json");
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-  preprocess: vitePreprocess(),
+  preprocess: sequence([vitePreprocess(), preprocessMeltUI()]),
   kit: {
     adapter: adapter({
       fallback: "index.html",

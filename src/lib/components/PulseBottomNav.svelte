@@ -2,6 +2,7 @@
   import { T } from '$lib/tokens';
   import { taggingProgress, groups, dbStats } from '$lib/store.svelte';
   import Icon from './Icon.svelte';
+  import { createToolbar, melt } from '@melt-ui/svelte';
 
   let { active, onChange }: {
     active: string;
@@ -17,13 +18,17 @@
     { id: 'ai',       label: 'ai',       icon: 'cpu'    },
     { id: 'settings', label: 'settings', icon: 'cog'    },
   ] as const;
+
+  const toolbar = createToolbar({ loop: false, orientation: 'horizontal' });
+  const { root, button } = toolbar.elements;
 </script>
 
-<div style="display:flex;flex-direction:column;border-top:1px solid {T.bd1};background:{T.bg1};flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px);">
+<div use:melt={$root} style="display:flex;flex-direction:column;border-top:1px solid {T.bd1};background:{T.bg1};flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px);">
   <div style="display:flex;">
   {#each tabs as tab}
     {@const a = tab.id === active}
     <button
+      use:melt={$button}
       onclick={() => onChange(tab.id)}
       style="
         flex:1;padding:10px 0 12px;
