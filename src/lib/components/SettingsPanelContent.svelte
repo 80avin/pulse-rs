@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { sources, clearItems, loadMockData, aiStatus, coldstartTiming, dbStats, addSource } from '$lib/store.svelte';
+  import { sources, groups, clearItems, loadMockData, aiStatus, coldstartTiming, dbStats, addSource, createGroup } from '$lib/store.svelte';
   import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
   import Icon from '$lib/components/Icon.svelte';
@@ -123,19 +123,26 @@
     try {
       const parsed = JSON.parse(sourceJson);
       if (!Array.isArray(parsed)) throw new Error('Expected a JSON array of sources');
-      let added = 0;
+      const existingGroupIds = new Set(groups.map(g => g.id));
+      const neededGroups = new Set<string>();
+      for (const entry of parsed) {
+        const g = (entry.group || '').trim();
+        if (g && g !== 'all' && !existingGroupIds.has(g)) neededGroups.add(g);
+      }
+      for (const g of neededGroups) await createGroup(g);
+      const before = sources.length;
       for (const entry of parsed) {
         if (!entry.url || !entry.name) continue;
         const kind = (['rss', 'hn', 'reddit'].includes(entry.kind) ? entry.kind : 'rss') as 'rss' | 'hn' | 'reddit';
         const group = entry.group || 'all';
         try {
           await addSource(entry.name, entry.url, kind, group);
-          added++;
         } catch (e) {
           logger.warn(`import: failed to add "${entry.name}"`, e);
         }
       }
-      importMsg = `Imported ${added} source${added !== 1 ? 's' : ''}.`;
+      const realAdded = sources.length - before;
+      importMsg = `Imported ${realAdded} source${realAdded !== 1 ? 's' : ''}.`;
       importStatus = 'done';
       setTimeout(() => { importStatus = 'idle'; importMsg = ''; }, 4000);
     } catch (e: any) {
