@@ -41,6 +41,7 @@ uuid = { workspace = true }
 
 # Streaming helpers for incremental download progress
 futures-util = "0.3"
+tauri-plugin-sharesheet = "0.0.1"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.21"

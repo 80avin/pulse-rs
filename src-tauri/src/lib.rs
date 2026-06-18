@@ -196,8 +196,13 @@ pub fn run() {
     let verbose = read_verbose_setting(&data_dir);
     let (log_guard, log_filter) = init_tracing(&data_dir, verbose);
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init());
+
+    #[cfg(mobile)]
+    let builder = builder.plugin(tauri_plugin_sharesheet::init());
+
+    builder
         .setup(move |app| {
             let t_setup = std::time::Instant::now();
 
@@ -276,8 +281,8 @@ pub fn run() {
                                 let err_msg = format!("PulseCore init failed: {e}");
                                 tracing::error!("{err_msg}");
                                 let _ = init_tx.send(InitState::Failed(err_msg));
-                            }
-                        }
+    }
+}
                     });
                 })
                 .expect("failed to spawn pulse-core-init thread");
