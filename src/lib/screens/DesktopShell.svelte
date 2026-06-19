@@ -538,7 +538,7 @@
           {#if openItem.n > 0}<span style="color:{T.ink3};">·</span><span style="color:{T.ink2};">{openItem.n}c</span>{/if}
         </div>
 
-        <ReaderView itemId={openItem.id} noteMode="inline" onTagClick={setActiveTag} onPopoverChange={(open) => { popoverOpen = open; }} showMetadata={false} />
+        <ReaderView itemId={openItem.id} noteMode="inline" onTagClick={setActiveTag} onPopoverChange={(open) => { popoverOpen = open; }} showMetadata={false} isDesktop={true} />
 
         <div style="display:flex;border-top:1px solid {T.bd1};background:{T.bg1};flex-shrink:0;">
           <button
@@ -631,7 +631,7 @@
 
     <!-- Sources modal -->
     <Modal open={showSources} title="Sources" onClose={() => { showSources = false; }} width="480px">
-      <SourceExplorer onSourceSelect={(id) => { setFeedFilter(id); showSources = false; }} compact={true} />
+      <SourceExplorer onSourceSelect={(id) => { setFeedFilter(id); showSources = false; }} compact={true} isDesktop={true} />
     </Modal>
 
     <!-- Context menu -->

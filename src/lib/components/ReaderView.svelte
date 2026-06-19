@@ -13,12 +13,14 @@
     onTagClick,
     onPopoverChange,
     showMetadata = true,
+    isDesktop = false,
   }: {
     itemId: string;
     noteMode?: 'inline' | 'sheet' | 'none';
     onTagClick?: (tag: string) => void;
     onPopoverChange?: (open: boolean) => void;
     showMetadata?: boolean;
+    isDesktop?: boolean;
   } = $props();
 
   const item = $derived(items.find(i => i.id === itemId));
@@ -167,8 +169,8 @@
     {#if popoverTag}
       {@const c = TAG_COLORS[popoverTag] ?? TAG_COLORS['low-effort']}
       {@const evidence = TAG_EVIDENCE[popoverTag] ?? ['title-token match', 'body-token match']}
-      <div {...$popoverOverlay} use:melt={$popoverOverlay} style="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:20;">
-        <div {...$popoverContent} use:melt={$popoverContent} style="width:100%;background:{T.bg2};border-top:1px solid {c.bd};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};">
+      <div {...$popoverOverlay} use:melt={$popoverOverlay} style="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:{isDesktop ? 'center' : 'flex-end'};justify-content:{isDesktop ? 'center' : 'stretch'};z-index:20;">
+        <div {...$popoverContent} use:melt={$popoverContent} style="{isDesktop ? 'width:380px;max-width:90vw;border-radius:8px;' : 'width:100%;border-radius:0;border-top:1px solid {c.bd};'}background:{T.bg2};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <TagChip tag={popoverTag} size={11} />

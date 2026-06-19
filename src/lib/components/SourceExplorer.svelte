@@ -12,10 +12,12 @@
     onSourceSelect,
     onSync = () => {},
     compact = false,
+    isDesktop = false,
   }: {
     onSourceSelect: (sourceId: string) => void;
     onSync?: () => void;
     compact?: boolean;
+    isDesktop?: boolean;
   } = $props();
 
   const byGroup = $derived.by(() => {
@@ -52,11 +54,12 @@
   let newGroupName = $state('');
   let addInputEl: HTMLInputElement | null = $state(null);
   let actionSheet = $state<string | null>(null);
+  let ctxMenuPos = $state<{ x: number; y: number } | null>(null);
 
   const actSheet = createDialog({
     defaultOpen: true,
     preventScroll: false,
-    onOpenChange: ({ next }) => { if (!next) actionSheet = null; return next; },
+    onOpenChange: ({ next }) => { if (!next) { actionSheet = null; ctxMenuPos = null; } return next; },
   });
   const { overlay: actOverlay, content: actContent, close: actClose } = actSheet.elements;
 
@@ -123,6 +126,7 @@
       longPressed = true;
       pressTimer  = null;
       actionSheet = sourceId;
+      ctxMenuPos = null;
     }, 450);
   }
 
@@ -150,6 +154,7 @@
   }
   function handleContextMenu(e: MouseEvent, sourceId: string) {
     e.preventDefault();
+    ctxMenuPos = { x: e.clientX, y: e.clientY };
     actionSheet = sourceId;
   }
 
@@ -306,138 +311,194 @@
     <div style="height:12px;"></div>
   </div>
 
-  <!-- Long-press action sheet -->
+  <!-- Long-press action sheet / Desktop context menu -->
   {#if actionSheet && actionSource}
-    <div {...$actOverlay} use:melt={$actOverlay} style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;display:flex;align-items:flex-end;">
-      <div {...$actContent} use:melt={$actContent} style="width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:0 0 24px;">
-        <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid {T.bd0};">
-          <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:4px;">
-            <SourceGlyph kind={actionSource.kind} size={14} />
-          </div>
-          <div>
-            <div style="font:13px/1 {T.mono};color:{T.ink0};">{actionSource.name}</div>
-            <div style="margin-top:4px;font:10px/1 {T.mono};color:{T.ink3};">{actionSource.host}</div>
-          </div>
-          <span style="flex:1;"></span>
-          <StatusDot status={actionSource.status} />
-        </div>
-        {#each [
-          { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
-          { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
-          { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
-          { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
-          { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
-        ] as act}
-          <button
-            onclick={act.action}
-            style="display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;background:transparent;border:none;border-bottom:1px solid {T.bd0};font:13px/1 {T.mono};color:{act.label === 'Remove source' ? T.red : T.ink0};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent;"
-          >
-            <Icon name={act.icon} size={16} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
-            {act.label}
-          </button>
-        {/each}
-        <button
-          use:melt={$actClose}
-          style="display:flex;align-items:center;justify-content:center;width:100%;padding:14px 16px;background:transparent;border:none;font:12px/1 {T.mono};color:{T.ink2};cursor:pointer;"
-        >cancel</button>
-      </div>
-    </div>
-  {/if}
-
-  <!-- Edit source sheet -->
-  {#if editingSourceId}
-    <div {...$editOverlay} use:melt={$editOverlay} style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);display:flex;flex-direction:column;justify-content:flex-end;">
-      <div {...$editContent} use:melt={$editContent} style="position:relative;background:{T.bg1};border-top-left-radius:12px;border-top-right-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:max(16px, env(safe-area-inset-bottom));">
-        <div style="font:11px/1 {T.mono};color:{T.ink2};letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">edit source</div>
-
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <label for="edit-url" style="font:10px/1 {T.mono};color:{T.ink3};">URL</label>
-          <input
-            id="edit-url"
-            bind:value={editUrl}
-            placeholder="https://example.com/feed.xml"
-            style="width:100%;padding:10px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:12px/1 {T.mono};color:{T.ink0};outline:none;box-sizing:border-box;"
-            oninput={() => { editKind = inferSourceMeta(editUrl).kind; }}
-          />
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <label for="edit-name" style="font:10px/1 {T.mono};color:{T.ink3};">NAME</label>
-            <button
-              onclick={() => fetchTitleForUrl(editUrl)}
-              disabled={fetchingTitle}
-              style="background:transparent;border:1px solid {T.bd1};border-radius:3px;padding:2px 8px;font:9px/1 {T.mono};color:{fetchingTitle ? T.ink3 : T.cyan};cursor:{fetchingTitle ? 'default' : 'pointer'};"
-            >{fetchingTitle ? 'fetching…' : 'fetch title'}</button>
-          </div>
-          <input
-            id="edit-name"
-            bind:value={editName}
-            placeholder="Display name"
-            style="width:100%;padding:10px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:12px/1 {T.mono};color:{T.ink0};outline:none;box-sizing:border-box;"
-          />
-        </div>
-
-        <div style="display:flex;gap:8px;">
-          <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
-            <label style="font:10px/1 {T.mono};color:{T.ink3};">TYPE</label>
-            <div style="display:flex;gap:3px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;padding:2px;">
-              {#each (['rss', 'hn', 'reddit'] as const) as k}
-                <button
-                  onclick={() => editKind = k}
-                  style="flex:1;padding:6px 4px;border:none;border-radius:2px;cursor:pointer;font:9px/1 {T.mono};text-transform:uppercase;background:{editKind===k ? T.bg3 : 'transparent'};color:{editKind===k ? T.cyan : T.ink2};"
-                >{k}</button>
-              {/each}
+    {#if isDesktop && ctxMenuPos}
+      <div {...$actOverlay} use:melt={$actOverlay} style="position:fixed;inset:0;z-index:100;">
+        <div
+          {...$actContent} use:melt={$actContent}
+          style="
+            position:absolute;
+            top:{Math.min(ctxMenuPos.y, (typeof window !== 'undefined' ? window.innerHeight : 600) - 280)}px;
+            left:{Math.min(ctxMenuPos.x, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 220)}px;
+            width:220px;
+            background:{T.bg2};
+            border:1px solid {T.bd1};
+            border-radius:4px;
+            box-shadow:0 8px 32px rgba(0,0,0,0.6);
+            overflow:hidden;
+          "
+        >
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid {T.bd0};">
+            <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;">
+              <SourceGlyph kind={actionSource.kind} size={11} />
+            </div>
+            <div style="min-width:0;">
+              <div style="font:11px/1 {T.mono};color:{T.ink0};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{actionSource.name}</div>
+              <div style="font:9px/1 {T.mono};color:{T.ink3};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{actionSource.host}</div>
             </div>
           </div>
-          <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
-            <label style="font:10px/1 {T.mono};color:{T.ink3};">GROUP</label>
-            <select
-              bind:value={editGroup}
-              style="width:100%;padding:8px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:12px/1 {T.mono};color:{T.ink0};cursor:pointer;"
+          {#each [
+            { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
+            { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
+            { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
+            { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
+            { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
+          ] as act}
+            <button
+              onclick={act.action}
+              style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd0};font:11px/1 {T.mono};color:{act.label === 'Remove source' ? T.red : T.ink0};cursor:pointer;text-align:left;"
             >
-              {#each groups as g}<option value={g.id}>{g.name}</option>{/each}
-            </select>
-          </div>
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <label style="font:10px/1 {T.mono};color:{T.ink3};">COLOUR</label>
-            {#if editHue != null}
-              <button
-                onclick={() => editHue = undefined}
-                style="background:transparent;border:none;color:{T.ink3};font:9px/1 {T.mono};cursor:pointer;padding:0;"
-              >reset</button>
-            {/if}
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <input
-              type="range"
-              min="0" max="360"
-              value={editHue ?? 200}
-              oninput={(e) => editHue = parseInt((e.target as HTMLInputElement).value)}
-              style="flex:1;accent-color:{T.cyan};height:6px;"
-            />
-            <div style="
-              width:28px;height:28px;border-radius:3px;flex-shrink:0;
-              background:{editHue != null ? `oklch(0.45 0.14 ${editHue})` : T.ink4};
-              border:1px solid {T.bd1};
-            "></div>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:8px;margin-top:4px;">
-          <button
-            use:melt={$editClose}
-            style="flex:1;padding:12px;background:transparent;border:1px solid {T.bd1};border-radius:4px;font:12px/1 {T.mono};color:{T.ink2};cursor:pointer;"
-          >cancel</button>
-          <button
-            onclick={submitEditSource}
-            style="flex:2;padding:12px;background:{T.cyan};border:none;border-radius:4px;font:12px/1 {T.mono};color:{T.bg0};cursor:pointer;font-weight:600;"
-          >save changes</button>
+              <Icon name={act.icon} size={13} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
+              {act.label}
+            </button>
+          {/each}
         </div>
       </div>
-    </div>
+    {:else}
+      <div {...$actOverlay} use:melt={$actOverlay} style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;display:flex;align-items:flex-end;">
+        <div {...$actContent} use:melt={$actContent} style="width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:0 0 24px;">
+          <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid {T.bd0};">
+            <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:4px;">
+              <SourceGlyph kind={actionSource.kind} size={14} />
+            </div>
+            <div>
+              <div style="font:13px/1 {T.mono};color:{T.ink0};">{actionSource.name}</div>
+              <div style="margin-top:4px;font:10px/1 {T.mono};color:{T.ink3};">{actionSource.host}</div>
+            </div>
+            <span style="flex:1;"></span>
+            <StatusDot status={actionSource.status} />
+          </div>
+          {#each [
+            { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
+            { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
+            { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
+            { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
+            { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
+          ] as act}
+            <button
+              onclick={act.action}
+              style="display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;background:transparent;border:none;border-bottom:1px solid {T.bd0};font:13px/1 {T.mono};color:{act.label === 'Remove source' ? T.red : T.ink0};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent;"
+            >
+              <Icon name={act.icon} size={16} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
+              {act.label}
+            </button>
+          {/each}
+          <button
+            use:melt={$actClose}
+            style="display:flex;align-items:center;justify-content:center;width:100%;padding:14px 16px;background:transparent;border:none;font:12px/1 {T.mono};color:{T.ink2};cursor:pointer;"
+          >cancel</button>
+        </div>
+      </div>
+    {/if}
+  {/if}
+
+  <!-- Edit source sheet / Desktop popover -->
+  {#if editingSourceId}
+    {#if isDesktop}
+      <div {...$editOverlay} use:melt={$editOverlay} style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">
+        <div {...$editContent} use:melt={$editContent} style="background:{T.bg1};border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:12px;width:400px;max-width:90vw;max-height:90vh;overflow-y:auto;">
+          {@render editForm()}
+        </div>
+      </div>
+    {:else}
+      <div {...$editOverlay} use:melt={$editOverlay} style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);display:flex;flex-direction:column;justify-content:flex-end;">
+        <div {...$editContent} use:melt={$editContent} style="position:relative;background:{T.bg1};border-top-left-radius:12px;border-top-right-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:max(16px, env(safe-area-inset-bottom));">
+          {@render editForm()}
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>
+
+{#snippet editForm()}
+  <div style="font:11px/1 {T.mono};color:{T.ink2};letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">edit source</div>
+
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <label for="edit-url" style="font:10px/1 {T.mono};color:{T.ink3};">URL</label>
+    <input
+      id="edit-url"
+      bind:value={editUrl}
+      placeholder="https://example.com/feed.xml"
+      style="width:100%;padding:10px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:12px/1 {T.mono};color:{T.ink0};outline:none;box-sizing:border-box;"
+      oninput={() => { editKind = inferSourceMeta(editUrl).kind; }}
+    />
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <label for="edit-name" style="font:10px/1 {T.mono};color:{T.ink3};">NAME</label>
+      <button
+        onclick={() => fetchTitleForUrl(editUrl)}
+        disabled={fetchingTitle}
+        style="background:transparent;border:1px solid {T.bd1};border-radius:3px;padding:2px 8px;font:9px/1 {T.mono};color:{fetchingTitle ? T.ink3 : T.cyan};cursor:{fetchingTitle ? 'default' : 'pointer'};"
+      >{fetchingTitle ? 'fetching…' : 'fetch title'}</button>
+    </div>
+    <input
+      id="edit-name"
+      bind:value={editName}
+      placeholder="Display name"
+      style="width:100%;padding:10px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:12px/1 {T.mono};color:{T.ink0};outline:none;box-sizing:border-box;"
+    />
+  </div>
+
+  <div style="display:flex;gap:8px;">
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+      <label style="font:10px/1 {T.mono};color:{T.ink3};">TYPE</label>
+      <div style="display:flex;gap:3px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;padding:2px;">
+        {#each (['rss', 'hn', 'reddit'] as const) as k}
+          <button
+            onclick={() => editKind = k}
+            style="flex:1;padding:6px 4px;border:none;border-radius:2px;cursor:pointer;font:9px/1 {T.mono};text-transform:uppercase;background:{editKind===k ? T.bg3 : 'transparent'};color:{editKind===k ? T.cyan : T.ink2};"
+          >{k}</button>
+        {/each}
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+      <label style="font:10px/1 {T.mono};color:{T.ink3};">GROUP</label>
+      <select
+        bind:value={editGroup}
+        style="width:100%;padding:8px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:12px/1 {T.mono};color:{T.ink0};cursor:pointer;"
+      >
+        {#each groups as g}<option value={g.id}>{g.name}</option>{/each}
+      </select>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <label style="font:10px/1 {T.mono};color:{T.ink3};">COLOUR</label>
+      {#if editHue != null}
+        <button
+          onclick={() => editHue = undefined}
+          style="background:transparent;border:none;color:{T.ink3};font:9px/1 {T.mono};cursor:pointer;padding:0;"
+        >reset</button>
+      {/if}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <input
+        type="range"
+        min="0" max="360"
+        value={editHue ?? 200}
+        oninput={(e) => editHue = parseInt((e.target as HTMLInputElement).value)}
+        style="flex:1;accent-color:{T.cyan};height:6px;"
+      />
+      <div style="
+        width:28px;height:28px;border-radius:3px;flex-shrink:0;
+        background:{editHue != null ? `oklch(0.45 0.14 ${editHue})` : T.ink4};
+        border:1px solid {T.bd1};
+      "></div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-top:4px;">
+    <button
+      use:melt={$editClose}
+      style="flex:1;padding:12px;background:transparent;border:1px solid {T.bd1};border-radius:4px;font:12px/1 {T.mono};color:{T.ink2};cursor:pointer;"
+    >cancel</button>
+    <button
+      onclick={submitEditSource}
+      style="flex:2;padding:12px;background:{T.cyan};border:none;border-radius:4px;font:12px/1 {T.mono};color:{T.bg0};cursor:pointer;font-weight:600;"
+    >save changes</button>
+  </div>
+{/snippet}

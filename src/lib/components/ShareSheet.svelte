@@ -4,6 +4,11 @@
   import { shareSheet, dismissShare, confirmShare } from '$lib/share.svelte';
 
   let submitting = $state(false);
+  let isDesktop = $state(false);
+
+  $effect(() => {
+    isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+  });
 
   const noFeedFound = $derived(
     !shareSheet.loading &&
@@ -31,7 +36,7 @@
   tabindex="-1"
   onclick={dismissShare}
   onkeydown={(e) => e.key === 'Escape' && dismissShare()}
-  style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;display:flex;align-items:flex-end;"
+  style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;display:flex;align-items:{isDesktop ? 'center' : 'flex-end'};justify-content:{isDesktop ? 'center' : 'stretch'};"
 >
   <div
     role="dialog"
@@ -39,7 +44,11 @@
     tabindex="-1"
     onclick={(e) => e.stopPropagation()}
     onkeydown={() => {}}
-    style="width:100%;background:{T.bg2};border-radius:16px 16px 0 0;padding:20px 16px max(20px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;"
+    style="{
+      isDesktop
+        ? 'width:400px;max-width:90vw;border-radius:8px;'
+        : 'width:100%;border-radius:16px 16px 0 0;'
+    }background:{T.bg2};padding:20px 16px max(20px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;max-height:90vh;overflow-y:auto;"
   >
     <!-- Header -->
     <div style="display:flex;align-items:center;gap:8px;">
