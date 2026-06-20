@@ -186,6 +186,12 @@ export async function initStore(): Promise<void> {
         itemCount: page.items.length, sourceCount: bs.length, groupCount: bg.length,
       };
       logger.info('coldstart: initStore complete', coldstartTiming.data);
+      // Fire-and-forget AI + stats init (no circular import: dynamic)
+      import('./ai.svelte').then(m => {
+        m.reloadAiInfo().catch(e => logger.warn('ai info failed', e));
+        m.reloadAiStats().catch(e => logger.warn('ai stats failed', e));
+      });
+      reloadDbStats().catch(e => logger.warn('db stats failed', e));
       return;
     } catch (e) {
       logger.warn(`coldstart: initStore attempt ${attempt + 1} failed`, e);

@@ -45,21 +45,9 @@
 }
 
 /* ── Density system ──────────────────────────────────────────────────────── */
-:root[data-density="dense"] {
-  --item-pad-y: 8px;
-  --item-font: 11px;
-  --item-line: 1.2;
-}
-:root[data-density="normal"] {
-  --item-pad-y: 13px;
-  --item-font: 12px;
-  --item-line: 1.4;
-}
-:root[data-density="roomy"] {
-  --item-pad-y: 16px;
-  --item-font: 14px;
-  --item-line: 1.5;
-}
+:root[data-density="dense"]  { --item-pad-y: 8px; }
+:root[data-density="normal"] { --item-pad-y: 13px; }
+:root[data-density="roomy"]  { --item-pad-y: 16px; }
 
 /* ── Tag color tokens (theme-aware) ──────────────────────────────────────── */
 /* Dark theme: existing palette (unchanged — :root is the default) */

@@ -5,6 +5,10 @@
   import { openExternal, shareItem } from '$lib/utils';
   import Icon from '$lib/components/Icon.svelte';
   import KeyCap from '$lib/components/KeyCap.svelte';
+  import DragHandle from '$lib/components/DragHandle.svelte';
+  import FilterPills from '$lib/components/FilterPills.svelte';
+  import BottomTools from '$lib/components/BottomTools.svelte';
+  import StatusBar from '$lib/components/StatusBar.svelte';
   import SourceGlyph from '$lib/components/SourceGlyph.svelte';
   import StatusDot from '$lib/components/StatusDot.svelte';
   import AiPanelContent from '$lib/components/AiPanelContent.svelte';
@@ -24,12 +28,12 @@
   let leftRailWidth   = $state(232);
   let leftRailPrevW   = 232;
   let timelineWidth   = $state(460);
-  let dragging        = $state<'left' | 'timeline' | null>(null);
+  let dragging        = $state<string | null>(null);
   let dragStartX      = 0;
   let dragStartW      = 0;
   let leftRailCollapsed = $state(false);
 
-  function onDragStart(edge: 'left' | 'timeline', e: MouseEvent) {
+  function onDragStart(edge: string, e: MouseEvent) {
     dragging = edge;
     dragStartX = e.clientX;
     dragStartW = edge === 'left' ? leftRailWidth : timelineWidth;
@@ -164,6 +168,16 @@
     const next = activeTag === tag ? null : tag;
     setTagFilter(next);
     showAI = false;
+  }
+
+  function handleFilterChange(filter: string) {
+    signalActive = false;
+    switch (filter) {
+      case 'all':    setReadFilter(null); setSavedFilter(null); break;
+      case 'unread': setReadFilter(false); setSavedFilter(null); break;
+      case 'saved':  setReadFilter(null); setSavedFilter(true); break;
+      case 'signal': setReadFilter(null); setSavedFilter(null); signalActive = true; break;
+    }
   }
 
   function openItemAndRead(id: string) {
@@ -342,15 +356,7 @@
       </div>
 
       <!-- Filter pills -->
-      <div style="padding:6px 8px 4px;border-bottom:1px solid {T.bd0};">
-        <div style="padding:0 4px 3px;font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">filter</div>
-        <div style="display:flex;flex-wrap:wrap;gap:3px;" role="group" aria-label="Item filters">
-          <button onclick={() => { setReadFilter(null); setSavedFilter(null); signalActive = false; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='all' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='all' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='all' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='all'} onmouseenter={(e) => { if(desktopFilter!=='all')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='all')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }}>all</button>
-          <button onclick={() => { setReadFilter(false); setSavedFilter(null); signalActive = false; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='unread' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='unread' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='unread' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='unread'} onmouseenter={(e) => { if(desktopFilter!=='unread')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='unread')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }}>unread</button>
-          <button onclick={() => { setReadFilter(null); setSavedFilter(true); signalActive = false; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='saved' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='saved' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='saved' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='saved'} onmouseenter={(e) => { if(desktopFilter!=='saved')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='saved')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }}>saved</button>
-          <button onclick={() => { setReadFilter(null); setSavedFilter(null); signalActive = true; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='signal' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='signal' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='signal' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='signal'} onmouseenter={(e) => { if(desktopFilter!=='signal')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='signal')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }}>signal</button>
-        </div>
-      </div>
+      <FilterPills active={desktopFilter} onChange={handleFilterChange} />
 
       <!-- Groups (vertical) -->
       <div style="padding:2px 0 4px;border-bottom:1px solid {T.bd0};">
@@ -408,67 +414,18 @@
       <div style="flex:1;"></div>
 
       <!-- Bottom utilities -->
-      <div style="border-top:1px solid {T.bd0};padding:4px 0;" role="list" aria-label="Tools">
-        <button
-          role="listitem"
-          onclick={() => { showAI = !showAI; if (showAI) showSettings = false; }}
-          onmouseenter={(e) => { if(!showAI)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
-          onmouseleave={(e) => { if(!showAI)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-          onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
-          onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
-          style="display:flex;align-items:center;gap:6px;padding:5px 12px;width:100%;background:{showAI ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {showAI ? T.cyan : 'transparent'};color:{showAI ? T.cyan : T.ink2};cursor:pointer;text-align:left;font:10px/1 {T.mono};"
-          title={taggingProgress.active ? `Tagging ${taggingProgress.tagged}/${taggingProgress.total}…` : 'AI Signal (a)'}
-          aria-label={`AI Signal${taggingProgress.active ? ` - tagging ${taggingProgress.tagged} of ${taggingProgress.total}` : ''}`}
-        >
-          <Icon name="cpu" size={12} color={taggingProgress.active ? T.amber : (showAI ? T.cyan : T.ink2)} />
-          <span style="flex:1;">AI Signal</span>
-          {#if taggingProgress.active}<span style="width:5px;height:5px;border-radius:50%;background:{T.amber};flex-shrink:0;" aria-hidden="true"></span>{/if}
-        </button>
-        <button
-          role="listitem"
-          onclick={() => { showSources = !showSources; }}
-          onmouseenter={(e) => { if(!showSources)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
-          onmouseleave={(e) => { if(!showSources)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-          onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
-          onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
-          style="display:flex;align-items:center;gap:6px;padding:5px 12px;width:100%;background:{showSources ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {showSources ? T.cyan : 'transparent'};color:{showSources ? T.cyan : T.ink2};cursor:pointer;text-align:left;font:10px/1 {T.mono};"
-          title="Sources (r)"
-          aria-label="Sources (r)"
-        >
-          <Icon name="rss" size={12} color={showSources ? T.cyan : T.ink2} />
-          <span>Sources</span>
-        </button>
-        <button
-          role="listitem"
-          onclick={() => { showSettings = !showSettings; if (showSettings) showAI = false; }}
-          onmouseenter={(e) => { if(!showSettings)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
-          onmouseleave={(e) => { if(!showSettings)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-          onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
-          onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
-          style="display:flex;align-items:center;gap:6px;padding:5px 12px;width:100%;background:{showSettings ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {showSettings ? T.cyan : 'transparent'};color:{showSettings ? T.cyan : T.ink2};cursor:pointer;text-align:left;font:10px/1 {T.mono};"
-          title="Settings"
-          aria-label="Settings"
-        >
-          <Icon name="cog" size={12} color={showSettings ? T.cyan : T.ink2} />
-          <span>Settings</span>
-        </button>
-        <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;font:10px/1 {T.mono};color:{T.ink3};" title={`Synced ${syncState.lastSyncAt}${syncState.lastNewCount > 0 ? ` · +${syncState.lastNewCount} new` : ''}`} aria-label={`Sync status: ${syncState.lastSyncAt}, ${syncState.lastNewCount > 0 ? syncState.lastNewCount + ' new items' : 'no new items'}`}>
-          <span style="color:{syncing ? T.cyan : T.green};">●</span>
-          <span>sync {syncState.lastSyncAt}</span>
-        </div>
-      </div>
+      <BottomTools
+        {showAI} {showSources} {showSettings}
+        {syncing} {syncState} {taggingProgress}
+        onToggleAI={() => { showAI = !showAI; if (showAI) showSettings = false; }}
+        onToggleSources={() => { showSources = !showSources; }}
+        onToggleSettings={() => { showSettings = !showSettings; if (showSettings) showAI = false; }}
+      />
     </div>
     {/if}
 
     <!-- Drag handle: left rail ↔ timeline -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      role="separator"
-      onmousedown={(e) => onDragStart('left', e)}
-      style="width:4px;flex-shrink:0;cursor:col-resize;background:transparent;"
-      onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.cyanDim; }}
-      onmouseleave={(e) => { if (dragging !== 'left') (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-    ></div>
+    <DragHandle edge="left" {onDragStart} {dragging} />
 
     <!-- Timeline pane -->
     <div style="width:{timelineWidth}px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid {T.bd0};overflow:hidden;background:{T.bg0};">
@@ -513,14 +470,7 @@
     </div>
 
     <!-- Drag handle: timeline ↔ reader -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      role="separator"
-      onmousedown={(e) => onDragStart('timeline', e)}
-      style="width:4px;flex-shrink:0;cursor:col-resize;background:transparent;"
-      onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.cyanDim; }}
-      onmouseleave={(e) => { if (dragging !== 'timeline') (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-    ></div>
+    <DragHandle edge="timeline" {onDragStart} {dragging} />
 
     <!-- Detail pane -->
     {#if openItem}
@@ -686,28 +636,16 @@
   </div>
 
   <!-- Status bar -->
-  <div style="height:24px;display:flex;align-items:center;padding:0 10px;gap:14px;border-top:1px solid {T.bd0};background:{T.bg1};flex-shrink:0;font:10px/1 {T.mono};color:{T.ink2};">
-    <span style="color:{T.bg0};background:{T.cyan};padding:3px 6px;border-radius:2px;font:600 9px/1 {T.mono};letter-spacing:0.6px;text-transform:uppercase;">{settings.density}</span>
-    <span><span style="color:{T.ink3};">group:</span> {activeGroupLabel}</span>
-    {#if activeSource}<span style="color:{T.ink4};">·</span><span><span style="color:{T.ink3};">src:</span> {sources.find(s => s.id === activeSource)?.name}</span>{/if}
-    <span style="color:{T.ink4};">·</span>
-    <span title="{displayItems.length} items in view · {pageCounts.total} total matching filter"><span style="color:{T.ink3};">items:</span> <span style="color:{T.ink0};">{displayItems.length}</span> / {pageCounts.total}</span>
-    <span style="color:{T.ink4};">·</span>
-    <span title="{unreadCount} unread in current view"><span style="color:{T.ink3};">unread:</span> <span style="color:{unreadCount > 0 ? T.cyan : T.ink3};">{unreadCount}</span></span>
-    <span style="color:{T.ink4};">·</span>
-    <span title="{taggedCount} items with at least one AI tag in current view"><span style="color:{T.ink3};">tagged:</span> <span style="color:{T.amber};">{taggedCount}</span></span>
-    {#if searchQuery}<span style="color:{T.ink4};">·</span><span style="color:{T.amber};">"{searchQuery}"</span>{/if}
-    <span style="flex:1;"></span>
-    <span title="last sync: {syncState.lastSyncAt}{syncState.lastNewCount > 0 ? ` · +${syncState.lastNewCount} new` : ''}">
-      <span style="color:{syncing ? T.cyan : T.green};">●</span>
-      <span style="color:{T.ink3};"> sync</span>
-      <span style="color:{T.ink1};"> {syncState.lastSyncAt}</span>
-      {#if syncState.lastNewCount > 0}<span style="color:{T.cyan};"> +{syncState.lastNewCount}</span>{/if}
-    </span>
-    <span style="color:{T.ink4};">·</span>
-    <span><span style="color:{T.ink3};">ai</span> <span style="color:{settings.aiTagging ? T.amber : T.ink3};">{settings.aiTagging ? 'on' : 'off'}</span></span>
-    <span style="color:{T.ink4};">·</span>
-    <button onclick={() => showCheatsheet = !showCheatsheet} style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink3};padding:0;" title="keyboard shortcuts (?)">?</button>
-  </div>
+  <StatusBar
+    density={settings.density}
+    aiTagging={settings.aiTagging}
+    {activeGroupLabel} {activeSource}
+    activeSourceName={activeSource ? sources.find(s => s.id === activeSource)?.name : undefined}
+    itemCount={displayItems.length}
+    totalCount={pageCounts.total}
+    {unreadCount} {taggedCount}
+    {searchQuery} {syncing} {syncState}
+    onToggleCheatsheet={() => showCheatsheet = !showCheatsheet}
+  />
 </div>
 {/if}
