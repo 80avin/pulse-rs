@@ -1,7 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import { createDialog, melt } from '@melt-ui/svelte';
-  import { sources, groups, items, markSourceRead, addSource as storeAddSource, removeSource as storeRemoveSource, updateSource as storeUpdateSource, syncSource as storeSyncSource, createGroup, detectFeed } from '$lib/store.svelte';
+  import { sources, groups, items, markSourceRead, addSource as storeAddSource, removeSource as storeRemoveSource, updateSource as storeUpdateSource, syncSource as storeSyncSource, createGroup, detectFeed } from '$lib/stores/data.svelte';
   import { logger } from '$lib/logger';
   import StatusDot from '$lib/components/StatusDot.svelte';
   import SourceGlyph from '$lib/components/SourceGlyph.svelte';

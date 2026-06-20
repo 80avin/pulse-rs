@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import '../app.css';
-  import { setupTaggingListener, initStore } from '$lib/store.svelte';
+  import { setupTaggingListener } from '$lib/stores/ai.svelte';
+  import { initStore } from '$lib/stores/data.svelte';
   import { logger } from '$lib/logger';
   import { setupShareListener, shareSheet } from '$lib/share.svelte';
   import { initSettings, settings } from '$lib/settings.svelte';

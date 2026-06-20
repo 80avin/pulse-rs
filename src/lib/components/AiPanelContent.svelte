@@ -1,6 +1,7 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
-  import { items, sources, aiStatus, models, taggingProgress, downloadModel, deleteModel, activateModel, retagAll, reloadAiInfo, aiStats } from '$lib/store.svelte';
+  import { items, sources } from '$lib/stores/data.svelte';
+  import { aiStatus, models, taggingProgress, downloadModel, deleteModel, activateModel, retagAll, reloadAiInfo, aiStats } from '$lib/stores/ai.svelte';
   import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
   import ScoreBar from '$lib/components/ScoreBar.svelte';

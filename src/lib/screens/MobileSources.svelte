@@ -1,6 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { sources, doSync as storeSync } from '$lib/store.svelte';
+  import { sources } from '$lib/stores/data.svelte';
+  import { doSync as storeSync } from '$lib/stores/sync.svelte';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import SourceExplorer from '$lib/components/SourceExplorer.svelte';

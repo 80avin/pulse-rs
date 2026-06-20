@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { markRead, toggleSaved, hideItem } from '$lib/store.svelte';
+  import { markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
   import { openExternal, shareItem } from '$lib/utils';
   import Icon from './Icon.svelte';
 

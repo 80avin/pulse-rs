@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { aiStatus } from '$lib/store.svelte';
+  import { aiStatus } from '$lib/stores/ai.svelte';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import AiPanelContent from '$lib/components/AiPanelContent.svelte';

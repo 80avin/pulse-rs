@@ -1,6 +1,10 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
-  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, doSync as storeSync, syncState, taggingProgress, searchItems, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts, dbStats, aiStats } from '$lib/store.svelte';
+  import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, dbStats } from '$lib/stores/data.svelte';
+  import { doSync as storeSync, syncState } from '$lib/stores/sync.svelte';
+  import { taggingProgress, aiStats } from '$lib/stores/ai.svelte';
+  import { searchItems } from '$lib/stores/search.svelte';
+  import { timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts } from '$lib/stores/timeline.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, shareItem } from '$lib/utils';
   import Icon from '$lib/components/Icon.svelte';

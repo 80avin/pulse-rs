@@ -1,4 +1,4 @@
-import { groups, addSource as storeAddSource, syncSource as storeSyncSource, createGroup } from '$lib/store.svelte';
+import { groups, addSource as storeAddSource, syncSource as storeSyncSource, createGroup } from '$lib/stores/data.svelte';
 import { logger } from '$lib/logger';
 
 const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;

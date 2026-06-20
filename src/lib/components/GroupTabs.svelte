@@ -1,7 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import type { Group } from '$lib/types';
-  import { createGroup, renameGroup, deleteGroup } from '$lib/store.svelte';
+  import { createGroup, renameGroup, deleteGroup } from '$lib/stores/data.svelte';
   import Icon from './Icon.svelte';
   import { createTabs, melt } from '@melt-ui/svelte';
 

@@ -1,7 +1,8 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import type { FeedItem } from '$lib/types';
-  import { sources, loadingMore, fetchNextPage, storeReady } from '$lib/store.svelte';
+  import { sources, storeReady } from '$lib/stores/data.svelte';
+  import { loadingMore, fetchNextPage } from '$lib/stores/timeline.svelte';
   import { settings } from '$lib/settings.svelte';
   import ItemRow from './ItemRow.svelte';
   import { createVirtualizer } from '@tanstack/svelte-virtual';

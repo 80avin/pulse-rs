@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { T } from '$lib/tokens';
-  import { storeReady, setFeedFilter, setTagFilter } from '$lib/store.svelte';
+  import { storeReady } from '$lib/stores/data.svelte';
+  import { setFeedFilter, setTagFilter } from '$lib/stores/timeline.svelte';
   import MobileTimeline from './MobileTimeline.svelte';
   import MobileReader from './MobileReader.svelte';
   import MobileSources from './MobileSources.svelte';

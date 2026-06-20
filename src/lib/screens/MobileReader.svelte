@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { T } from '$lib/tokens';
   import { createDialog, melt } from '@melt-ui/svelte';
-  import { items, sources, markRead, toggleSaved, hideItem } from '$lib/store.svelte';
+  import { items, sources, markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, shareItem } from '$lib/utils';
   import KeyCap from '$lib/components/KeyCap.svelte';

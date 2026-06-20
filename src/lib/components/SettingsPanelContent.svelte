@@ -1,6 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { sources, groups, clearItems, loadMockData, aiStatus, coldstartTiming, dbStats, addSource, createGroup } from '$lib/store.svelte';
+  import { sources, groups, clearItems, loadMockData, coldstartTiming, dbStats, addSource, createGroup } from '$lib/stores/data.svelte';
+  import { aiStatus } from '$lib/stores/ai.svelte';
   import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
   import Icon from '$lib/components/Icon.svelte';

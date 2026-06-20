@@ -1,7 +1,8 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
   import { createDialog, melt } from '@melt-ui/svelte';
-  import { items, sources, toggleSaved, aiStatus } from '$lib/store.svelte';
+  import { items, sources, toggleSaved } from '$lib/stores/data.svelte';
+  import { aiStatus } from '$lib/stores/ai.svelte';
   import { openExternal, sanitizeHtml, TAG_EVIDENCE } from '$lib/utils';
   import TagChip from './TagChip.svelte';
   import ScoreBar from './ScoreBar.svelte';

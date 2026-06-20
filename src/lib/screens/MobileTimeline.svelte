@@ -2,7 +2,10 @@
   import { T } from '$lib/tokens';
   import { createDialog, melt } from '@melt-ui/svelte';
   import type { FeedItem } from '$lib/types';
-  import { groups, sources, items, markAllRead, markRead, toggleSaved, hideItem, doSync as storeSync, syncState, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts, aiStats } from '$lib/store.svelte';
+  import { groups, sources, items, markAllRead, markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
+  import { doSync as storeSync, syncState } from '$lib/stores/sync.svelte';
+  import { timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts } from '$lib/stores/timeline.svelte';
+  import { aiStats } from '$lib/stores/ai.svelte';
   import { openExternal, shareItem } from '$lib/utils';
   import { settings } from '$lib/settings.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';

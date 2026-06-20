@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { groups } from '$lib/store.svelte';
+  import { groups } from '$lib/stores/data.svelte';
   import { shareSheet, dismissShare, confirmShare } from '$lib/share.svelte';
 
   let submitting = $state(false);

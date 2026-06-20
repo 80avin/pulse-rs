@@ -1,6 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { taggingProgress, groups, dbStats } from '$lib/store.svelte';
+  import { groups, dbStats } from '$lib/stores/data.svelte';
+  import { taggingProgress } from '$lib/stores/ai.svelte';
   import Icon from './Icon.svelte';
   import { createToolbar, melt } from '@melt-ui/svelte';
 

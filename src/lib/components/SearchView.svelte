@@ -1,6 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { sources, searchItems } from '$lib/store.svelte';
+  import { sources } from '$lib/stores/data.svelte';
+  import { searchItems } from '$lib/stores/search.svelte';
   import Icon from './Icon.svelte';
   import ItemRow from './ItemRow.svelte';
   import type { FeedItem } from '$lib/types';
