@@ -1,7 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import { sources } from '$lib/stores/data.svelte';
-  import { doSync as storeSync } from '$lib/stores/sync.svelte';
+  import { doSync as storeSync, syncState } from '$lib/stores/sync.svelte';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import SourceExplorer from '$lib/components/SourceExplorer.svelte';
@@ -12,13 +12,8 @@
     onSourceSelect: (sourceId: string) => void;
   } = $props();
 
-  let syncing = $state(false);
-
   async function doSync() {
-    if (syncing) return;
-    syncing = true;
     await storeSync();
-    syncing = false;
   }
 </script>
 
@@ -29,8 +24,8 @@
       sources <span style="color:{T.ink3};">· {sources.length}</span>
     </span>
     <button onclick={doSync} style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:4px;">
-      <span class={syncing ? 'syncing' : ''}>
-        <Icon name="sync" size={16} color={syncing ? T.cyan : T.ink1} />
+      <span class={syncState.syncing ? 'syncing' : ''}>
+        <Icon name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1} />
       </span>
     </button>
     <button

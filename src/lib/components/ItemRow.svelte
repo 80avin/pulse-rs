@@ -135,7 +135,7 @@
   <span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{isFocused ? T.cyan : (item.read ? 'transparent' : T.cyanDim)};z-index:1;"></span>
 
   <!-- Body -->
-  <div style="flex:1;min-width:0;display:flex;gap:12px;padding:var(--item-pad-y) 14px var(--item-pad-y) 12px;">
+  <div style="flex:1;min-width:0;display:flex;gap:12px;padding:var(--item-pad-y,13px) 14px var(--item-pad-y,13px) 12px;">
 
     <!-- Source pill -->
     <div style="

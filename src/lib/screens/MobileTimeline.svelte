@@ -22,7 +22,6 @@
 
   let activeGroup = $derived(timelineFilter.groupId ?? 'all');
   let sort = $state('time');
-  let syncing = $state(false);
   let showFilter = $state(true);
   let actionSheetItem = $state<FeedItem | null>(null);
   let signalActive = $state(false);
@@ -70,10 +69,7 @@
   }
 
   async function doSync() {
-    if (syncing) return;
-    syncing = true;
     await storeSync();
-    syncing = false;
   }
 
   const feedFilterName = $derived(sources.find(s => s.id === timelineFilter.feedId)?.name ?? timelineFilter.feedId);
@@ -89,8 +85,8 @@
       onclick={doSync}
       style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:4px;"
     >
-      <span class={syncing ? 'syncing' : ''}>
-        <Icon name="sync" size={18} color={syncing ? T.cyan : T.ink1} />
+      <span class={syncState.syncing ? 'syncing' : ''}>
+        <Icon name="sync" size={18} color={syncState.syncing ? T.cyan : T.ink1} />
       </span>
     </button>
     <button

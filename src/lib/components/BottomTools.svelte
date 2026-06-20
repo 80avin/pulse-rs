@@ -16,9 +16,8 @@
   } = $props();
 </script>
 
-<div style="border-top:1px solid var(--color-bd-0);padding:4px 0;" role="list" aria-label="Tools">
+<div style="border-top:1px solid var(--color-bd-0);padding:4px 0;" aria-label="Tools">
   <button
-    role="listitem"
     onclick={onToggleAI}
     style="display:flex;align-items:center;gap:6px;padding:5px 12px;width:100%;background:{showAI ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {showAI ? 'var(--color-cyan)' : 'transparent'};color:{showAI ? 'var(--color-cyan)' : 'var(--color-ink-2)'};cursor:pointer;text-align:left;font:10px/1 var(--font-mono);"
     onmouseenter={(e) => { if(!showAI)(e.currentTarget as HTMLElement).style.background = 'var(--color-bg-2)'; }}
@@ -31,7 +30,6 @@
     {#if taggingProgress.active}<span style="width:5px;height:5px;border-radius:50%;background:var(--color-amber);flex-shrink:0;" aria-hidden="true"></span>{/if}
   </button>
   <button
-    role="listitem"
     onclick={onToggleSources}
     style="display:flex;align-items:center;gap:6px;padding:5px 12px;width:100%;background:{showSources ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {showSources ? 'var(--color-cyan)' : 'transparent'};color:{showSources ? 'var(--color-cyan)' : 'var(--color-ink-2)'};cursor:pointer;text-align:left;font:10px/1 var(--font-mono);"
     onmouseenter={(e) => { if(!showSources)(e.currentTarget as HTMLElement).style.background = 'var(--color-bg-2)'; }}
@@ -43,7 +41,6 @@
     <span>Sources</span>
   </button>
   <button
-    role="listitem"
     onclick={onToggleSettings}
     style="display:flex;align-items:center;gap:6px;padding:5px 12px;width:100%;background:{showSettings ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {showSettings ? 'var(--color-cyan)' : 'transparent'};color:{showSettings ? 'var(--color-cyan)' : 'var(--color-ink-2)'};cursor:pointer;text-align:left;font:10px/1 var(--font-mono);"
     onmouseenter={(e) => { if(!showSettings)(e.currentTarget as HTMLElement).style.background = 'var(--color-bg-2)'; }}

@@ -79,7 +79,6 @@
   const density    = $derived(settings.density);
   let searchQuery  = $state('');
   let ftsResults   = $state<import('$lib/types').FeedItem[] | null>(null);
-  let syncing      = $state(false);
   let searchInputEl: HTMLInputElement | null = $state(null);
   let showSettings  = $state(false);
   let showAI        = $state(false);
@@ -190,10 +189,7 @@
   }
 
   async function doSync() {
-    if (syncing) return;
-    syncing = true;
     await storeSync();
-    syncing = false;
   }
 
   // Keyboard shortcuts
@@ -294,7 +290,7 @@
       <Icon name="search" size={13} color={T.ink1} />
     </button>
     <button onclick={doSync} aria-label="Sync feeds" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" title="Sync">
-      <span class={syncing ? 'syncing' : ''}><Icon name="sync" size={13} color={syncing ? T.cyan : T.ink1} /></span>
+      <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={13} color={syncState.syncing ? T.cyan : T.ink1} /></span>
     </button>
     <button onclick={() => showCheatsheet = !showCheatsheet} aria-label="Keyboard shortcuts (?)" style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink3};padding:0 4px;" title="Keyboard shortcuts (?)">?</button>
   </div>
@@ -421,7 +417,8 @@
       <!-- Bottom utilities -->
       <BottomTools
         {showAI} {showSources} {showSettings}
-        {syncing} {syncState} {taggingProgress}
+        syncing={syncState.syncing}
+        {syncState} {taggingProgress}
         onToggleAI={() => { showAI = !showAI; if (showAI) showSettings = false; }}
         onToggleSources={() => { showSources = !showSources; }}
         onToggleSettings={() => { showSettings = !showSettings; if (showSettings) showAI = false; }}
@@ -649,7 +646,7 @@
     itemCount={displayItems.length}
     totalCount={pageCounts.total}
     {unreadCount} {taggedCount}
-    {searchQuery} {syncing} {syncState}
+    {searchQuery} syncing={syncState.syncing} {syncState}
     onToggleCheatsheet={() => showCheatsheet = !showCheatsheet}
   />
 </div>
