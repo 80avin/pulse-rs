@@ -64,6 +64,13 @@
   const padY        = $derived(density === 'dense' ? 8 : density === 'roomy' ? 16 : 13);
   const isDense     = $derived(density === 'dense');
 
+  // Font scaling with density
+  const titleFont   = $derived(density === 'dense' ? '12px/1.25' : density === 'roomy' ? '15px/1.4' : '14px/1.32');
+  const snippetFont = $derived(density === 'roomy' ? '13px/1.45' : '12px/1.4');
+  const metaFont    = $derived(density === 'dense' ? '10px/1' : density === 'roomy' ? '12px/1' : '11px/1');
+  const urlFont     = $derived(density === 'dense' ? '9px/1' : density === 'roomy' ? '11px/1' : '10px/1');
+  const pillFont    = $derived(density === 'dense' ? '8px/1' : density === 'roomy' ? '10px/1' : '9px/1');
+
   // Source pill
   const sk          = $derived(SOURCE_KIND[source?.kind ?? 'rss'] ?? SOURCE_KIND.rss);
   const pillLabel   = $derived(source ? sourcePillLabel(source.name) : '??');
@@ -137,7 +144,7 @@
       border-radius:{pillRadius};background:{pillBg};
       display:flex;align-items:center;justify-content:center;
       margin-top:2px;
-      font:700 {isDense ? 7 : 9}px/1 {T.mono};color:#fff;
+      font:700 {pillFont} {T.mono};color:#fff;
     ">{pillLabel}</div>
 
     <!-- Content column -->
@@ -154,7 +161,7 @@
 
       <!-- Title -->
       <div style="
-        font:{dim ? '400' : '500'} 14px/1.32 {T.sans};
+        font:{dim ? '400' : '500'} {titleFont} {T.sans};
         color:{dim ? T.ink2 : T.ink0};
         overflow:hidden;text-overflow:ellipsis;
         display:-webkit-box;-webkit-line-clamp:{isDense ? 1 : 2};-webkit-box-orient:vertical;
@@ -163,7 +170,7 @@
 
       <!-- URL bar (between title and snippet) -->
       {#if displayUrl}
-        <div style="margin-top:3px;font:10px/1 {T.mono};color:{sk.accent};display:flex;align-items:center;gap:4px;overflow:hidden;">
+        <div style="margin-top:3px;font:{urlFont} {T.mono};color:{sk.accent};display:flex;align-items:center;gap:4px;overflow:hidden;">
           <Icon name="link" size={10} color={sk.accent} />
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{urlDisplay}</span>
         </div>
@@ -171,13 +178,13 @@
 
       <!-- Snippet -->
       {#if item.snippet && !isDense}
-        <div style="margin-top:{displayUrl ? 5 : 4}px;font:12px/1.4 {T.sans};color:{T.ink2};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        <div style="margin-top:{displayUrl ? 5 : 4}px;font:{snippetFont} {T.sans};color:{T.ink2};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
           {item.snippet}
         </div>
       {/if}
 
       <!-- Meta row -->
-      <div style="margin-top:{!isDense ? 6 : 4}px;display:flex;align-items:center;gap:6px;font:10px/1 {T.mono};flex-wrap:wrap;">
+      <div style="margin-top:{!isDense ? 6 : 4}px;display:flex;align-items:center;gap:6px;font:{metaFont} {T.mono};flex-wrap:wrap;">
 
         {#if showPlatformIcon}
           <Icon name={platformIcon} size={12} color={sk.accent} />

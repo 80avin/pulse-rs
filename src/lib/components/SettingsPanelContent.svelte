@@ -5,6 +5,7 @@
   import { logger } from '$lib/logger';
   import Icon from '$lib/components/Icon.svelte';
   import KeyCap from '$lib/components/KeyCap.svelte';
+  import ThemeSection from '$lib/components/ThemeSection.svelte';
   import { version } from '$app/environment';
   import { openExternal, shareItem } from '$lib/utils';
 
@@ -149,7 +150,7 @@
     {#each options as opt}
       <button
         onclick={() => change(opt)}
-        style="flex:1;padding:5px 4px;border:none;border-radius:3px;cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;text-transform:uppercase;background:{opt === active ? T.bg3 : 'transparent'};color:{opt === active ? T.cyan : T.ink2};"
+        style="flex:1;padding:5px 4px;border:none;border-radius:3px;cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;text-transform:uppercase;background:{opt === active ? T.bg3 : 'transparent'};color:{opt === active ? T.cyan : T.ink2};"
       >{opt}</button>
     {/each}
   </div>
@@ -157,7 +158,7 @@
 
 <!-- Stats overview -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">overview</div>
+  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">overview</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     {#each [
       { label: 'items',       val: String(dbStats.totalItems),   color: T.cyan  },
@@ -167,20 +168,22 @@
     ] as stat}
       <div style="padding:8px;background:{T.bg0};border:1px solid {T.bd0};border-radius:3px;">
         <div style="font:16px/1 {T.mono};color:{stat.color};font-variant-numeric:tabular-nums;">{stat.val}</div>
-        <div style="margin-top:5px;font:9px/1 {T.mono};color:{T.ink3};">{stat.label}</div>
+        <div style="margin-top:5px;font:10px/1 {T.mono};color:{T.ink3};">{stat.label}</div>
       </div>
     {/each}
   </div>
 </div>
 
+<!-- Appearance -->
+<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
+  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">appearance</div>
+  <ThemeSection />
+</div>
+
 <!-- Reading -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">reading</div>
+  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">reading</div>
   <div style="display:flex;flex-direction:column;gap:10px;">
-    <div>
-      <div style="font:11px/1 {T.mono};color:{T.ink1};margin-bottom:6px;">Density</div>
-      {@render seg(['dense','normal','roomy'], settings.density, v => { settings.density = v as typeof settings.density; })}
-    </div>
     <div>
       <div style="font:11px/1 {T.mono};color:{T.ink1};margin-bottom:6px;">Mark as read</div>
       {@render seg(['open','never'], settings.markReadOn, v => { settings.markReadOn = v as typeof settings.markReadOn; })}
@@ -190,7 +193,7 @@
 
 <!-- Sync -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">sync</div>
+  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">sync</div>
   <div style="display:flex;flex-direction:column;gap:10px;">
     <div>
       <div style="font:11px/1 {T.mono};color:{T.ink1};margin-bottom:6px;">Interval (minutes)</div>
@@ -210,10 +213,10 @@
 <!-- AI -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-    <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">ai tagging</div>
-    <div style="font:8px/1 {T.mono};color:{T.amber};letter-spacing:0.5px;text-transform:uppercase;padding:2px 5px;border:1px solid {T.amber};border-radius:2px;opacity:0.8;">experimental</div>
+    <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">ai tagging</div>
+    <div style="font:10px/1 {T.mono};color:{T.amber};letter-spacing:0.5px;text-transform:uppercase;padding:2px 5px;border:1px solid {T.amber};border-radius:2px;opacity:0.8;">experimental</div>
   </div>
-  <div style="margin-bottom:10px;font:9px/1.5 {T.mono};color:{T.ink3};">Tags may be inaccurate. Raise the confidence threshold or disable tagging if results look wrong.</div>
+  <div style="margin-bottom:10px;font:10px/1.5 {T.mono};color:{T.ink3};">Tags may be inaccurate. Raise the confidence threshold or disable tagging if results look wrong.</div>
   <div style="display:flex;flex-direction:column;gap:10px;">
     <div style="display:flex;align-items:center;gap:8px;">
       <span style="flex:1;font:11px/1 {T.mono};color:{T.ink1};">AI tagging</span>
@@ -232,7 +235,7 @@
 
 <!-- Notifications -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">notifications</div>
+  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">notifications</div>
   <div style="display:flex;flex-direction:column;gap:10px;">
     <div style="display:flex;align-items:center;gap:8px;">
       <span style="flex:1;font:11px/1 {T.mono};color:{T.ink1};">High-signal items</span>
@@ -248,7 +251,7 @@
 <!-- Keyboard shortcuts (desktop only) -->
 {#if showShortcuts}
   <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-    <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">keyboard shortcuts</div>
+    <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">keyboard shortcuts</div>
     <div style="display:flex;flex-direction:column;gap:6px;">
       {#each [['j / k', 'navigate items'], ['m', 'toggle read'], ['s', 'save / unsave'], ['o', 'open link'], ['h', 'hide item'], ['a', 'toggle ai panel'], ['/', 'focus search'], ['Esc', 'clear / close']] as [k, label]}
         <div style="display:flex;align-items:center;gap:8px;font:10px/1 {T.mono};color:{T.ink2};">
@@ -262,7 +265,7 @@
 
 <!-- Storage + About -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">storage</div>
+  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">storage</div>
   <div style="font:11px/1.4 {T.mono};color:{T.ink1};">{dbStats.totalItems} items · {sources.length} sources</div>
   <div style="margin-top:4px;font:10px/1.4 {T.mono};color:{T.ink3};">SQLite WAL{dbStats.dbSizeKb > 0 ? ` · ${dbStats.dbSizeKb >= 1024 ? (dbStats.dbSizeKb/1024).toFixed(1)+' MB' : dbStats.dbSizeKb+' KB'}` : ''}</div>
 </div>
@@ -270,14 +273,14 @@
 <!-- Diagnostics -->
 {#if IS_TAURI}
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">diagnostics</div>
+  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">diagnostics</div>
   <div style="display:flex;flex-direction:column;gap:10px;">
 
     <!-- Verbose logging toggle -->
     <div style="display:flex;align-items:center;gap:8px;">
       <div style="flex:1;">
         <div style="font:11px/1 {T.mono};color:{T.ink1};">Verbose logging</div>
-        <div style="margin-top:3px;font:9px/1.4 {T.mono};color:{T.ink3};">Logs per-item tagging, sync steps, and inference calls. Enable before reproducing a bug.</div>
+        <div style="margin-top:3px;font:10px/1.4 {T.mono};color:{T.ink3};">Logs per-item tagging, sync steps, and inference calls. Enable before reproducing a bug.</div>
       </div>
       {@render toggle(settings.verboseLogging, () => { settings.verboseLogging = !settings.verboseLogging; })}
     </div>
@@ -285,7 +288,7 @@
     <!-- Desktop: show log path + open folder -->
     {#if IS_DESKTOP}
       {#if logPath}
-        <div style="font:9px/1.4 {T.mono};color:{T.ink3};word-break:break-all;">Logs: {logPath}</div>
+        <div style="font:10px/1.4 {T.mono};color:{T.ink3};word-break:break-all;">Logs: {logPath}</div>
       {/if}
       <button
         onclick={handleOpenLogsFolder}
@@ -317,7 +320,7 @@
 <!-- Performance -->
 {#if IS_TAURI}
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">performance</div>
+  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">performance</div>
   {#if coldstartTiming.data}
     {@const d = coldstartTiming.data}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -329,12 +332,12 @@
       ] as stat}
         <div style="padding:8px;background:{T.bg0};border:1px solid {T.bd0};border-radius:3px;">
           <div style="font:16px/1 {T.mono};color:{stat.color};font-variant-numeric:tabular-nums;">{stat.val}</div>
-          <div style="margin-top:5px;font:9px/1 {T.mono};color:{T.ink3};">{stat.label}</div>
+          <div style="margin-top:5px;font:10px/1 {T.mono};color:{T.ink3};">{stat.label}</div>
         </div>
       {/each}
     </div>
     {#if d.attempt > 0}
-      <div style="margin-top:8px;font:9px/1.4 {T.mono};color:{T.amber};">loaded on retry {d.attempt} (bridge delay: {d.waitMs} ms)</div>
+      <div style="margin-top:8px;font:10px/1.4 {T.mono};color:{T.amber};">loaded on retry {d.attempt} (bridge delay: {d.waitMs} ms)</div>
     {/if}
   {:else}
     <div style="font:10px/1.4 {T.mono};color:{T.ink3};">loading…</div>
@@ -344,7 +347,7 @@
 
 <!-- About -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">about</div>
+  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">about</div>
   <div style="font:11px/1.5 {T.mono};color:{T.ink2};">Pulse <span style="color:{T.cyan};">{version}</span></div>
   <div style="margin-top:2px;font:10px/1.5 {T.mono};color:{T.ink3};">Tauri 2 · Svelte 5 · Rust · MIT</div>
   <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
@@ -363,7 +366,7 @@
       report an issue
     </button>
   </div>
-  <div style="margin-top:10px;font:9px/1.4 {T.mono};color:{T.ink3};">No telemetry. All data stays on your device.</div>
+  <div style="margin-top:10px;font:10px/1.4 {T.mono};color:{T.ink3};">No telemetry. All data stays on your device.</div>
 </div>
 
 <!-- Advanced -->
@@ -373,12 +376,12 @@
     style="display:flex;align-items:center;gap:6px;width:100%;background:transparent;border:none;cursor:pointer;padding:0;text-align:left;"
   >
     <Icon name={showAdvanced ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
-    <div style="font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">advanced</div>
+    <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">advanced</div>
   </button>
 
   {#if showAdvanced}
     <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
-      <div style="font:9px/1.4 {T.mono};color:{T.ink3};">Export your sources as JSON to back them up or share them. Paste JSON below to import.</div>
+      <div style="font:10px/1.4 {T.mono};color:{T.ink3};">Export your sources as JSON to back them up or share them. Paste JSON below to import.</div>
 
       <textarea
         bind:value={sourceJson}
@@ -406,7 +409,7 @@
       </div>
 
       {#if importMsg}
-        <div style="font:9px/1 {T.mono};color:{importStatus === 'error' ? T.red : T.green};">{importMsg}</div>
+        <div style="font:10px/1 {T.mono};color:{importStatus === 'error' ? T.red : T.green};">{importMsg}</div>
       {/if}
     </div>
   {/if}

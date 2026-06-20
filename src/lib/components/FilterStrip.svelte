@@ -70,27 +70,27 @@
         {@const tc = TAG_COLORS[activeTag] ?? { fg: T.cyan, bg: 'rgba(78,205,214,0.10)', bd: 'rgba(78,205,214,0.30)' }}
         <button
           onclick={() => onClearTagFilter?.()}
-          style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;background:{tc.bg};border:1px solid {tc.bd};border-radius:2px;font:9px/1 {T.mono};color:{tc.fg};cursor:pointer;letter-spacing:0.2px;white-space:nowrap;"
+          style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;background:{tc.bg};border:1px solid {tc.bd};border-radius:2px;font:10px/1 {T.mono};color:{tc.fg};cursor:pointer;letter-spacing:0.2px;white-space:nowrap;"
         >
           <span style="color:{T.ink3};">tag:</span>{activeTag} ×
         </button>
         {#if topTags.length > 0}
-          <span style="flex-shrink:0;color:{T.ink3};font:9px/1 {T.mono};">·</span>
+          <span style="flex-shrink:0;color:{T.ink3};font:10px/1 {T.mono};">·</span>
           {#each topTags as tag}
             {@const tc2 = TAG_COLORS[tag] ?? { fg: T.ink2, bg: 'transparent', bd: T.bd1 }}
             <button
               onclick={() => onTagFilter?.(tag)}
-              style="flex-shrink:0;display:inline-flex;align-items:center;padding:2px 7px;background:transparent;border:1px solid {T.bd1};border-radius:2px;font:9px/1 {T.mono};color:{tag === activeTag ? tc2.fg : T.ink3};cursor:pointer;white-space:nowrap;opacity:{tag === activeTag ? 1 : 0.6};"
+              style="flex-shrink:0;display:inline-flex;align-items:center;padding:2px 7px;background:transparent;border:1px solid {T.bd1};border-radius:2px;font:10px/1 {T.mono};color:{tag === activeTag ? tc2.fg : T.ink3};cursor:pointer;white-space:nowrap;opacity:{tag === activeTag ? 1 : 0.6};"
             >{tag}</button>
           {/each}
         {/if}
       {:else}
-        <span style="flex-shrink:0;font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.3px;">top:</span>
+        <span style="flex-shrink:0;font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.3px;">top:</span>
         {#each topTags as tag}
           {@const tc = TAG_COLORS[tag] ?? { fg: T.ink2, bg: 'transparent', bd: T.bd1 }}
           <button
             onclick={() => onTagFilter?.(tag)}
-            style="flex-shrink:0;display:inline-flex;align-items:center;padding:2px 7px;background:{tc.bg};border:1px solid {tc.bd};border-radius:2px;font:9px/1 {T.mono};color:{tc.fg};cursor:pointer;white-space:nowrap;"
+            style="flex-shrink:0;display:inline-flex;align-items:center;padding:2px 7px;background:{tc.bg};border:1px solid {tc.bd};border-radius:2px;font:10px/1 {T.mono};color:{tc.fg};cursor:pointer;white-space:nowrap;"
           >{tag}</button>
         {/each}
       {/if}

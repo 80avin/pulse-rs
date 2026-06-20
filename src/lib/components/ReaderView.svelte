@@ -124,7 +124,7 @@
         {:else if item.note}
           <div style="margin-top:14px;padding:10px 12px;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-              <span style="font:9px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.4px;">note</span>
+              <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.4px;">note</span>
               <button onclick={startNoteEdit} style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink2};padding:2px 6px;">edit</button>
             </div>
             <p style="margin:0;font:12px/1.5 {T.sans};color:{T.ink1};white-space:pre-wrap;">{item.note}</p>
@@ -139,7 +139,7 @@
           <div style="padding:10px 12px;margin-top:14px;background:{T.bg1};border-left:3px solid {T.amber};border-radius:0 3px 3px 0;font:11px/1.5 {T.mono};color:{T.ink1};white-space:pre-wrap;">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
               <Icon name="bookmark" size={11} color={T.amber} />
-              <span style="font:9px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.4px;">note</span>
+              <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.4px;">note</span>
             </div>
             {item.note}
           </div>

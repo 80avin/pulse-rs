@@ -1,10 +1,247 @@
+@import "tailwindcss";
+
+/* ── Design tokens (Tailwind v4 @theme) ─────────────────────────────────── */
+/* light-dark(LIGHT-value, DARK-value) — first arg is light color-scheme */
+@theme {
+  /* Surface layers */
+  --color-bg-0: light-dark(#ffffff, #07090c);
+  --color-bg-1: light-dark(#f8f9fa, #0c1015);
+  --color-bg-2: light-dark(#eef0f2, #11161e);
+  --color-bg-3: light-dark(#e4e7eb, #171d27);
+
+  /* Borders */
+  --color-bd-0: light-dark(#d5d9df, #1a212c);
+  --color-bd-1: light-dark(#c4cad2, #222b38);
+  --color-bd-2: light-dark(#a8b0bb, #2c3645);
+
+  /* Text / ink */
+  --color-ink-0: light-dark(#0d1117, #e6ebf2);
+  --color-ink-1: light-dark(#374151, #a7b2c2);
+  --color-ink-2: light-dark(#4b5563, #7a8290);
+  --color-ink-3: light-dark(#6b7280, #757f8c);
+  --color-ink-4: light-dark(#d1d5db, #2a313c);
+
+  /* Semantic — darker in light mode for 7:1+ contrast on white */
+  --color-cyan:      var(--user-accent, light-dark(#155e75, #4ecdd6));
+  --color-cyan-dim:  var(--user-accent-dim, light-dark(#0e7490, #2a7a82));
+  --color-amber:     light-dark(#92400e, #e6b450);
+  --color-amber-dim: light-dark(#78350f, #7a5e2a);
+  --color-green:     light-dark(#166534, #6bd896);
+  --color-green-dim: light-dark(#14532d, #2f6a44);
+  --color-red:       light-dark(#991b1b, #e26b6b);
+  --color-red-dim:   light-dark(#7f1d1d, #7a2f2f);
+  --color-violet:    light-dark(#5b21b6, #b48ce6);
+  --color-orange:    light-dark(#9a3412, #e69056);
+  --color-pink:      light-dark(#9d174d, #e078b8);
+
+  /* Source spines (fixed) */
+  --color-spine-rss:    #1a73e8;
+  --color-spine-hn:     #ff6600;
+  --color-spine-reddit: #ff4500;
+
+  /* Typography */
+  --font-mono: "JetBrains Mono", "Berkeley Mono", "Fira Code", ui-monospace, monospace;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* ── Density system ──────────────────────────────────────────────────────── */
+:root[data-density="dense"] {
+  --item-pad-y: 8px;
+  --item-font: 11px;
+  --item-line: 1.2;
+}
+:root[data-density="normal"] {
+  --item-pad-y: 13px;
+  --item-font: 12px;
+  --item-line: 1.4;
+}
+:root[data-density="roomy"] {
+  --item-pad-y: 16px;
+  --item-font: 14px;
+  --item-line: 1.5;
+}
+
+/* ── Tag color tokens (theme-aware) ──────────────────────────────────────── */
+/* Dark theme: existing palette (unchanged — :root is the default) */
+:root {
+  --tag-technical-fg: var(--color-cyan);
+  --tag-technical-bg: rgba(78,205,214,0.10);
+  --tag-technical-bd: rgba(78,205,214,0.30);
+  --tag-research-fg: var(--color-violet);
+  --tag-research-bg: rgba(180,140,230,0.10);
+  --tag-research-bd: rgba(180,140,230,0.30);
+  --tag-tutorial-fg: var(--color-green);
+  --tag-tutorial-bg: rgba(107,216,150,0.10);
+  --tag-tutorial-bd: rgba(107,216,150,0.30);
+  --tag-news-fg: var(--color-amber);
+  --tag-news-bg: rgba(230,180,80,0.10);
+  --tag-news-bd: rgba(230,180,80,0.30);
+  --tag-ai-ml-fg: var(--color-amber);
+  --tag-ai-ml-bg: rgba(230,180,80,0.10);
+  --tag-ai-ml-bd: rgba(230,180,80,0.30);
+  --tag-security-fg: var(--color-red);
+  --tag-security-bg: rgba(226,107,107,0.10);
+  --tag-security-bd: rgba(226,107,107,0.30);
+  --tag-privacy-fg: var(--color-violet);
+  --tag-privacy-bg: rgba(180,140,230,0.08);
+  --tag-privacy-bd: rgba(180,140,230,0.25);
+  --tag-policy-fg: var(--color-ink-1);
+  --tag-policy-bg: rgba(167,178,194,0.08);
+  --tag-policy-bd: rgba(167,178,194,0.25);
+  --tag-science-fg: var(--color-cyan);
+  --tag-science-bg: rgba(78,205,214,0.08);
+  --tag-science-bd: rgba(78,205,214,0.25);
+  --tag-clickbait-fg: var(--color-orange);
+  --tag-clickbait-bg: rgba(230,144,86,0.10);
+  --tag-clickbait-bd: rgba(230,144,86,0.30);
+
+  --tag-show-hn-fg: var(--color-cyan);
+  --tag-show-hn-bg: rgba(78,205,214,0.10);
+  --tag-show-hn-bd: rgba(78,205,214,0.30);
+  --tag-ask-hn-fg: var(--color-green);
+  --tag-ask-hn-bg: rgba(107,216,150,0.10);
+  --tag-ask-hn-bd: rgba(107,216,150,0.30);
+  --tag-job-posting-fg: var(--color-amber);
+  --tag-job-posting-bg: rgba(230,180,80,0.10);
+  --tag-job-posting-bd: rgba(230,180,80,0.30);
+  --tag-paywall-fg: var(--color-orange);
+  --tag-paywall-bg: rgba(230,144,86,0.08);
+  --tag-paywall-bd: rgba(230,144,86,0.25);
+  --tag-video-fg: var(--color-pink);
+  --tag-video-bg: rgba(224,120,184,0.10);
+  --tag-video-bd: rgba(224,120,184,0.30);
+
+  --tag-meme-fg: var(--color-pink);
+  --tag-meme-bg: rgba(224,120,184,0.10);
+  --tag-meme-bd: rgba(224,120,184,0.30);
+  --tag-screenshot-fg: var(--color-ink-1);
+  --tag-screenshot-bg: rgba(167,178,194,0.08);
+  --tag-screenshot-bd: rgba(167,178,194,0.25);
+  --tag-photo-share-fg: var(--color-green);
+  --tag-photo-share-bg: rgba(107,216,150,0.08);
+  --tag-photo-share-bd: rgba(107,216,150,0.25);
+
+  --tag-civic-fg: var(--color-red);
+  --tag-civic-bg: rgba(226,107,107,0.10);
+  --tag-civic-bd: rgba(226,107,107,0.30);
+  --tag-local-rec-fg: var(--color-green);
+  --tag-local-rec-bg: rgba(107,216,150,0.10);
+  --tag-local-rec-bd: rgba(107,216,150,0.30);
+  --tag-culture-fg: var(--color-violet);
+  --tag-culture-bg: rgba(180,140,230,0.10);
+  --tag-culture-bd: rgba(180,140,230,0.30);
+  --tag-marketplace-fg: var(--color-amber);
+  --tag-marketplace-bg: rgba(230,180,80,0.10);
+  --tag-marketplace-bd: rgba(230,180,80,0.30);
+
+  --tag-low-effort-fg: var(--color-ink-2);
+  --tag-low-effort-bg: rgba(108,118,134,0.10);
+  --tag-low-effort-bd: rgba(108,118,134,0.30);
+  --tag-no-context-fg: var(--color-ink-2);
+  --tag-no-context-bg: rgba(108,118,134,0.10);
+  --tag-no-context-bd: rgba(108,118,134,0.30);
+  --tag-inappropriate-fg: var(--color-red);
+  --tag-inappropriate-bg: rgba(226,107,107,0.10);
+  --tag-inappropriate-bd: rgba(226,107,107,0.30);
+  --tag-noise-fg: var(--color-ink-3);
+  --tag-noise-bg: rgba(69,77,91,0.10);
+  --tag-noise-bd: rgba(69,77,91,0.30);
+}
+
+/* Light theme: higher contrast tag colors */
+[data-theme="light"] {
+  --tag-technical-fg: #0e7490;
+  --tag-technical-bg: rgba(14,116,144,0.12);
+  --tag-technical-bd: rgba(14,116,144,0.30);
+  --tag-research-fg: #6d28d9;
+  --tag-research-bg: rgba(109,40,217,0.10);
+  --tag-research-bd: rgba(109,40,217,0.30);
+  --tag-tutorial-fg: #15803d;
+  --tag-tutorial-bg: rgba(21,128,61,0.12);
+  --tag-tutorial-bd: rgba(21,128,61,0.30);
+  --tag-news-fg: #b45309;
+  --tag-news-bg: rgba(180,83,9,0.10);
+  --tag-news-bd: rgba(180,83,9,0.30);
+  --tag-ai-ml-fg: #b45309;
+  --tag-ai-ml-bg: rgba(180,83,9,0.10);
+  --tag-ai-ml-bd: rgba(180,83,9,0.30);
+  --tag-security-fg: #b91c1c;
+  --tag-security-bg: rgba(185,28,28,0.10);
+  --tag-security-bd: rgba(185,28,28,0.30);
+  --tag-privacy-fg: #6d28d9;
+  --tag-privacy-bg: rgba(109,40,217,0.08);
+  --tag-privacy-bd: rgba(109,40,217,0.25);
+  --tag-policy-fg: var(--color-ink-1);
+  --tag-policy-bg: rgba(55,65,81,0.08);
+  --tag-policy-bd: rgba(55,65,81,0.25);
+  --tag-science-fg: #0e7490;
+  --tag-science-bg: rgba(14,116,144,0.08);
+  --tag-science-bd: rgba(14,116,144,0.25);
+  --tag-clickbait-fg: #c2410c;
+  --tag-clickbait-bg: rgba(194,65,12,0.10);
+  --tag-clickbait-bd: rgba(194,65,12,0.30);
+
+  --tag-show-hn-fg: #0e7490;
+  --tag-show-hn-bg: rgba(14,116,144,0.12);
+  --tag-show-hn-bd: rgba(14,116,144,0.30);
+  --tag-ask-hn-fg: #15803d;
+  --tag-ask-hn-bg: rgba(21,128,61,0.12);
+  --tag-ask-hn-bd: rgba(21,128,61,0.30);
+  --tag-job-posting-fg: #b45309;
+  --tag-job-posting-bg: rgba(180,83,9,0.10);
+  --tag-job-posting-bd: rgba(180,83,9,0.30);
+  --tag-paywall-fg: #c2410c;
+  --tag-paywall-bg: rgba(194,65,12,0.08);
+  --tag-paywall-bd: rgba(194,65,12,0.25);
+  --tag-video-fg: #be185d;
+  --tag-video-bg: rgba(190,24,93,0.10);
+  --tag-video-bd: rgba(190,24,93,0.30);
+
+  --tag-meme-fg: #be185d;
+  --tag-meme-bg: rgba(190,24,93,0.10);
+  --tag-meme-bd: rgba(190,24,93,0.30);
+  --tag-screenshot-fg: var(--color-ink-1);
+  --tag-screenshot-bg: rgba(55,65,81,0.08);
+  --tag-screenshot-bd: rgba(55,65,81,0.25);
+  --tag-photo-share-fg: #15803d;
+  --tag-photo-share-bg: rgba(21,128,61,0.08);
+  --tag-photo-share-bd: rgba(21,128,61,0.25);
+
+  --tag-civic-fg: #b91c1c;
+  --tag-civic-bg: rgba(185,28,28,0.10);
+  --tag-civic-bd: rgba(185,28,28,0.30);
+  --tag-local-rec-fg: #15803d;
+  --tag-local-rec-bg: rgba(21,128,61,0.12);
+  --tag-local-rec-bd: rgba(21,128,61,0.30);
+  --tag-culture-fg: #6d28d9;
+  --tag-culture-bg: rgba(109,40,217,0.10);
+  --tag-culture-bd: rgba(109,40,217,0.30);
+  --tag-marketplace-fg: #b45309;
+  --tag-marketplace-bg: rgba(180,83,9,0.10);
+  --tag-marketplace-bd: rgba(180,83,9,0.30);
+
+  --tag-low-effort-fg: var(--color-ink-2);
+  --tag-low-effort-bg: rgba(107,114,128,0.10);
+  --tag-low-effort-bd: rgba(107,114,128,0.30);
+  --tag-no-context-fg: var(--color-ink-2);
+  --tag-no-context-bg: rgba(107,114,128,0.10);
+  --tag-no-context-bd: rgba(107,114,128,0.30);
+  --tag-inappropriate-fg: #b91c1c;
+  --tag-inappropriate-bg: rgba(185,28,28,0.10);
+  --tag-inappropriate-bd: rgba(185,28,28,0.30);
+  --tag-noise-fg: var(--color-ink-3);
+  --tag-noise-bg: rgba(156,163,175,0.10);
+  --tag-noise-bd: rgba(156,163,175,0.30);
+}
+
+/* ── Global resets ────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
   height: 100%;
-  background: #07090c;
-  color: #e6ebf2;
-  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--color-bg-0);
+  color: var(--color-ink-0);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -15,23 +252,35 @@ html, body {
   flex-direction: column;
 }
 
+:root {
+  color-scheme: light dark;
+}
+
 button { cursor: pointer; }
 
+*:focus-visible {
+  outline: 2px solid var(--color-cyan);
+  outline-offset: 1px;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #222b38; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--color-bd-1); border-radius: 2px; }
 
-* { scrollbar-width: thin; scrollbar-color: #222b38 transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--color-bd-1) transparent; }
 
+/* ── Input defaults ───────────────────────────────────────────────────────── */
 input {
   background: transparent;
   border: none;
   outline: none;
-  color: #e6ebf2;
+  color: var(--color-ink-0);
   width: 100%;
 }
-input::placeholder { color: #454d5b; }
+input::placeholder { color: var(--color-ink-3); }
 
+/* ── Animations ───────────────────────────────────────────────────────────── */
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .syncing { animation: spin 1s linear infinite; display: block; }
 
@@ -41,15 +290,11 @@ input::placeholder { color: #454d5b; }
 @keyframes reader-slide-in-next { from { transform: translateX(30px); opacity: 0.6; } }
 @keyframes reader-slide-in-prev { from { transform: translateX(-30px); opacity: 0.6; } }
 
-/* Override default link color inside article content for dark bg contrast */
-.item-body a {
-  color: #4ecdd6;
-}
-.item-body a:visited {
-  color: #2a7a82;
-}
+/* ── Article body links ───────────────────────────────────────────────────── */
+.item-body a { color: var(--color-cyan); }
+.item-body a:visited { color: var(--color-cyan-dim); }
 
-/* Safe-area CSS custom properties — populated by env() with 0 fallback */
+/* ── Safe-area insets ──────────────────────────────────────────────────────── */
 :root {
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);

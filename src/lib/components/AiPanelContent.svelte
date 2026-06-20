@@ -85,7 +85,7 @@
 <div style="display:flex;flex-direction:column;gap:{gap};">
   <!-- Experimental notice -->
   <div style="padding:10px 12px;background:transparent;border:1px solid {T.amber};border-radius:4px;display:flex;align-items:flex-start;gap:8px;">
-    <span style="font:9px/1 {T.mono};color:{T.amber};letter-spacing:0.5px;text-transform:uppercase;padding:2px 5px;border:1px solid {T.amber};border-radius:2px;flex-shrink:0;margin-top:1px;">experimental</span>
+    <span style="font:10px/1 {T.mono};color:{T.amber};letter-spacing:0.5px;text-transform:uppercase;padding:2px 5px;border:1px solid {T.amber};border-radius:2px;flex-shrink:0;margin-top:1px;">experimental</span>
     <span style="font:10px/1.5 {T.mono};color:{T.ink2};">Tags may be inaccurate. Raise the confidence threshold in Settings or disable AI tagging if results look wrong.</span>
   </div>
 
@@ -99,7 +99,7 @@
       <span style="font:11px/1 {T.mono};color:{T.ink0};flex:1;">
         {aiStatus.fasttextLoaded ? (aiStatus.fasttextModelName ?? 'fasttext') : 'fasttext · not loaded'}
       </span>
-      {#if aiStatus.fasttextLoaded}<span style="font:9px/1 {T.mono};color:{T.cyan};padding:1px 5px;border:1px solid {T.cyan};border-radius:2px;">text</span>{/if}
+      {#if aiStatus.fasttextLoaded}<span style="font:10px/1 {T.mono};color:{T.cyan};padding:1px 5px;border:1px solid {T.cyan};border-radius:2px;">text</span>{/if}
     </div>
 
     <!-- MiniLM row -->
@@ -108,7 +108,7 @@
       <span style="font:11px/1 {T.mono};color:{T.ink0};flex:1;">
         {aiStatus.minimlLoaded ? (aiStatus.minimlModelName ?? 'miniml') : 'miniml · not loaded'}
       </span>
-      {#if aiStatus.minimlLoaded}<span style="font:9px/1 {T.mono};color:{T.cyan};padding:1px 5px;border:1px solid {T.cyan};border-radius:2px;">semantic</span>{/if}
+      {#if aiStatus.minimlLoaded}<span style="font:10px/1 {T.mono};color:{T.cyan};padding:1px 5px;border:1px solid {T.cyan};border-radius:2px;">semantic</span>{/if}
     </div>
 
     <!-- Vision model row -->
@@ -117,7 +117,7 @@
       <span style="font:11px/1 {T.mono};color:{T.ink0};flex:1;">
         {aiStatus.visionLoaded ? (aiStatus.visionModelName ?? 'clip vision') : 'clip vision · not loaded'}
       </span>
-      {#if aiStatus.visionLoaded}<span style="font:9px/1 {T.mono};color:{T.cyan};padding:1px 5px;border:1px solid {T.cyan};border-radius:2px;">vision</span>{/if}
+      {#if aiStatus.visionLoaded}<span style="font:10px/1 {T.mono};color:{T.cyan};padding:1px 5px;border:1px solid {T.cyan};border-radius:2px;">vision</span>{/if}
     </div>
 
     <!-- Stats grid -->
@@ -129,13 +129,13 @@
       ] as stat}
         <div style="padding:8px;background:{T.bg0};border:1px solid {T.bd0};border-radius:3px;text-align:center;">
           <div style="font:{compact ? '14px' : '16px'}/1 {T.mono};color:{stat.color};font-variant-numeric:tabular-nums;">{stat.val}</div>
-          <div style="margin-top:5px;font:9px/1 {T.mono};color:{T.ink3};">{stat.label}</div>
+          <div style="margin-top:5px;font:10px/1 {T.mono};color:{T.ink3};">{stat.label}</div>
         </div>
       {/each}
     </div>
 
     <!-- Mode label -->
-    <div style="margin-top:8px;font:9px/1 {T.mono};color:{T.ink3};">
+    <div style="margin-top:8px;font:10px/1 {T.mono};color:{T.ink3};">
       mode: <span style="color:{aiStatus.taggingMode === 'loading' ? T.ink3 : aiStatus.taggingMode === 'none' ? T.amber : T.cyan};">{aiStatus.taggingMode}</span>
     </div>
 
@@ -159,7 +159,7 @@
           <div style="height:2px;background:{T.bg0};border-radius:1px;overflow:hidden;">
             <div style="height:100%;width:{pct}%;background:{T.amber};border-radius:1px;transition:width 0.15s;"></div>
           </div>
-          <div style="margin-top:4px;font:9px/1 {T.mono};color:{T.ink3};">{pct}% complete</div>
+          <div style="margin-top:4px;font:10px/1 {T.mono};color:{T.ink3};">{pct}% complete</div>
         </div>
       {/if}
     </div>
@@ -176,22 +176,22 @@
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <span style="font:11px/1 {T.mono};color:{T.ink0};flex:1;">{m.name}</span>
             {#if m.active}
-              <span style="font:9px/1 {T.mono};color:{T.cyan};padding:2px 6px;border:1px solid {T.cyan};border-radius:2px;">active</span>
+              <span style="font:10px/1 {T.mono};color:{T.cyan};padding:2px 6px;border:1px solid {T.cyan};border-radius:2px;">active</span>
             {:else if m.downloaded}
               <button
                 onclick={() => handleActivate(m.id)}
-                style="font:9px/1 {T.mono};color:{T.amber};background:transparent;border:1px solid {T.amber};border-radius:2px;padding:2px 6px;cursor:pointer;"
+                style="font:10px/1 {T.mono};color:{T.amber};background:transparent;border:1px solid {T.amber};border-radius:2px;padding:2px 6px;cursor:pointer;"
               >activate</button>
               <button
                 onclick={() => handleDelete(m.id)}
-                style="font:9px/1 {T.mono};color:{T.red};background:transparent;border:1px solid {T.red};border-radius:2px;padding:2px 6px;cursor:pointer;"
+                style="font:10px/1 {T.mono};color:{T.red};background:transparent;border:1px solid {T.red};border-radius:2px;padding:2px 6px;cursor:pointer;"
               >remove</button>
             {:else if isDownloading}
-              <span style="font:9px/1 {T.mono};color:{T.amber};">downloading</span>
+              <span style="font:10px/1 {T.mono};color:{T.amber};">downloading</span>
             {:else}
               <button
                 onclick={() => handleDownload(m.id)}
-                style="font:9px/1 {T.mono};color:{T.cyan};background:transparent;border:1px solid {T.cyan};border-radius:2px;padding:2px 6px;cursor:pointer;"
+                style="font:10px/1 {T.mono};color:{T.cyan};background:transparent;border:1px solid {T.cyan};border-radius:2px;padding:2px 6px;cursor:pointer;"
               >download</button>
             {/if}
           </div>
@@ -199,7 +199,7 @@
           <div style="font:10px/1 {T.mono};color:{T.ink2};">{m.sizeMb} MB · {m.kind === 'miniml' ? 'semantic tagger' : 'vision tagger'}</div>
           {#if prog}
             <div style="margin-top:8px;">
-              <div style="font:9px/1 {T.mono};color:{T.ink3};margin-bottom:4px;">{prog.file} · {prog.pct}%</div>
+              <div style="font:10px/1 {T.mono};color:{T.ink3};margin-bottom:4px;">{prog.file} · {prog.pct}%</div>
               <div style="height:3px;background:{T.bg1};border-radius:2px;overflow:hidden;">
                 <div style="height:100%;width:{prog.pct}%;background:{T.cyan};border-radius:2px;transition:width 0.2s;"></div>
               </div>

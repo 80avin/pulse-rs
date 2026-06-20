@@ -87,4 +87,8 @@
   <svg viewBox="0 0 24 24" style={S()}><circle style={p()} cx="18" cy="6" r="3"/><circle style={p()} cx="6" cy="12" r="3"/><circle style={p()} cx="18" cy="18" r="3"/><path style={p()} d="M8.7 10.7L15.3 7.3M8.7 13.3L15.3 16.7"/></svg>
 {:else if name === 'import'}
   <svg viewBox="0 0 24 24" style={S()}><path style={p()} d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+{:else if name === 'moon'}
+  <svg viewBox="0 0 24 24" style={S()}><path style={p()} d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+{:else if name === 'sun'}
+  <svg viewBox="0 0 24 24" style={S()}><circle style={p()} cx="12" cy="12" r="5"/><path style={p()} d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
 {/if}

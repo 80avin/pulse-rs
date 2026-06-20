@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
-  let { tag, dim = false, size = 11, onclick }: {
+  let { tag, dim = false, size = 10, onclick }: {
     tag: string; dim?: boolean; size?: number; onclick?: () => void;
   } = $props();
   const c = $derived(TAG_COLORS[tag] ?? TAG_COLORS['low-effort']);

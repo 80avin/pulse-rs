@@ -272,10 +272,10 @@
     <span style="font:11px/1 {T.mono};color:{T.ink3};">—</span>
     <span style="font:11px/1 {T.mono};color:{T.ink2};">{activeGroupLabel} · {displayItems.length} items</span>
     <span style="flex:1;"></span>
-    <button onclick={() => searchInputEl?.focus()} style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" title="Search (/)">
+    <button onclick={() => searchInputEl?.focus()} aria-label="Search" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" title="Search (/)">
       <Icon name="search" size={13} color={T.ink1} />
     </button>
-    <button onclick={doSync} style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" title="Sync">
+    <button onclick={doSync} aria-label="Sync feeds" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" title="Sync">
       <span class={syncing ? 'syncing' : ''}><Icon name="sync" size={13} color={syncing ? T.cyan : T.ink1} /></span>
     </button>
     <button onclick={() => showCheatsheet = !showCheatsheet} style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink3};padding:0 4px;" title="Keyboard shortcuts (?)">?</button>
@@ -292,7 +292,7 @@
     <!-- Left rail -->
     {#if leftRailCollapsed}
       <div style="width:32px;flex-shrink:0;background:{T.bg1};border-right:1px solid {T.bd0};display:flex;flex-direction:column;align-items:center;padding-top:4px;gap:6px;overflow:hidden;">
-        <button onclick={toggleLeftRail} title="Expand sidebar" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+        <button onclick={toggleLeftRail} aria-label="Expand sidebar" title="Expand sidebar" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="chev-r" size={13} color={T.ink2} />
         </button>
         {#each groups as g}
@@ -308,7 +308,7 @@
           </button>
         {/each}
         <div style="flex:1;"></div>
-        <button onclick={() => { showAI = !showAI; }} title="AI Signal" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+        <button onclick={() => { showAI = !showAI; }} aria-label="AI Signal" title="AI Signal" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="cpu" size={13} color={showAI ? T.cyan : T.ink2} />
         </button>
         <button onclick={() => { showSources = !showSources; }} title="Sources" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
@@ -345,10 +345,10 @@
       <div style="padding:6px 8px 4px;border-bottom:1px solid {T.bd0};">
         <div style="padding:0 4px 3px;font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">filter</div>
         <div style="display:flex;flex-wrap:wrap;gap:3px;" role="group" aria-label="Item filters">
-          <button onclick={() => { setReadFilter(null); setSavedFilter(null); signalActive = false; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='all' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='all' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='all' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='all'} onmouseenter={(e) => { if(desktopFilter!=='all')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='all')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }} onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }} onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}>all</button>
-          <button onclick={() => { setReadFilter(false); setSavedFilter(null); signalActive = false; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='unread' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='unread' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='unread' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='unread'} onmouseenter={(e) => { if(desktopFilter!=='unread')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='unread')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }} onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }} onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}>unread</button>
-          <button onclick={() => { setReadFilter(null); setSavedFilter(true); signalActive = false; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='saved' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='saved' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='saved' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='saved'} onmouseenter={(e) => { if(desktopFilter!=='saved')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='saved')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }} onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }} onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}>saved</button>
-          <button onclick={() => { setReadFilter(null); setSavedFilter(null); signalActive = true; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='signal' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='signal' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='signal' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='signal'} onmouseenter={(e) => { if(desktopFilter!=='signal')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='signal')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }} onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }} onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}>signal</button>
+          <button onclick={() => { setReadFilter(null); setSavedFilter(null); signalActive = false; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='all' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='all' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='all' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='all'} onmouseenter={(e) => { if(desktopFilter!=='all')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='all')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }}>all</button>
+          <button onclick={() => { setReadFilter(false); setSavedFilter(null); signalActive = false; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='unread' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='unread' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='unread' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='unread'} onmouseenter={(e) => { if(desktopFilter!=='unread')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='unread')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }}>unread</button>
+          <button onclick={() => { setReadFilter(null); setSavedFilter(true); signalActive = false; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='saved' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='saved' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='saved' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='saved'} onmouseenter={(e) => { if(desktopFilter!=='saved')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='saved')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }}>saved</button>
+          <button onclick={() => { setReadFilter(null); setSavedFilter(null); signalActive = true; }} style="padding:4px 10px;border-radius:3px;border:1px solid {desktopFilter==='signal' ? T.cyan : T.bd1};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;text-transform:uppercase;background:{desktopFilter==='signal' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{desktopFilter==='signal' ? T.cyan : T.ink2};" aria-pressed={desktopFilter==='signal'} onmouseenter={(e) => { if(desktopFilter!=='signal')(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }} onmouseleave={(e) => { if(desktopFilter!=='signal')(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }}>signal</button>
         </div>
       </div>
 
@@ -452,7 +452,7 @@
           <Icon name="cog" size={12} color={showSettings ? T.cyan : T.ink2} />
           <span>Settings</span>
         </button>
-        <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;font:9px/1 {T.mono};color:{T.ink3};" title={`Synced ${syncState.lastSyncAt}${syncState.lastNewCount > 0 ? ` · +${syncState.lastNewCount} new` : ''}`} aria-label={`Sync status: ${syncState.lastSyncAt}, ${syncState.lastNewCount > 0 ? syncState.lastNewCount + ' new items' : 'no new items'}`}>
+        <div style="display:flex;align-items:center;gap:6px;padding:4px 12px;font:10px/1 {T.mono};color:{T.ink3};" title={`Synced ${syncState.lastSyncAt}${syncState.lastNewCount > 0 ? ` · +${syncState.lastNewCount} new` : ''}`} aria-label={`Sync status: ${syncState.lastSyncAt}, ${syncState.lastNewCount > 0 ? syncState.lastNewCount + ' new items' : 'no new items'}`}>
           <span style="color:{syncing ? T.cyan : T.green};">●</span>
           <span>sync {syncState.lastSyncAt}</span>
         </div>
@@ -480,22 +480,22 @@
           {#if searchQuery}<span style="color:{T.ink3};">·</span><span style="color:{T.amber};">"{searchQuery}"</span>{/if}
           <span style="flex:1;"></span>
           {#if unreadCount > 0}
-            <button onclick={() => markAllRead(displayItems.map(i => i.id))} style="background:transparent;border:none;cursor:pointer;font:9px/1 {T.mono};color:{T.ink2};">mark all read</button>
+            <button onclick={() => markAllRead(displayItems.map(i => i.id))} style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink2};">mark all read</button>
           {/if}
         </div>
         {#if activeTag || topTags.length > 0}
           <div style="display:flex;align-items:center;gap:6px;padding:0 8px 6px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;">
             {#if activeTag}
               {@const tc = TAG_COLORS[activeTag] ?? { fg: T.cyan, bg: 'rgba(78,205,214,0.10)', bd: 'rgba(78,205,214,0.30)' }}
-              <button onclick={() => setTagFilter(null)} style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;background:{tc.bg};border:1px solid {tc.bd};border-radius:2px;font:9px/1 {T.mono};color:{tc.fg};cursor:pointer;letter-spacing:0.2px;white-space:nowrap;">
+              <button onclick={() => setTagFilter(null)} style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;background:{tc.bg};border:1px solid {tc.bd};border-radius:2px;font:10px/1 {T.mono};color:{tc.fg};cursor:pointer;letter-spacing:0.2px;white-space:nowrap;">
                 <span style="color:{T.ink3};">tag:</span>{activeTag} ×
               </button>
-              {#if topTags.length > 0}<span style="flex-shrink:0;color:{T.ink3};font:9px/1 {T.mono};">·</span>{/if}
+              {#if topTags.length > 0}<span style="flex-shrink:0;color:{T.ink3};font:10px/1 {T.mono};">·</span>{/if}
             {/if}
             {#each topTags as tag}
               {#if tag !== activeTag}
                 {@const tc = TAG_COLORS[tag] ?? { fg: T.ink2, bg: 'transparent', bd: T.bd1 }}
-                <button onclick={() => setActiveTag(tag)} style="flex-shrink:0;display:inline-flex;align-items:center;padding:2px 7px;background:transparent;border:1px solid {T.bd1};border-radius:2px;font:9px/1 {T.mono};color:{tc.fg};cursor:pointer;white-space:nowrap;">{tag}</button>
+                <button onclick={() => setActiveTag(tag)} style="flex-shrink:0;display:inline-flex;align-items:center;padding:2px 7px;background:transparent;border:1px solid {T.bd1};border-radius:2px;font:10px/1 {T.mono};color:{tc.fg};cursor:pointer;white-space:nowrap;">{tag}</button>
               {/if}
             {/each}
           </div>

@@ -212,7 +212,7 @@
             background:transparent;border:none;
             border-bottom:2px solid {g.id === active ? T.cyan : 'transparent'};
             color:{g.id === active ? T.ink0 : T.ink2};
-            font:{g.id === active ? '600' : '400'} 12px/1 {T.mono};
+            font:{g.id === active ? '600' : '400'} 13px/1.2 {T.mono};
             cursor:pointer;display:flex;align-items:center;gap:6px;letter-spacing:0.3px;
           "
         >

@@ -197,7 +197,7 @@
     <div style="display:flex;border-top:1px solid {T.bd1};background:{T.bg1};flex-shrink:0;">
       <button
         onclick={() => markRead(item.id, !item.read)}
-        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{item.read ? T.green : T.ink2};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{item.read ? T.green : T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
       >
         <div style="display:flex;align-items:center;gap:4px;">
           <Icon name="check" size={16} color={item.read ? T.green : T.ink1} />
@@ -210,18 +210,18 @@
         ontouchstart={startSavePress}
         ontouchend={endSavePress}
         ontouchcancel={cancelSavePress}
-        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{item.saved ? T.amber : T.ink2};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{item.saved ? T.amber : T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
       >
         <div style="display:flex;align-items:center;gap:4px;">
           <Icon name="bookmark" size={16} color={item.saved ? T.amber : T.ink1} />
-          {#if item.note}<span style="font:9px/1 {T.mono};color:{T.amber};">*</span>{/if}
+          {#if item.note}<span style="font:10px/1 {T.mono};color:{T.amber};">*</span>{/if}
           <KeyCap k="s" dim />
         </div>
         <span style="text-transform:uppercase;">{item.saved ? 'saved' : 'save'}</span>
       </button>
       <button
         onclick={() => item.url && openExternal(item.url)}
-        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.ink2};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
         title={item.domain ? `Open https://${item.domain}` : undefined}
       >
         <div style="display:flex;align-items:center;gap:4px;">
@@ -232,7 +232,7 @@
       </button>
       <button
         onclick={() => shareItem(item.title, item.url ?? item.externalUrl)}
-        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.ink2};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
       >
         <div style="display:flex;align-items:center;gap:4px;">
           <Icon name="share" size={16} color={T.ink1} />
@@ -241,7 +241,7 @@
       </button>
       <button
         onclick={() => { hideItem(item.id); onBack(); }}
-        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.red};cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.red};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
       >
         <div style="display:flex;align-items:center;gap:4px;">
           <Icon name="eye-off" size={16} color={T.red} />
