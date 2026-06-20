@@ -296,7 +296,7 @@
     <button onclick={doSync} aria-label="Sync feeds" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" title="Sync">
       <span class={syncing ? 'syncing' : ''}><Icon name="sync" size={13} color={syncing ? T.cyan : T.ink1} /></span>
     </button>
-    <button onclick={() => showCheatsheet = !showCheatsheet} style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink3};padding:0 4px;" title="Keyboard shortcuts (?)">?</button>
+    <button onclick={() => showCheatsheet = !showCheatsheet} aria-label="Keyboard shortcuts (?)" style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink3};padding:0 4px;" title="Keyboard shortcuts (?)">?</button>
   </div>
 
   <!-- Main body -->
@@ -319,6 +319,7 @@
             onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }}
             onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             title={`${g.name} (${g.n})`}
+            aria-label={`${g.name} group, ${g.n} items`}
             style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:{g.id===activeGroup?'rgba(78,205,214,0.12)':'transparent'};border:none;border-radius:3px;cursor:pointer;position:relative;"
           >
             <span style="font:700 10px/1 {T.mono};color:{g.id===activeGroup ? T.cyan : T.ink2};">{g.name.slice(0, 2).toUpperCase()}</span>
@@ -329,10 +330,10 @@
         <button onclick={() => { showAI = !showAI; }} aria-label="AI Signal" title="AI Signal" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="cpu" size={13} color={showAI ? T.cyan : T.ink2} />
         </button>
-        <button onclick={() => { showSources = !showSources; }} title="Sources" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+        <button onclick={() => { showSources = !showSources; }} aria-label="Sources" title="Sources" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="rss" size={13} color={showSources ? T.cyan : T.ink2} />
         </button>
-        <button onclick={() => { showSettings = !showSettings; }} title="Settings" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;margin-bottom:6px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+        <button onclick={() => { showSettings = !showSettings; }} aria-label="Settings" title="Settings" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;margin-bottom:6px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="cog" size={13} color={showSettings ? T.cyan : T.ink2} />
         </button>
       </div>
@@ -340,7 +341,7 @@
     <div style="width:{leftRailWidth}px;flex-shrink:0;background:{T.bg1};border-right:1px solid {T.bd0};display:flex;flex-direction:column;overflow:hidden;">
       <!-- Collapse toggle -->
       <div style="display:flex;justify-content:flex-end;padding:2px 4px 0;">
-        <button onclick={toggleLeftRail} title="Collapse sidebar" style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+        <button onclick={toggleLeftRail} aria-label="Collapse sidebar" title="Collapse sidebar" style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="chev-l" size={12} color={T.ink3} />
         </button>
       </div>

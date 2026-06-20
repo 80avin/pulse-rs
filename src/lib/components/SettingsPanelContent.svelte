@@ -7,6 +7,7 @@
   import Icon from '$lib/components/Icon.svelte';
   import KeyCap from '$lib/components/KeyCap.svelte';
   import ThemeSection from '$lib/components/ThemeSection.svelte';
+  import SettingsSection from '$lib/components/SettingsSection.svelte';
   import { version } from '$app/environment';
   import { openExternal, shareItem } from '$lib/utils';
 
@@ -157,9 +158,7 @@
   </div>
 {/snippet}
 
-<!-- Stats overview -->
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">overview</div>
+<SettingsSection label="overview">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     {#each [
       { label: 'items',       val: String(dbStats.totalItems),   color: T.cyan  },
@@ -173,28 +172,22 @@
       </div>
     {/each}
   </div>
-</div>
+</SettingsSection>
 
-<!-- Appearance -->
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">appearance</div>
+<SettingsSection label="appearance">
   <ThemeSection />
-</div>
+</SettingsSection>
 
-<!-- Reading -->
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">reading</div>
+<SettingsSection label="reading">
   <div style="display:flex;flex-direction:column;gap:10px;">
     <div>
       <div style="font:11px/1 {T.mono};color:{T.ink1};margin-bottom:6px;">Mark as read</div>
       {@render seg(['open','never'], settings.markReadOn, v => { settings.markReadOn = v as typeof settings.markReadOn; })}
     </div>
   </div>
-</div>
+</SettingsSection>
 
-<!-- Sync -->
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">sync</div>
+<SettingsSection label="sync">
   <div style="display:flex;flex-direction:column;gap:10px;">
     <div>
       <div style="font:11px/1 {T.mono};color:{T.ink1};margin-bottom:6px;">Interval (minutes)</div>
@@ -209,7 +202,7 @@
       {@render toggle(settings.backgroundSync, () => { settings.backgroundSync = !settings.backgroundSync; })}
     </div>
   </div>
-</div>
+</SettingsSection>
 
 <!-- AI -->
 <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
