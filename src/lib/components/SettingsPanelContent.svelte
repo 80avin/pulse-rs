@@ -6,7 +6,7 @@
   import Icon from '$lib/components/Icon.svelte';
   import KeyCap from '$lib/components/KeyCap.svelte';
   import { version } from '$app/environment';
-  import { openExternal } from '$lib/utils';
+  import { openExternal, shareItem } from '$lib/utils';
 
   let { showShortcuts = false }: { showShortcuts?: boolean } = $props();
 
@@ -28,7 +28,7 @@
   // Diagnostics state
   let logPath = $state('');
   let sharingLogs = $state(false);
-  let shareStatus = $state<'idle' | 'copied' | 'error'>('idle');
+  let shareStatus = $state<'idle' | 'done' | 'error'>('idle');
 
   $effect(() => {
     if (!IS_TAURI) return;
@@ -52,22 +52,10 @@
     sharingLogs = true;
     shareStatus = 'idle';
     try {
-      const content = await tauriInvoke<string>('get_log_content', { lines: 500 });
-      if (!content.trim()) {
-        shareStatus = 'error';
-        return;
-      }
-      // Use Web Share API if available (Android WebView), fall back to clipboard.
-      // Cast to any to avoid TypeScript narrowing the type to never in the else branch.
-      const navAny = navigator as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-      if (typeof navAny?.share === 'function') {
-        await navAny.share({ title: 'Pulse debug logs', text: content });
-      } else {
-        await navigator.clipboard.writeText(content);
-        shareStatus = 'copied';
-        setTimeout(() => { shareStatus = 'idle'; }, 2500);
-      }
-    } catch (e) {
+      await tauriInvoke('share_log_file');
+      shareStatus = 'done';
+      setTimeout(() => { shareStatus = 'idle'; }, 2500);
+    } catch (e: any) {
       logger.warn('share logs failed', e);
       shareStatus = 'error';
       setTimeout(() => { shareStatus = 'idle'; }, 2500);
@@ -104,16 +92,7 @@
 
   async function handleShareExport() {
     if (!sourceJson) exportSources();
-    const navAny = navigator as any;
-    if (typeof navAny?.share === 'function') {
-      try {
-        await navAny.share({ title: 'Pulse sources', text: sourceJson });
-      } catch (e) {
-        // user cancelled — ignore
-      }
-    } else {
-      await handleCopyExport();
-    }
+    await shareItem('Pulse sources', undefined, sourceJson);
   }
 
   async function handleImport() {
@@ -324,7 +303,10 @@
         disabled={sharingLogs}
         style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px 10px;background:transparent;border:1px solid {T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{sharingLogs ? T.ink3 : shareStatus === 'error' ? T.amber : T.ink1};cursor:{sharingLogs ? 'default' : 'pointer'};"
       >
-        {sharingLogs ? 'preparing…' : shareStatus === 'copied' ? 'copied to clipboard' : shareStatus === 'error' ? 'no logs yet' : 'Share recent logs'}
+        {#if sharingLogs}
+          <span class="syncing"><Icon name="sync" size={11} color={T.ink3} /></span>
+        {/if}
+        {sharingLogs ? 'sharing…' : shareStatus === 'done' ? 'shared' : shareStatus === 'error' ? 'no logs yet' : 'Share recent logs'}
       </button>
     {/if}
 
@@ -407,7 +389,7 @@
 
       <div style="display:flex;gap:8px;">
         <button
-          onclick={handleCopyExport}
+          onclick={handleShareExport}
           style="flex:1;padding:8px;background:transparent;border:1px solid {T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{T.ink1};cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"
         >
           <Icon name="share" size={11} color={T.ink2} />

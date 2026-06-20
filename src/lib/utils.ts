@@ -14,8 +14,9 @@ export async function openExternal(url: string) {
   }
 }
 
-export async function shareItem(title: string, url?: string): Promise<boolean> {
-  const text = url ? `${title}\n${url}` : title;
+export async function shareItem(title: string, url?: string, body?: string): Promise<boolean> {
+  const text = body ?? (url ? `${title}\n${url}` : title);
+  const hasContent = !!url || !!text;
 
   // 1. Tauri plugin (Android/iOS native share sheet)
   if (typeof window !== 'undefined' && '__TAURI__' in window) {
@@ -39,8 +40,8 @@ export async function shareItem(title: string, url?: string): Promise<boolean> {
   }
 
   // 3. Clipboard fallback
-  if (url) {
-    try { await navigator.clipboard.writeText(url); toast('URL copied to clipboard'); return true; } catch {}
+  if (hasContent) {
+    try { await navigator.clipboard.writeText(text); toast(body ? 'Content copied to clipboard' : 'URL copied to clipboard'); return true; } catch {}
   }
   return false;
 }

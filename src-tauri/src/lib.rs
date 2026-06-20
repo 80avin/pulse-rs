@@ -90,6 +90,8 @@ fn init_tracing(
 
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static PENDING_SHARE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+#[cfg(target_os = "android")]
+static ANDROID_VM: OnceLock<jni::JavaVM> = OnceLock::new();
 
 /// Represents the initialization state of PulseCore so commands can
 /// distinguish "still loading" from "failed permanently".
@@ -341,9 +343,25 @@ pub fn run() {
             commands::get_log_content,
             commands::get_log_path,
             commands::open_logs_folder,
+            commands::share_log_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// JNI function called from ShareBridge.kt during MainActivity.onCreate.
+/// Caches the JavaVM so background commands (e.g. share_log_file) can call
+/// Kotlin methods from any thread.
+#[cfg(target_os = "android")]
+#[allow(non_snake_case)]
+#[unsafe(no_mangle)]
+pub extern "C" fn Java_com_avinthakur080_pulse_1rs_ShareBridge_init(
+    env: jni::JNIEnv,
+    _class: jni::objects::JClass,
+) {
+    if let Ok(vm) = env.get_java_vm() {
+        let _ = ANDROID_VM.set(vm);
+    }
 }
 
 /// JNI function called from ShareBridge.kt when Android receives a share/view intent.

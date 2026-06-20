@@ -3,7 +3,7 @@
   import { createDialog, melt } from '@melt-ui/svelte';
   import type { FeedItem } from '$lib/types';
   import { groups, sources, items, markAllRead, markRead, toggleSaved, hideItem, doSync as storeSync, syncState, timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts, aiStats } from '$lib/store.svelte';
-  import { openExternal } from '$lib/utils';
+  import { openExternal, shareItem } from '$lib/utils';
   import { settings } from '$lib/settings.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import FilterStrip from '$lib/components/FilterStrip.svelte';
@@ -227,6 +227,15 @@
         <Icon name="edit" size={13} color={T.ink2} />
         <span>Copy title</span>
       </button>
+      {#if ci.title && (ci.url || ci.externalUrl)}
+        <button
+          onclick={() => { shareItem(ci.title, ci.url ?? ci.externalUrl); actionSheetItem = null; }}
+          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+        >
+          <Icon name="share" size={13} color={T.ink2} />
+          <span>Share</span>
+        </button>
+      {/if}
 
       <div style="height:1px;background:{T.bd0};margin:4px 0;"></div>
 

@@ -6,8 +6,10 @@ import androidx.activity.enableEdgeToEdge
 
 class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        ShareBridge.activity = this
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        ShareBridge.init()
         handleShareIntent(intent)
     }
 

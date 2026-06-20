@@ -945,6 +945,64 @@ pub fn open_logs_folder(app: tauri::AppHandle, state: State<'_, AppState>) -> Re
         .map_err(|e| e.to_string())
 }
 
+/// Copy the most recent log file to the app cache directory and share it via
+/// the native share sheet (Android). On desktop, opens the original log file
+/// in the default text editor.
+#[tauri::command]
+pub fn share_log_file(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let log_dir = state.data_dir.join("logs");
+    let log_file = find_most_recent_log(&log_dir).ok_or_else(|| {
+        "No log file found yet — try again after the app has been running.".to_string()
+    })?;
+
+    let log_path = log_file.to_string_lossy().to_string();
+
+    #[cfg(target_os = "android")]
+    {
+        use tauri::Manager;
+        let cache_dir = match app.path().app_cache_dir() {
+            Ok(d) => d,
+            Err(e) => return Err(format!("cache dir unavailable: {e}")),
+        };
+        std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
+
+        let dest = cache_dir.join("pulse-debug-logs.txt");
+        std::fs::copy(&log_file, &dest).map_err(|e| format!("failed to copy log: {e}"))?;
+        let dest_str = dest.to_string_lossy().to_string();
+
+        if let Some(vm) = crate::ANDROID_VM.get() {
+            let Ok(mut env) = vm.attach_current_thread() else {
+                return Err("JNI: cannot attach thread".into());
+            };
+            let Ok(class) = env.find_class("com/avinthakur080/pulse_rs/ShareBridge") else {
+                return Err("JNI: ShareBridge class not found".into());
+            };
+            let Ok(jpath) = env.new_string(&dest_str) else {
+                return Err("JNI: cannot create string".into());
+            };
+            if let Err(e) = env.call_static_method(
+                class,
+                "shareFile",
+                "(Ljava/lang/String;)V",
+                &[jni::objects::JValue::Object(&jpath)],
+            ) {
+                return Err(format!("JNI: shareFile failed: {e}"));
+            }
+            tracing::info!(path = %dest_str, "share_log_file: shared via Android intent");
+            return Ok(());
+        }
+        return Err("JNI: Android VM not available (app not fully initialized)".into());
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        use tauri_plugin_opener::OpenerExt;
+        app.opener()
+            .open_path(&log_path, None::<&str>)
+            .map_err(|e| e.to_string())
+    }
+}
+
 fn find_most_recent_log(log_dir: &std::path::Path) -> Option<std::path::PathBuf> {
     std::fs::read_dir(log_dir)
         .ok()?
