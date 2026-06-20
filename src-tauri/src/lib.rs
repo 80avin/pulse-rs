@@ -190,14 +190,7 @@ fn extract_bundled_models(data_dir: &std::path::Path) {
 pub fn run() {
     let _ = PENDING_SHARE.set(Mutex::new(None));
 
-    // Read the persisted verbose setting before init so the correct filter is
-    // active from the very first log event (important for crash reproduction).
-    let data_dir = pulse_core::config::platform_data_dir();
-    let verbose = read_verbose_setting(&data_dir);
-    let (log_guard, log_filter) = init_tracing(&data_dir, verbose);
-
-    let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init());
+    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
 
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_sharesheet::init());
@@ -209,9 +202,6 @@ pub fn run() {
             // Persist the AppHandle so the JNI bridge can emit events
             let _ = APP_HANDLE.set(app.handle().clone());
 
-            // On Android use Tauri's app_data_dir() so the path is keyed by the
-            // package ID and survives updates. On desktop keep platform_data_dir()
-            // so the Tauri app and the CLI share the same database.
             #[cfg(target_os = "android")]
             let data_dir = app
                 .path()
@@ -221,6 +211,9 @@ pub fn run() {
             let data_dir = pulse_core::config::platform_data_dir();
 
             std::fs::create_dir_all(&data_dir)?;
+            let verbose = read_verbose_setting(&data_dir);
+            let (log_guard, log_filter) = init_tracing(&data_dir, verbose);
+
             tracing::info!(
                 elapsed_ms = t_setup.elapsed().as_millis(),
                 "coldstart: setup: data_dir ready"
@@ -281,8 +274,8 @@ pub fn run() {
                                 let err_msg = format!("PulseCore init failed: {e}");
                                 tracing::error!("{err_msg}");
                                 let _ = init_tx.send(InitState::Failed(err_msg));
-    }
-}
+                            }
+                        }
                     });
                 })
                 .expect("failed to spawn pulse-core-init thread");
