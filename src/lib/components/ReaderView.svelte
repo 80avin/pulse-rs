@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
-  import { createDialog, melt } from '@melt-ui/svelte';
+  import { Dialog } from 'bits-ui';
   import { items, sources, toggleSaved } from '$lib/stores/data.svelte';
   import { aiStatus } from '$lib/stores/ai.svelte';
   import { openExternal, sanitizeHtml, TAG_EVIDENCE } from '$lib/utils';
@@ -31,13 +31,6 @@
   let noteEditing = $state(false);
   let noteDraft = $state('');
 
-  const tagPopover = createDialog({
-    defaultOpen: true,
-    preventScroll: false,
-    onOpenChange: ({ next }) => { if (!next) popoverTag = null; return next; },
-  });
-  const { overlay: popoverOverlay, content: popoverContent, close: popoverClose } = tagPopover.elements;
-
   $effect(() => {
     onPopoverChange?.(popoverTag !== null);
   });
@@ -61,9 +54,6 @@
 
 
 </script>
-
-
-
 
 {#if item}
   <div style="position:relative;display:flex;flex-direction:column;height:100%;background:{T.bg0};color:{T.ink0};">
@@ -170,21 +160,27 @@
     {#if popoverTag}
       {@const c = TAG_COLORS[popoverTag] ?? TAG_COLORS['low-effort']}
       {@const evidence = TAG_EVIDENCE[popoverTag] ?? ['title-token match', 'body-token match']}
-      <div {...$popoverOverlay} use:melt={$popoverOverlay} style="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:{isDesktop ? 'center' : 'flex-end'};justify-content:{isDesktop ? 'center' : 'stretch'};z-index:20;">
-        <div {...$popoverContent} use:melt={$popoverContent} style="{isDesktop ? 'width:380px;max-width:90vw;border-radius:8px;' : 'width:100%;border-radius:0;border-top:1px solid {c.bd};'}background:{T.bg2};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <TagChip tag={popoverTag} size={11} />
-              <span style="font:10px/1 {T.mono};color:{T.ink3};">tagged by {aiStatus.modelName ?? aiStatus.taggingMode} · {Math.round((item.aiScore ?? 0.8) * 100)}% conf</span>
+      <Dialog.Root open={popoverTag !== null} onOpenChange={(open) => { if (!open) popoverTag = null; }}>
+        <Dialog.Portal>
+          <Dialog.Overlay style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:20;" />
+          <Dialog.Content
+            preventScroll={false}
+            style="{isDesktop ? 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:380px;max-width:90vw;border-radius:8px;' : 'position:fixed;bottom:0;left:0;right:0;width:100%;border-radius:0;'}background:{T.bg2};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};z-index:20;"
+          >
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <TagChip tag={popoverTag} size={11} />
+                <span style="font:10px/1 {T.mono};color:{T.ink3};">tagged by {aiStatus.modelName ?? aiStatus.taggingMode} · {Math.round((item.aiScore ?? 0.8) * 100)}% conf</span>
+              </div>
+              <Dialog.Close style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;"><Icon name="x" size={14} /></Dialog.Close>
             </div>
-            <button use:melt={$popoverClose} style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;"><Icon name="x" size={14} /></button>
-          </div>
-          <div style="color:{T.ink1};margin-bottom:8px;">Why tagged <b style="color:{c.fg};">{popoverTag}</b>:</div>
-          <ul style="margin:0;padding:0 0 0 14px;color:{T.ink1};font:12px/1.55 {T.sans};">
-            {#each evidence as ev}<li style="margin-bottom:2px;">{ev}</li>{/each}
-          </ul>
-        </div>
-      </div>
+            <div style="color:{T.ink1};margin-bottom:8px;">Why tagged <b style="color:{c.fg};">{popoverTag}</b>:</div>
+            <ul style="margin:0;padding:0 0 0 14px;color:{T.ink1};font:12px/1.55 {T.sans};">
+              {#each evidence as ev}<li style="margin-bottom:2px;">{ev}</li>{/each}
+            </ul>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     {/if}
   </div>
 {:else}

@@ -3,7 +3,7 @@
   import { groups, dbStats } from '$lib/stores/data.svelte';
   import { taggingProgress } from '$lib/stores/ai.svelte';
   import Icon from './Icon.svelte';
-  import { createToolbar, melt } from '@melt-ui/svelte';
+  import { Toolbar } from 'bits-ui';
 
   let { active, onChange }: {
     active: string;
@@ -19,17 +19,13 @@
     { id: 'ai',       label: 'ai',       icon: 'cpu'    },
     { id: 'settings', label: 'settings', icon: 'cog'    },
   ] as const;
-
-  const toolbar = createToolbar({ loop: false, orientation: 'horizontal' });
-  const { root, button } = toolbar.elements;
 </script>
 
-<div use:melt={$root} style="display:flex;flex-direction:column;border-top:1px solid {T.bd1};background:{T.bg1};flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px);">
+<Toolbar.Root loop={false} orientation="horizontal" style="display:flex;flex-direction:column;border-top:1px solid {T.bd1};background:{T.bg1};flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px);">
   <div style="display:flex;">
   {#each tabs as tab}
     {@const a = tab.id === active}
-    <button
-      use:melt={$button}
+    <Toolbar.Button
       onclick={() => onChange(tab.id)}
       style="
         flex:1;padding:10px 0 12px;
@@ -62,7 +58,7 @@
         {/if}
       </div>
       <span>{tab.label}</span>
-    </button>
+    </Toolbar.Button>
   {/each}
   </div>
-</div>
+</Toolbar.Root>

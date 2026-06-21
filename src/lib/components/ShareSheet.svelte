@@ -1,5 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
+  import { Dialog } from 'bits-ui';
   import { groups } from '$lib/stores/data.svelte';
   import { shareSheet, dismissShare, confirmShare } from '$lib/share.svelte';
 
@@ -31,30 +32,18 @@
   }
 </script>
 
-<div
-  role="button"
-  tabindex="-1"
-  onclick={dismissShare}
-  onkeydown={(e) => e.key === 'Escape' && dismissShare()}
-  style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;display:flex;align-items:{isDesktop ? 'center' : 'flex-end'};justify-content:{isDesktop ? 'center' : 'stretch'};"
->
-  <div
-    role="dialog"
-    aria-modal="true"
-    tabindex="-1"
-    onclick={(e) => e.stopPropagation()}
-    onkeydown={() => {}}
-    style="{
-      isDesktop
-        ? 'width:400px;max-width:90vw;border-radius:8px;'
-        : 'width:100%;border-radius:16px 16px 0 0;'
-    }background:{T.bg2};padding:20px 16px max(20px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;max-height:90vh;overflow-y:auto;"
-  >
-    <!-- Header -->
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="flex:1;font:600 12px/1 {T.mono};color:{T.ink0};letter-spacing:0.3px;">ADD FEED FROM SHARE</span>
-      <button onclick={dismissShare} style="background:transparent;border:none;cursor:pointer;padding:4px;color:{T.ink2};font-size:16px;">&#x2715;</button>
-    </div>
+<Dialog.Root open={shareSheet.candidate !== null} onOpenChange={(open) => { if (!open) dismissShare(); }}>
+  <Dialog.Portal>
+    <Dialog.Overlay style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:300;" />
+    <Dialog.Content
+      preventScroll={false}
+      style="position:fixed;{isDesktop ? 'left:50%;top:50%;transform:translate(-50%,-50%);width:400px;max-width:90vw;border-radius:8px;' : 'bottom:0;left:0;right:0;width:100%;border-radius:16px 16px 0 0;'}background:{T.bg2};padding:20px 16px max(20px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;max-height:90vh;overflow-y:auto;z-index:300;"
+    >
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <Dialog.Title style="flex:1;font:600 12px/1 {T.mono};color:{T.ink0};letter-spacing:0.3px;margin:0;">ADD FEED FROM SHARE</Dialog.Title>
+        <Dialog.Close style="background:transparent;border:none;cursor:pointer;padding:4px;color:{T.ink2};font-size:16px;">&#x2715;</Dialog.Close>
+      </div>
 
     {#if shareSheet.loading}
       <div style="text-align:center;padding:20px;font:11px/1 {T.mono};color:{T.ink3};">detecting feed…</div>
@@ -152,6 +141,7 @@
           {submitting ? 'adding…' : 'add feed'}
         </button>
       </div>
-    {/if}
-  </div>
-</div>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Portal>
+</Dialog.Root>

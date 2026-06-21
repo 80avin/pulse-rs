@@ -43,9 +43,15 @@
     settings.theme === 'system' ? (systemPrefersDark ? 'dark' : 'light') : settings.theme
   );
 
-  const themeStyle = $derived(`color-scheme:${resolvedTheme};height:100%;display:flex;flex-direction:column`);
+  const themeStyle = $derived(`height:100%;display:flex;flex-direction:column`);
   const densityAttr = $derived(settings.density);
   const accentColor = $derived(settings.accentColor);
+
+  // Apply theme to <html> so portal content (Dialog.Portal) also inherits it
+  $effect(() => {
+    document.documentElement.style.colorScheme = resolvedTheme;
+    document.documentElement.dataset.theme = resolvedTheme;
+  });
 
   const ACCENTS: Record<string, { light: string; dark: string; lightDim: string; darkDim: string }> = {
     cyan:   { light: '#155e75', dark: '#4ecdd6', lightDim: '#0e7490', darkDim: '#2a7a82' },

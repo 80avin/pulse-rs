@@ -21,9 +21,8 @@
   import TimelineList from '$lib/components/TimelineList.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import ReaderView from '$lib/components/ReaderView.svelte';
-  import ContextActions from '$lib/components/ContextActions.svelte';
   import Modal from '$lib/components/Modal.svelte';
-  import { createAccordion, createContextMenu, melt } from '@melt-ui/svelte';
+  import { Accordion } from 'bits-ui';
 
   let activeGroup  = $derived(timelineFilter.groupId ?? 'all');
   let activeSource = $derived(timelineFilter.feedId ?? null);
@@ -83,44 +82,10 @@
   let showSettings  = $state(false);
   let showAI        = $state(false);
   let showSources   = $state(false);
-  let showSourcesAccordion = $state(true);
+  let accValue = $state<string[]>(['sources']);
+  let showSourcesAccordion = $derived(accValue.includes('sources'));
   let popoverOpen   = $state(false);
   let showCheatsheet = $state(false);
-
-  // Accordion builder
-  const srcAcc = createAccordion({
-    multiple: true as const,
-    defaultValue: ['sources'] as string[],
-    onValueChange: ({ next }) => {
-      if (Array.isArray(next)) {
-        showSourcesAccordion = next.includes('sources');
-      }
-      return next;
-    },
-  });
-  const { root: srcAccRoot, trigger: srcAccTrigger, content: srcAccContent } = srcAcc.elements;
-
-  // Context menu builder
-  const ctxMenu = createContextMenu({
-    closeOnOutsideClick: true,
-    closeOnItemClick: true,
-    onOpenChange: ({ next }) => {
-      if (!next) contextMenu = null;
-      return next;
-    },
-  });
-  const ctxMenuMenu = ctxMenu.elements.menu;
-  const ctxMenuItem = ctxMenu.elements.item;
-
-  // Context menu state
-  let contextMenu = $state<{ x: number; y: number; item: import('$lib/types').FeedItem } | null>(null);
-
-  // Sync context menu state with melt open state
-  $effect(() => {
-    if (contextMenu) {
-      ctxMenu.states.open.set(true);
-    }
-  });
 
   const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
 
@@ -199,7 +164,6 @@
       const inInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 
       if (e.key === 'Escape') {
-        if (contextMenu)  { contextMenu = null; return; }
         if (showCheatsheet) { showCheatsheet = false; return; }
         if (searchQuery)  { searchQuery = ''; return; }
         searchInputEl?.blur();
@@ -366,50 +330,49 @@
       </div>
 
       <!-- Sources accordion -->
-      {#if true}
-        {@const triggerAttrs = $srcAccTrigger('sources')}
-        {@const contentAttrs = $srcAccContent('sources')}
-      <div use:melt={$srcAccRoot} style="border-bottom:1px solid {T.bd0};">
-      <button
-        {...triggerAttrs} use:melt={triggerAttrs}
-        onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }}
-        onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-        style="display:flex;align-items:center;gap:4px;padding:6px 12px;width:100%;background:transparent;border:none;cursor:pointer;text-align:left;"
-        aria-label={`Sources for ${activeGroupLabel}`}
-      >
-        <span style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;flex:1;">sources</span>
-        <span style="font:10px/1 {T.mono};color:{T.ink2};">{groupSources.length}</span>
-        <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
-      </button>
-      <div {...contentAttrs} use:melt={contentAttrs} style="padding:0 8px 6px;">
-        {#each groupSources as s}
-          <button
-            onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }}
-            oncontextmenu={(e) => { e.preventDefault(); showSources = !showSources; }}
-            onmouseenter={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
-            onmouseleave={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-            onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
-            onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
-            style="display:flex;align-items:center;gap:6px;padding:4px 6px;width:100%;background:{activeSource===s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {activeSource===s.id ? T.cyan : 'transparent'};cursor:pointer;text-align:left;"
-            aria-current={activeSource===s.id ? 'true' : undefined}
-          >
-            <StatusDot status={s.status} size={5} />
-            <span style="font:11px/1.2 {T.mono};color:{activeSource===s.id ? T.ink0 : T.ink1};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{s.name}</span>
-            {#if s.unread > 0}<span style="font:10px/1 {T.mono};color:{T.cyan};">{s.unread}</span>{/if}
-          </button>
-        {/each}
-        <button
-          onclick={() => { showSources = !showSources; }}
-          onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }}
-          onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-          style="display:flex;align-items:center;gap:4px;padding:4px 6px;width:100%;background:transparent;border:none;color:{T.ink3};font:10px/1 {T.mono};cursor:pointer;text-align:left;margin-top:2px;"
-        >
-          <Icon name="plus" size={10} color={T.ink3} />
-          <span>Manage Sources</span>
-        </button>
-      </div>
-    </div>
-      {/if}
+      <Accordion.Root type="multiple" bind:value={accValue} style="border-bottom:1px solid {T.bd0};">
+        <Accordion.Item value="sources">
+          <Accordion.Header>
+            <Accordion.Trigger
+              onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }}
+              onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              style="display:flex;align-items:center;gap:4px;padding:6px 12px;width:100%;background:transparent;border:none;cursor:pointer;text-align:left;"
+              aria-label={`Sources for ${activeGroupLabel}`}
+            >
+              <span style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;flex:1;">sources</span>
+              <span style="font:10px/1 {T.mono};color:{T.ink2};">{groupSources.length}</span>
+              <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
+            </Accordion.Trigger>
+          </Accordion.Header>
+          <Accordion.Content style="padding:0 8px 6px;">
+            {#each groupSources as s}
+              <button
+                onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }}
+                oncontextmenu={(e) => { e.preventDefault(); showSources = !showSources; }}
+                onmouseenter={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
+                onmouseleave={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
+                onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
+                style="display:flex;align-items:center;gap:6px;padding:4px 6px;width:100%;background:{activeSource===s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {activeSource===s.id ? T.cyan : 'transparent'};cursor:pointer;text-align:left;"
+                aria-current={activeSource===s.id ? 'true' : undefined}
+              >
+                <StatusDot status={s.status} size={5} />
+                <span style="font:11px/1.2 {T.mono};color:{activeSource===s.id ? T.ink0 : T.ink1};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{s.name}</span>
+                {#if s.unread > 0}<span style="font:10px/1 {T.mono};color:{T.cyan};">{s.unread}</span>{/if}
+              </button>
+            {/each}
+            <button
+              onclick={() => { showSources = !showSources; }}
+              onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }}
+              onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              style="display:flex;align-items:center;gap:4px;padding:4px 6px;width:100%;background:transparent;border:none;color:{T.ink3};font:10px/1 {T.mono};cursor:pointer;text-align:left;margin-top:2px;"
+            >
+              <Icon name="plus" size={10} color={T.ink3} />
+              <span>Manage Sources</span>
+            </button>
+          </Accordion.Content>
+        </Accordion.Item>
+      </Accordion.Root>
 
       <!-- Spacer -->
       <div style="flex:1;"></div>
@@ -466,7 +429,6 @@
         {searchQuery}
         {openId}
         onItemClick={(id) => openItemAndRead(id)}
-        onItemContextMenu={(e, item) => { e.preventDefault(); contextMenu = { x: e.clientX, y: e.clientY, item }; }}
         onTagClick={setActiveTag}
       />
     </div>
@@ -585,32 +547,6 @@
     <Modal open={showSources} title="Sources" onClose={() => { showSources = false; }} width="480px">
       <SourceExplorer onSourceSelect={(id) => { setFeedFilter(id); showSources = false; }} compact={true} isDesktop={true} />
     </Modal>
-
-    <!-- Context menu -->
-    {#if contextMenu}
-      <div
-        use:melt={$ctxMenuMenu}
-        style="
-          position:fixed;
-          top:{Math.min(contextMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 600) - 300)}px;
-          left:{Math.min(contextMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 212)}px;
-          width:200px;
-          background:{T.bg1};
-          border:1px solid {T.bd1};
-          border-radius:4px;
-          box-shadow:0 8px 32px rgba(0,0,0,0.6);
-          z-index:200;
-          overflow:hidden;
-        "
-      >
-        <ContextActions
-          item={contextMenu.item}
-          variant="menu"
-          onClose={() => contextMenu = null}
-          menuItemBuilder={ctxMenuItem}
-        />
-      </div>
-    {/if}
 
     <!-- Keyboard shortcut cheatsheet -->
     <Modal open={showCheatsheet} title="Keyboard Shortcuts" onClose={() => showCheatsheet = false} width="440px">

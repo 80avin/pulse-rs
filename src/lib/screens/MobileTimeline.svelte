@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { createDialog, melt } from '@melt-ui/svelte';
+  import { Dialog } from 'bits-ui';
   import type { FeedItem } from '$lib/types';
   import { groups, sources, items, markAllRead, markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
   import { doSync as storeSync, syncState } from '$lib/stores/sync.svelte';
@@ -25,13 +25,6 @@
   let showFilter = $state(true);
   let actionSheetItem = $state<FeedItem | null>(null);
   let signalActive = $state(false);
-
-  const actionDlg = createDialog({
-    defaultOpen: true,
-    preventScroll: false,
-    onOpenChange: ({ next }) => { if (!next) actionSheetItem = null; return next; },
-  });
-  const { overlay: actOverlay, content: actContent, close: actClose } = actionDlg.elements;
 
   // Group, feed, tag, read, and saved filters are applied server-side in `items`.
   // Signal filtering is client-side for now (TODO: move to server-side).
@@ -188,87 +181,92 @@
 </div>
 
 <!-- Long-press action sheet -->
-{#if actionSheetItem}
-  {@const ci = actionSheetItem}
-  {@const isHnSelf = ci.url?.includes('news.ycombinator.com/item') ?? false}
-  <div {...$actOverlay} use:melt={$actOverlay} style="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:100;">
-    <div {...$actContent} use:melt={$actContent} style="width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};max-height:70vh;overflow-y:auto;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;"
-    >
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.5px;">actions</span>
-        <button use:melt={$actClose} style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
-          <Icon name="x" size={14} />
-        </button>
-      </div>
-
-      {#if ci.url && !isHnSelf}
-        <button
-          onclick={() => { openExternal(ci.url!); actionSheetItem = null; }}
-          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
-        >
-          <Icon name="ext" size={13} color={T.ink2} />
-          <span>Open in browser</span>
-        </button>
-      {/if}
-      {#if ci.url}
-        <button
-          onclick={() => { navigator.clipboard.writeText(ci.url!); actionSheetItem = null; }}
-          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
-        >
-          <Icon name="link" size={13} color={T.ink2} />
-          <span>Copy URL</span>
-        </button>
-      {/if}
-      <button
-        onclick={() => { navigator.clipboard.writeText(ci.title); actionSheetItem = null; }}
-        style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+  <Dialog.Root open={actionSheetItem !== null} onOpenChange={(open) => { if (!open) actionSheetItem = null; }}>
+    <Dialog.Portal>
+      <Dialog.Overlay style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:100;" />
+      <Dialog.Content
+        preventScroll={false}
+        style="position:fixed;bottom:0;left:0;right:0;width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};max-height:70vh;overflow-y:auto;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;z-index:100;"
       >
-        <Icon name="edit" size={13} color={T.ink2} />
-        <span>Copy title</span>
-      </button>
-      {#if ci.title && (ci.url || ci.externalUrl)}
+        {#if actionSheetItem}
+          {@const ci = actionSheetItem}
+          {@const isHnSelf = ci.url?.includes('news.ycombinator.com/item') ?? false}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.5px;">actions</span>
+          <Dialog.Close style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
+            <Icon name="x" size={14} />
+          </Dialog.Close>
+        </div>
+
+        {#if ci.url && !isHnSelf}
+          <button
+            onclick={() => { openExternal(ci.url!); actionSheetItem = null; }}
+            style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+          >
+            <Icon name="ext" size={13} color={T.ink2} />
+            <span>Open in browser</span>
+          </button>
+        {/if}
+        {#if ci.url}
+          <button
+            onclick={() => { navigator.clipboard.writeText(ci.url!); actionSheetItem = null; }}
+            style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+          >
+            <Icon name="link" size={13} color={T.ink2} />
+            <span>Copy URL</span>
+          </button>
+        {/if}
         <button
-          onclick={() => { shareItem(ci.title, ci.url ?? ci.externalUrl); actionSheetItem = null; }}
+          onclick={() => { navigator.clipboard.writeText(ci.title); actionSheetItem = null; }}
           style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
         >
-          <Icon name="share" size={13} color={T.ink2} />
-          <span>Share</span>
+          <Icon name="edit" size={13} color={T.ink2} />
+          <span>Copy title</span>
         </button>
-      {/if}
+        {#if ci.title && (ci.url || ci.externalUrl)}
+          <button
+            onclick={() => { shareItem(ci.title, ci.url ?? ci.externalUrl); actionSheetItem = null; }}
+            style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+          >
+            <Icon name="share" size={13} color={T.ink2} />
+            <span>Share</span>
+          </button>
+        {/if}
 
-      <div style="height:1px;background:{T.bd0};margin:4px 0;"></div>
+        <div style="height:1px;background:{T.bd0};margin:4px 0;"></div>
 
-      <button
-        onclick={() => { markRead(ci.id, !ci.read); actionSheetItem = null; }}
-        style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{ci.read ? T.ink1 : T.cyan};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
-      >
-        <Icon name="check" size={13} color={ci.read ? T.ink2 : T.cyan} />
-        <span>{ci.read ? 'Mark as unread' : 'Mark as read'}</span>
-      </button>
-      <button
-        onclick={() => { toggleSaved(ci.id); actionSheetItem = null; }}
-        style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{ci.saved ? T.amber : T.ink1};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
-      >
-        <Icon name="bookmark" size={13} color={ci.saved ? T.amber : T.ink2} />
-        <span>{ci.saved ? 'Unsave' : 'Save'}</span>
-      </button>
-      <button
-        onclick={() => { hideItem(ci.id); actionSheetItem = null; }}
-        style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.red};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
-      >
-        <Icon name="eye-off" size={13} color={T.red} />
-        <span>Hide</span>
-      </button>
+        <button
+          onclick={() => { markRead(ci.id, !ci.read); actionSheetItem = null; }}
+          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{ci.read ? T.ink1 : T.cyan};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+        >
+          <Icon name="check" size={13} color={ci.read ? T.ink2 : T.cyan} />
+          <span>{ci.read ? 'Mark as unread' : 'Mark as read'}</span>
+        </button>
+        <button
+          onclick={() => { toggleSaved(ci.id); actionSheetItem = null; }}
+          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{ci.saved ? T.amber : T.ink1};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+        >
+          <Icon name="bookmark" size={13} color={ci.saved ? T.amber : T.ink2} />
+          <span>{ci.saved ? 'Unsave' : 'Save'}</span>
+        </button>
+        <button
+          onclick={() => { hideItem(ci.id); actionSheetItem = null; }}
+          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.red};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+        >
+          <Icon name="eye-off" size={13} color={T.red} />
+          <span>Hide</span>
+        </button>
 
-      <div style="height:1px;background:{T.bd0};margin:4px 0;"></div>
+        <div style="height:1px;background:{T.bd0};margin:4px 0;"></div>
 
-      <button
-        onclick={() => { onOpen(ci.id, displayItems.map(i => i.id)); actionSheetItem = null; }}
-        style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;color:{T.ink1};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
-      >
-        <Icon name="cpu" size={13} color={T.ink2} />
-        <span>Tag info</span>
-      </button>
-    </div>
-  </div>
-{/if}
+        <button
+          onclick={() => { onOpen(ci.id, displayItems.map(i => i.id)); actionSheetItem = null; }}
+          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;color:{T.ink1};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+        >
+          <Icon name="cpu" size={13} color={T.ink2} />
+          <span>Tag info</span>
+        </button>
+        {/if}
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
