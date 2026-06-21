@@ -17,7 +17,7 @@
 </script>
 
 {#if data && data.length >= 2}
-  <svg width={w} height={h} style="display:block;">
+  <svg width={w} height={h} class="block">
     <polyline points={points} fill="none" stroke={color} stroke-width="1" />
   </svg>
 {/if}

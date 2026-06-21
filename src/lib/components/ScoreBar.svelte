@@ -5,9 +5,9 @@
   const pct = $derived(Math.round(value * 100));
 </script>
 
-<span style="display:inline-flex;align-items:center;gap:4px;font:10px/1 {T.mono};color:{c};">
-  <span style="width:{w}px;height:4px;background:{T.ink4};border-radius:1px;position:relative;overflow:hidden;">
-    <span style="position:absolute;left:0;top:0;bottom:0;width:{pct}%;background:{c};"></span>
+<span class="inline-flex items-center gap-1 text-[10px] leading-none font-mono" style="color:{c};">
+  <span class="h-1 rounded-[1px] relative overflow-hidden bg-ink-4" style="width:{w}px;">
+    <span class="absolute left-0 top-0 bottom-0" style="width:{pct}%;background:{c};"></span>
   </span>
-  <span style="font-variant-numeric:tabular-nums;">{value.toFixed(2)}</span>
+  <span class="tabular-nums">{value.toFixed(2)}</span>
 </span>

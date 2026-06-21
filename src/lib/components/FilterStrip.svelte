@@ -25,39 +25,36 @@
   const showTagRow = $derived(!!activeTag || topTags.length > 0);
 </script>
 
-<div style="display:flex;flex-direction:column;border-top:1px solid {T.bd0};background:{T.bg1};flex-shrink:0;">
+<div class="flex flex-col shrink-0 border-t border-bd-0 bg-bg-1">
   <!-- Tabs row -->
-  <div style="display:flex;align-items:center;overflow-x:auto;scrollbar-width:none;">
+  <div class="flex items-center overflow-x-auto" style="scrollbar-width:none;">
     {#each tabs as tab}
       {@const a = tab.id === filter}
       <button
         onclick={() => onFilter(tab.id)}
         aria-pressed={a}
-        style="
-          flex-shrink:0;padding:10px 12px;
+        class="shrink-0 border-none border-r border-bd-0 cursor-pointer flex items-center px-3 py-2.5 gap-1.25 tracking-[0.3px] text-[11px] leading-none font-mono" style="
           background:{a ? T.bg3 : 'transparent'};
-          border:none;border-right:1px solid {T.bd0};
           color:{a ? (tab.color ?? T.cyan) : T.ink1};
-          font:{a ? '600' : '400'} 11px/1 {T.mono};
-          cursor:pointer;display:flex;align-items:center;gap:5px;letter-spacing:0.3px;
+          font-weight:{a ? '600' : '400'};
         "
       >
         <span>{tab.label}</span>
-        <span style="font:10px/1 {T.mono};color:{a ? (tab.color ?? T.cyan) : T.ink3};font-variant-numeric:tabular-nums;">{tab.n}</span>
+        <span class="tabular-nums text-[10px] leading-none font-mono" style="color:{a ? (tab.color ?? T.cyan) : T.ink3};">{tab.n}</span>
       </button>
     {/each}
-    <div style="flex:1;min-width:4px;"></div>
+    <div class="flex-1 min-w-[4px]"></div>
     <button
       onclick={() => onSort(sort === 'time' ? 'score' : 'time')}
-      style="flex-shrink:0;padding:10px 12px;background:transparent;border:none;border-left:1px solid {T.bd0};color:{T.ink1};font:11px/1 {T.mono};letter-spacing:0.3px;cursor:pointer;display:flex;align-items:center;gap:4px;"
+      class="shrink-0 bg-transparent border-none border-l border-bd-0 text-ink-1 cursor-pointer flex items-center p-2.5 px-3 gap-1 tracking-[0.3px] text-[11px] leading-none font-mono"
     >
-      <span style="color:{T.ink3};">sort</span>
+      <span class="text-ink-3">sort</span>
       <span>{sort === 'time' ? 'time ↓' : 'score ↓'}</span>
     </button>
     <button
       onclick={onMarkAllRead}
       title="Mark all read"
-      style="flex-shrink:0;padding:10px 12px;background:transparent;border:none;border-left:1px solid {T.bd0};color:{T.green};display:flex;align-items:center;cursor:pointer;"
+      class="shrink-0 bg-transparent border-none border-l border-bd-0 text-green flex items-center cursor-pointer p-2.5 px-3"
     >
       <Icon name="check" size={14} />
     </button>
@@ -65,32 +62,32 @@
 
   <!-- Tag filter row (shown when activeTag is set or top tags are available) -->
   {#if showTagRow}
-    <div style="display:flex;align-items:center;gap:6px;padding:5px 10px 6px;border-top:1px solid {T.bd0};overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;min-height:0;">
+    <div class="flex items-center gap-1.5 border-t border-bd-0 overflow-x-auto flex-nowrap pt-[5px] px-2.5 pb-1.5 min-h-0" style="scrollbar-width:none;">
       {#if activeTag}
         {@const tc = TAG_COLORS[activeTag] ?? { fg: T.cyan, bg: 'rgba(78,205,214,0.10)', bd: 'rgba(78,205,214,0.30)' }}
         <button
           onclick={() => onClearTagFilter?.()}
-          style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;background:{tc.bg};border:1px solid {tc.bd};border-radius:2px;font:10px/1 {T.mono};color:{tc.fg};cursor:pointer;letter-spacing:0.2px;white-space:nowrap;"
+          class="shrink-0 inline-flex items-center cursor-pointer whitespace-nowrap gap-1 px-1.75 py-0.5 rounded-sm tracking-[0.2px] text-[10px] leading-none font-mono" style="background:{tc.bg};border:1px solid {tc.bd};color:{tc.fg};"
         >
-          <span style="color:{T.ink3};">tag:</span>{activeTag} ×
+          <span class="text-ink-3">tag:</span>{activeTag} ×
         </button>
         {#if topTags.length > 0}
-          <span style="flex-shrink:0;color:{T.ink3};font:10px/1 {T.mono};">·</span>
+          <span class="shrink-0 text-ink-3 text-[10px] leading-none font-mono">·</span>
           {#each topTags as tag}
             {@const tc2 = TAG_COLORS[tag] ?? { fg: T.ink2, bg: 'transparent', bd: T.bd1 }}
             <button
               onclick={() => onTagFilter?.(tag)}
-              style="flex-shrink:0;display:inline-flex;align-items:center;padding:2px 7px;background:transparent;border:1px solid {T.bd1};border-radius:2px;font:10px/1 {T.mono};color:{tag === activeTag ? tc2.fg : T.ink3};cursor:pointer;white-space:nowrap;opacity:{tag === activeTag ? 1 : 0.6};"
+              class="shrink-0 inline-flex items-center bg-transparent cursor-pointer whitespace-nowrap px-1.75 py-0.5 rounded-sm border border-bd-1 text-[10px] leading-none font-mono" style="color:{tag === activeTag ? tc2.fg : T.ink3};opacity:{tag === activeTag ? 1 : 0.6};"
             >{tag}</button>
           {/each}
         {/if}
       {:else}
-        <span style="flex-shrink:0;font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.3px;">top:</span>
+        <span class="shrink-0 text-ink-3 tracking-[0.3px] text-[10px] leading-none font-mono">top:</span>
         {#each topTags as tag}
           {@const tc = TAG_COLORS[tag] ?? { fg: T.ink2, bg: 'transparent', bd: T.bd1 }}
           <button
             onclick={() => onTagFilter?.(tag)}
-            style="flex-shrink:0;display:inline-flex;align-items:center;padding:2px 7px;background:{tc.bg};border:1px solid {tc.bd};border-radius:2px;font:10px/1 {T.mono};color:{tc.fg};cursor:pointer;white-space:nowrap;"
+            class="shrink-0 inline-flex items-center cursor-pointer whitespace-nowrap px-1.75 py-0.5 rounded-sm text-[10px] leading-none font-mono" style="background:{tc.bg};border:1px solid {tc.bd};color:{tc.fg};"
           >{tag}</button>
         {/each}
       {/if}

@@ -25,7 +25,7 @@
     display:flex;align-items:center;justify-content:center;
   ">
     {#if item.kind === 'image' || (item.kind === 'crosspost' && !item.domain)}
-      <svg width={w} height={h} style="position:absolute;inset:0;opacity:0.18;">
+      <svg width={w} height={h} class="absolute inset-0 opacity-[0.18]">
         <defs>
           <pattern id="p-{item.id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <line x1="0" y1="0" x2="0" y2="6" stroke={fg} stroke-width="1.5"/>

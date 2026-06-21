@@ -9,14 +9,14 @@
   } = $props();
 </script>
 
-<div style="display:flex;flex-direction:column;height:100%;background:{T.bg0};color:{T.ink0};">
-  <div style="height:44px;display:flex;align-items:center;padding:0 14px;border-bottom:1px solid {T.bd0};background:{T.bg1};flex-shrink:0;">
-    <span style="font:12px/1 {T.mono};color:{T.ink0};letter-spacing:0.5px;">settings</span>
+<div class="flex flex-col h-full bg-bg-0 text-ink-0">
+  <div class="h-[44px] flex items-center px-3.5 border-b border-b-bd-0 bg-bg-1 shrink-0">
+    <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px]">settings</span>
   </div>
 
-  <div style="flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:10px;">
+  <div class="flex-1 overflow-y-auto flex flex-col gap-2.5 p-3 px-2.5">
     <SettingsPanelContent showShortcuts={false} />
-    <div style="height:12px;"></div>
+    <div class="h-3"></div>
   </div>
 
   <PulseBottomNav active={tab} onChange={onTabChange} />

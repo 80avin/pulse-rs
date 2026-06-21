@@ -223,7 +223,13 @@
 }
 
 /* ── Global resets ────────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Wrapped in @layer base so Tailwind v4 utility classes (in @layer utilities)
+   win over margin/padding — unlayered styles beat layered per CSS Cascade 2022+.
+   Tailwind's preflight already provides the same reset in @layer base.
+   This just ensures ours is in the same layer for correct layering order. */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+}
 
 html, body {
   height: 100%;

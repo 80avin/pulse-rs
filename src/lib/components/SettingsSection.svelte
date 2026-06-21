@@ -2,7 +2,7 @@
   let { label, children }: { label: string; children: import('svelte').Snippet } = $props();
 </script>
 
-<div style="padding:12px;background:var(--color-bg-1);border:1px solid var(--color-bd-0);border-radius:4px;">
-  <div style="font:10px/1 var(--font-mono);color:var(--color-ink-3);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">{label}</div>
+<div class="p-3 rounded bg-[var(--color-bg-1)] border border-[var(--color-bd-0)]">
+  <div class="uppercase text-[10px] leading-none font-mono text-[var(--color-ink-3)] tracking-[0.6px] mb-2.5">{label}</div>
   {@render children()}
 </div>

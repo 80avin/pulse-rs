@@ -69,13 +69,13 @@
   });
 </script>
 
-<div bind:this={listScrollEl} style="flex:1;overflow-y:auto;overflow-x:hidden;position:relative;">
+<div bind:this={listScrollEl} class="flex-1 overflow-y-auto overflow-x-hidden relative">
   {#if items.length === 0 && !storeReady.loading}
-    <div style="padding:32px;text-align:center;font:11px/1.6 {T.mono};color:{T.ink3};">
+    <div class="p-8 text-center text-[11px] leading-[1.6] font-mono text-ink-3">
       {emptyMessage || (searchQuery ? `no results for "${searchQuery}"` : 'no items in this view')}
     </div>
   {:else}
-    <div style="height:{$listVirtualizer.getTotalSize()}px;position:relative;">
+    <div class="relative" style="height:{$listVirtualizer.getTotalSize()}px;">
       {#each $listVirtualizer.getVirtualItems() as vItem (vItem.key)}
         {@const item = items[vItem.index]}
         {#if item}
@@ -83,7 +83,7 @@
           <div
             data-index={vItem.index}
             use:measureItem
-            style="position:absolute;top:0;left:0;width:100%;transform:translateY({vItem.start}px);"
+            class="absolute top-0 left-0 w-full" style="transform:translateY({vItem.start}px);"
           >
             <ItemRow
               {item}
@@ -99,7 +99,7 @@
       {/each}
     </div>
     {#if loadingMore.cursor}
-      <div style="height:36px;display:flex;align-items:center;justify-content:center;font:10px/1 {T.mono};color:{T.ink3};">
+      <div class="h-9 flex items-center justify-center text-[10px] leading-none font-mono text-ink-3">
         {loadingMore.active ? 'loading…' : ''}
       </div>
     {/if}

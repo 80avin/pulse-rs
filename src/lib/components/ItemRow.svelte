@@ -3,6 +3,7 @@
   import type { FeedItem, Source, Density } from '$lib/types';
   import Icon from './Icon.svelte';
   import TagChip from './TagChip.svelte';
+  import { longpress } from './longpress.svelte';
   import { ContextMenu } from 'bits-ui';
   import { openExternal, shareItem } from '$lib/utils';
   import { markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
@@ -16,52 +17,6 @@
     onTagClick?: (tag: string) => void;
     onLongPress?: () => void;
   } = $props();
-
-  // Long-press detection (mobile context menu)
-  let pressTimer: ReturnType<typeof setTimeout> | null = null;
-  let longPressed = false;
-  let touchMoved = false;
-  let touchStartX = 0;
-  let touchStartY = 0;
-
-  function startPress(e: TouchEvent) {
-    if (!onLongPress) return;
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    touchMoved = false;
-    longPressed = false;
-    pressTimer = setTimeout(() => {
-      if (touchMoved) return;
-      longPressed = true;
-      pressTimer = null;
-      onLongPress?.();
-    }, 450);
-  }
-
-  function handleTouchMove(e: TouchEvent) {
-    if (!onLongPress) return;
-    const dx = Math.abs(e.touches[0].clientX - touchStartX);
-    const dy = Math.abs(e.touches[0].clientY - touchStartY);
-    if (dx > 8 || dy > 8) {
-      touchMoved = true;
-      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    }
-  }
-
-  function cancelPress() {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    touchMoved = false;
-    longPressed = false;
-  }
-
-  function handleTouchEnd(e: TouchEvent) {
-    if (!onLongPress) return;
-    const wasLong = longPressed;
-    cancelPress();
-    if (wasLong) {
-      e.preventDefault();
-    }
-  }
 
   function copyUrl(u: string) { navigator.clipboard.writeText(u).catch(() => {}); }
   function copyTitle(t: string) { navigator.clipboard.writeText(t).catch(() => {}); }
@@ -120,108 +75,92 @@
     tabindex={0}
     {onclick}
     onkeydown={(e) => { if (e.key === 'Enter') onclick(); }}
-    ontouchstart={startPress}
-    ontouchmove={handleTouchMove}
-    ontouchend={handleTouchEnd}
-    ontouchcancel={cancelPress}
-    style="
-      position:relative;display:flex;gap:0;
-      padding:0;border:0;
-      border-bottom:1px solid {T.bd0};cursor:pointer;
-      background:{isFocused ? 'rgba(78,205,214,0.05)' : 'transparent'};
-      min-height:56px;
-      user-select:none;
-      -webkit-user-select:none;
-      -webkit-touch-callout:none;
-      width:100%;text-align:left;font:inherit;
-    "
+    // use:longpress={{ onLongpress: () => onLongPress?.() }}
+    class="relative flex p-0 border-0 border-b border-bd-0 cursor-pointer select-none w-full text-left min-h-14"
+    style="background:{isFocused ? 'rgba(78,205,214,0.05)' : 'transparent'};-webkit-touch-callout:none;"
   >
     <!-- Platform-colored left spine -->
-    <span style="width:3px;flex-shrink:0;background:{sk.spine};"></span>
+    <span class="shrink-0" style="width:3px;background:{sk.spine};"></span>
 
     <!-- Unread / focus indicator -->
-    <span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{isFocused ? T.cyan : (item.read ? 'transparent' : T.cyanDim)};z-index:1;"></span>
+    <span class="absolute" style="left:0;top:0;bottom:0;width:3px;background:{isFocused ? T.cyan : (item.read ? 'transparent' : T.cyanDim)};z-index:1;"></span>
 
     <!-- Body -->
-    <div style="flex:1;min-width:0;display:flex;gap:12px;padding:var(--item-pad-y,13px) 14px var(--item-pad-y,13px) 12px;">
+    <div class="flex-1 min-w-0 flex gap-3" style="padding:var(--item-pad-y,13px) 14px var(--item-pad-y,13px) 12px;" use:longpress={{ onLongpress: () => onLongPress?.() }} >
 
       <!-- Source pill -->
-      <div style="
-        width:{pillSize}px;height:{pillSize}px;flex-shrink:0;
+      <div class="flex items-center justify-center shrink-0 mt-0.5 text-white" style="
+        width:{pillSize}px;height:{pillSize}px;
         border-radius:{pillRadius};background:{pillBg};
-        display:flex;align-items:center;justify-content:center;
-        margin-top:2px;
-        font:700 {pillFont} {T.mono};color:#fff;
+        font:700 {pillFont} {T.mono};
       ">{pillLabel}</div>
 
       <!-- Content column -->
-      <div style="flex:1;min-width:0;">
+      <div class="flex-1 min-w-0">
 
         <!-- Crosspost banner -->
         {#if item.kind === 'crosspost' && item.crossFrom}
-          <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;font:9px/1 {T.mono};">
+          <div class="flex items-center gap-1 mb-1 text-[9px] leading-none font-mono">
             <Icon name="crosspost" size={10} color={T.violet} />
-            <span style="color:{T.violet};">crosspost from</span>
-            <span style="color:{T.ink1};font-weight:500;">{item.crossFrom}</span>
+            <span class="text-violet">crosspost from</span>
+            <span class="text-ink-1 font-medium">{item.crossFrom}</span>
           </div>
         {/if}
 
         <!-- Title -->
-        <div style="
+        <div class="overflow-hidden text-ellipsis tracking-[-0.1px]" style="
           font:{dim ? '400' : '500'} {titleFont} {T.sans};
           color:{dim ? T.ink2 : T.ink0};
-          overflow:hidden;text-overflow:ellipsis;
           display:-webkit-box;-webkit-line-clamp:{isDense ? 1 : 2};-webkit-box-orient:vertical;
-          letter-spacing:-0.1px;
         ">{item.title}</div>
 
         <!-- URL bar (between title and snippet) -->
         {#if displayUrl}
-          <div style="margin-top:3px;font:{urlFont} {T.mono};color:{sk.accent};display:flex;align-items:center;gap:4px;overflow:hidden;">
+          <div class="flex items-center gap-1 overflow-hidden mt-0.75" style="font:{urlFont} {T.mono};color:{sk.accent};">
             <Icon name="link" size={10} color={sk.accent} />
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{urlDisplay}</span>
+            <span class="truncate">{urlDisplay}</span>
           </div>
         {/if}
 
         <!-- Snippet -->
         {#if item.snippet && !isDense}
-          <div style="margin-top:{displayUrl ? 5 : 4}px;font:{snippetFont} {T.sans};color:{T.ink2};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          <div class="truncate text-ink-2" style="margin-top:{displayUrl ? 5 : 4}px;font:{snippetFont} {T.sans};">
             {item.snippet}
           </div>
         {/if}
 
         <!-- Meta row -->
-        <div style="margin-top:{!isDense ? 6 : 4}px;display:flex;align-items:center;gap:6px;font:{metaFont} {T.mono};flex-wrap:wrap;">
+        <div class="flex items-center gap-1.5 flex-wrap" style="margin-top:{!isDense ? 6 : 4}px;font:{metaFont} {T.mono};">
 
           {#if showPlatformIcon}
             <Icon name={platformIcon} size={12} color={sk.accent} />
           {/if}
 
           {#if source}
-            <span style="font-weight:600;color:{T.ink0};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">{source.name}</span>
-            <span style="color:{T.ink3};">·</span>
+            <span class="font-semibold text-ink-0 truncate max-w-35">{source.name}</span>
+            <span class="text-ink-3">·</span>
           {/if}
 
-          <span style="color:{T.ink2};">{item.age}</span>
+          <span class="text-ink-2">{item.age}</span>
 
           {#if item.score > 0}
-            <span style="color:{T.ink3};">·</span>
-            <span style="color:{T.amber};">▲ {item.score}</span>
+            <span class="text-ink-3">·</span>
+            <span class="text-amber">▲ {item.score}</span>
           {/if}
 
           {#if item.n > 0}
-            <span style="color:{T.ink3};">·</span>
-            <span style="color:{T.ink2};">{commentLabel}</span>
+            <span class="text-ink-3">·</span>
+            <span class="text-ink-2">{commentLabel}</span>
           {/if}
 
           {#if item.saved}
-            <span style="display:inline-flex;align-items:center;gap:1px;">
+            <span class="inline-flex items-center gap-px">
               <Icon name="bookmark" size={12} color={T.amber} />
-              {#if item.note}<span style="font:8px/1 {T.mono};color:{T.amber};">*</span>{/if}
+              {#if item.note}<span class="text-[8px] leading-none font-mono text-amber">*</span>{/if}
             </span>
           {/if}
 
-          <span style="flex:1;"></span>
+          <span class="flex-1"></span>
 
           <!-- Muted tags -->
           {#if item.tags.length > 0 && !isDense}
@@ -238,7 +177,7 @@
           src={item.ogImage}
           alt=""
           loading="lazy"
-          style="width:{thumbSize}px;height:{thumbSize}px;object-fit:cover;border-radius:3px;border:1px solid {T.bd0};flex-shrink:0;align-self:flex-start;"
+          style="width:{thumbSize}px;height:{thumbSize}px;" class="object-cover rounded border border-bd-0 shrink-0 self-start"
           onerror={() => { item.ogImage = null; }}
         />
       {/if}
@@ -246,47 +185,39 @@
   </ContextMenu.Trigger>
 
   <ContextMenu.Portal>
-    <ContextMenu.Content style="
-      width:200px;
-      background:{T.bg1};
-      border:1px solid {T.bd1};
-      border-radius:4px;
-      box-shadow:0 8px 32px rgba(0,0,0,0.6);
-      z-index:200;
-      overflow:hidden;
-    ">
+    <ContextMenu.Content class="bg-bg-1 border border-bd-1 rounded overflow-hidden w-50 shadow-[0_8px_32px_rgba(0,0,0,0.6)] z-20">
       {#if item.url && !isHnSelf}
-        <ContextMenu.Item onclick={() => openExternal(item.url!)} style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{T.ink0};cursor:pointer;text-align:left;font:11px/1 {T.mono};">
+        <ContextMenu.Item onclick={() => openExternal(item.url!)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono text-ink-0">
           <Icon name="ext" size={11} color={T.ink2} />
           <span>Open in browser</span>
         </ContextMenu.Item>
       {/if}
       {#if item.url}
-        <ContextMenu.Item onclick={() => copyUrl(item.url!)} style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{T.ink0};cursor:pointer;text-align:left;font:11px/1 {T.mono};">
+        <ContextMenu.Item onclick={() => copyUrl(item.url!)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono text-ink-0">
           <Icon name="link" size={11} color={T.ink2} />
           <span>Copy URL</span>
         </ContextMenu.Item>
       {/if}
-      <ContextMenu.Item onclick={() => copyTitle(item.title)} style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.ink0};cursor:pointer;text-align:left;font:11px/1 {T.mono};">
+      <ContextMenu.Item onclick={() => copyTitle(item.title)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-1 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono text-ink-0">
         <Icon name="edit" size={11} color={T.ink2} />
         <span>Copy title</span>
       </ContextMenu.Item>
       {#if item.title && (item.url || item.externalUrl)}
-        <ContextMenu.Item onclick={() => shareItem(item.title, item.url ?? item.externalUrl)} style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.ink0};cursor:pointer;text-align:left;font:11px/1 {T.mono};">
+        <ContextMenu.Item onclick={() => shareItem(item.title, item.url ?? item.externalUrl)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-1 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono text-ink-0">
           <Icon name="share" size={11} color={T.ink2} />
           <span>Share</span>
         </ContextMenu.Item>
       {/if}
-      <div style="height:1px;background:{T.bd0};margin:4px 0;"></div>
-      <ContextMenu.Item onclick={() => markRead(item.id, !item.read)} style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{item.read ? T.ink1 : T.cyan};cursor:pointer;text-align:left;font:11px/1 {T.mono};">
+      <div class="bg-bd-0 h-px my-1"></div>
+      <ContextMenu.Item onclick={() => markRead(item.id, !item.read)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono" style="color:{item.read ? T.ink1 : T.cyan};">
         <Icon name="check" size={11} color={item.read ? T.ink2 : T.cyan} />
         <span>{item.read ? 'Mark as unread' : 'Mark as read'}</span>
       </ContextMenu.Item>
-      <ContextMenu.Item onclick={() => toggleSaved(item.id)} style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{item.saved ? T.amber : T.ink1};cursor:pointer;text-align:left;font:11px/1 {T.mono};">
+      <ContextMenu.Item onclick={() => toggleSaved(item.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-1 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono" style="color:{item.saved ? T.amber : T.ink1};">
         <Icon name="bookmark" size={11} color={item.saved ? T.amber : T.ink2} />
         <span>{item.saved ? 'Unsave' : 'Save'}</span>
       </ContextMenu.Item>
-      <ContextMenu.Item onclick={() => hideItem(item.id)} style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.red};cursor:pointer;text-align:left;font:11px/1 {T.mono};">
+      <ContextMenu.Item onclick={() => hideItem(item.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-1 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono text-red">
         <Icon name="eye-off" size={11} color={T.red} />
         <span>Hide</span>
       </ContextMenu.Item>

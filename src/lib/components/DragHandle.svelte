@@ -10,7 +10,7 @@
 <div
   role="separator"
   onmousedown={(e) => onDragStart(edge, e)}
-  style="width:4px;flex-shrink:0;cursor:col-resize;background:transparent;"
+  class="shrink-0 cursor-col-resize bg-transparent w-[4px]"
   onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-cyan-dim)'; }}
   onmouseleave={(e) => { if (dragging !== edge) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
 ></div>

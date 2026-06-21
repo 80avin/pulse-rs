@@ -232,36 +232,36 @@
 </script>
 
 {#if storeReady.error}
-  <div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:{T.bg0};font:11px/1.6 {T.mono};color:{T.red};">
+  <div class="flex items-center justify-center w-full h-full bg-bg-0 text-red text-[11px] leading-[1.6] font-mono">
     failed to load data — check console for details
   </div>
 {:else}
-<div style="display:flex;flex-direction:column;width:100%;height:100%;background:{T.bg0};color:{T.ink0};overflow:hidden;">
+<div class="flex flex-col w-full h-full bg-bg-0 text-ink-0 overflow-hidden">
 
   <!-- Window chrome -->
-  <div style="height:32px;display:flex;align-items:center;padding:0 8px 0 12px;background:{T.bg0};border-bottom:1px solid {T.bd0};flex-shrink:0;gap:10px;">
-    <div style="display:flex;gap:7px;align-items:center;">
-      <span style="width:11px;height:11px;border-radius:11px;background:#e26b6b;display:block;"></span>
-      <span style="width:11px;height:11px;border-radius:11px;background:#e6b450;display:block;"></span>
-      <span style="width:11px;height:11px;border-radius:11px;background:#6bd896;display:block;"></span>
+  <div class="h-8 flex items-center pl-3 pr-2 bg-bg-0 border-b border-bd-0 shrink-0 gap-2.5">
+    <div class="flex items-center gap-1.75">
+      <span class="block w-2.75 h-2.75 rounded-full bg-[#e26b6b]"></span>
+      <span class="block w-2.75 h-2.75 rounded-full bg-[#e6b450]"></span>
+      <span class="block w-2.75 h-2.75 rounded-full bg-[#6bd896]"></span>
     </div>
-    <div style="width:18px;"></div>
-    <span style="font:600 11px/1 {T.mono};color:{T.ink0};letter-spacing:1px;">PULSE<span style="color:{T.cyan};">.</span></span>
-    <span style="font:11px/1 {T.mono};color:{T.ink3};">—</span>
-    <span style="font:11px/1 {T.mono};color:{T.ink2};">{activeGroupLabel} · {displayItems.length} items</span>
-    <span style="flex:1;"></span>
-    <button onclick={() => searchInputEl?.focus()} aria-label="Search" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" title="Search (/)">
+    <div class="w-[18px]"></div>
+    <span class="text-ink-0 tracking-[1px] font-semibold text-[11px] leading-none font-mono">PULSE<span class="text-cyan">.</span></span>
+    <span class="text-ink-3 text-[11px] leading-none font-mono">—</span>
+    <span class="text-ink-2 text-[11px] leading-none font-mono">{activeGroupLabel} · {displayItems.length} items</span>
+    <span class="flex-1"></span>
+    <button onclick={() => searchInputEl?.focus()} aria-label="Search" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" title="Search (/)">
       <Icon name="search" size={13} color={T.ink1} />
     </button>
-    <button onclick={doSync} aria-label="Sync feeds" style="width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" title="Sync">
+    <button onclick={doSync} aria-label="Sync feeds" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" title="Sync">
       <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={13} color={syncState.syncing ? T.cyan : T.ink1} /></span>
     </button>
-    <button onclick={() => showCheatsheet = !showCheatsheet} aria-label="Keyboard shortcuts (?)" style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink3};padding:0 4px;" title="Keyboard shortcuts (?)">?</button>
+    <button onclick={() => showCheatsheet = !showCheatsheet} aria-label="Keyboard shortcuts (?)" class="bg-transparent border-none cursor-pointer text-ink-3 px-1 text-[10px] leading-none font-mono" title="Keyboard shortcuts (?)">?</button>
   </div>
 
   <!-- Main body -->
   <div
-    style="flex:1;display:flex;overflow:hidden;position:relative;"
+    class="flex-1 flex overflow-hidden relative"
     onmousemove={onMouseMove}
     onmouseup={stopDrag}
     onmouseleave={stopDrag}
@@ -269,8 +269,8 @@
 
     <!-- Left rail -->
     {#if leftRailCollapsed}
-      <div style="width:32px;flex-shrink:0;background:{T.bg1};border-right:1px solid {T.bd0};display:flex;flex-direction:column;align-items:center;padding-top:4px;gap:6px;overflow:hidden;">
-        <button onclick={toggleLeftRail} aria-label="Expand sidebar" title="Expand sidebar" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+      <div class="w-8 shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col items-center pt-1 overflow-hidden gap-1.5">
+        <button onclick={toggleLeftRail} aria-label="Expand sidebar" title="Expand sidebar" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="chev-r" size={13} color={T.ink2} />
         </button>
         {#each groups as g}
@@ -280,40 +280,41 @@
             onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             title={`${g.name} (${g.n})`}
             aria-label={`${g.name} group, ${g.n} items`}
-            style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:{g.id===activeGroup?'rgba(78,205,214,0.12)':'transparent'};border:none;border-radius:3px;cursor:pointer;position:relative;"
+            class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px]"
+            style="background:{g.id===activeGroup?'rgba(78,205,214,0.12)':'transparent'}"
           >
-            <span style="font:700 10px/1 {T.mono};color:{g.id===activeGroup ? T.cyan : T.ink2};">{g.name.slice(0, 2).toUpperCase()}</span>
-            {#if g.n > 0}<span style="position:absolute;top:0;right:0;width:6px;height:6px;border-radius:50%;background:{T.cyan};"></span>{/if}
+            <span class="font-bold text-[10px] leading-none font-mono text-cyan={g.id===activeGroup} text-ink-2={g.id!==activeGroup}">{g.name.slice(0, 2).toUpperCase()}</span>
+            {#if g.n > 0}<span class="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-cyan"></span>{/if}
           </button>
         {/each}
-        <div style="flex:1;"></div>
-        <button onclick={() => { showAI = !showAI; }} aria-label="AI Signal" title="AI Signal" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+        <div class="flex-1"></div>
+        <button onclick={() => { showAI = !showAI; }} aria-label="AI Signal" title="AI Signal" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="cpu" size={13} color={showAI ? T.cyan : T.ink2} />
         </button>
-        <button onclick={() => { showSources = !showSources; }} aria-label="Sources" title="Sources" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+        <button onclick={() => { showSources = !showSources; }} aria-label="Sources" title="Sources" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="rss" size={13} color={showSources ? T.cyan : T.ink2} />
         </button>
-        <button onclick={() => { showSettings = !showSettings; }} aria-label="Settings" title="Settings" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;margin-bottom:6px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+        <button onclick={() => { showSettings = !showSettings; }} aria-label="Settings" title="Settings" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer mb-1.5 rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="cog" size={13} color={showSettings ? T.cyan : T.ink2} />
         </button>
       </div>
     {:else}
-    <div style="width:{leftRailWidth}px;flex-shrink:0;background:{T.bg1};border-right:1px solid {T.bd0};display:flex;flex-direction:column;overflow:hidden;">
+    <div class="shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col overflow-hidden" style="width:{leftRailWidth}px">
       <!-- Collapse toggle -->
-      <div style="display:flex;justify-content:flex-end;padding:2px 4px 0;">
-        <button onclick={toggleLeftRail} aria-label="Collapse sidebar" title="Collapse sidebar" style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:3px;" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+      <div class="flex justify-end pt-0.5 px-1">
+        <button onclick={toggleLeftRail} aria-label="Collapse sidebar" title="Collapse sidebar" class="flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="chev-l" size={12} color={T.ink3} />
         </button>
       </div>
       <!-- Search -->
-      <div style="padding:8px 8px 4px;">
-        <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;">
+      <div class="px-2 pt-2 pb-1">
+        <div class="flex items-center gap-1.5 bg-bg-0 border border-bd-1 p-1.25 px-2 rounded">
           <Icon name="search" size={11} color={T.ink3} />
           <input
             bind:this={searchInputEl}
             bind:value={searchQuery}
             placeholder="search {dbStats.totalItems} items"
-            style="flex:1;font:11px/1 {T.mono};"
+            class="flex-1 text-[11px] leading-none font-mono"
             aria-label="Search items"
           />
           <KeyCap k="/" dim />
@@ -324,27 +325,27 @@
       <FilterPills active={desktopFilter} onChange={handleFilterChange} />
 
       <!-- Groups (vertical) -->
-      <div style="padding:2px 0 4px;border-bottom:1px solid {T.bd0};">
-        <div style="padding:6px 12px 2px;font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">groups</div>
+      <div class="border-b border-bd-0 pt-0.5 pb-1">
+        <div class="uppercase text-ink-3 px-3 pt-1.5 pb-0.5 tracking-[0.6px] text-[10px] leading-none font-mono">groups</div>
         <GroupTabs {groups} active={activeGroup} onSelect={(id) => selectGroup(id)} orientation="vertical" />
       </div>
 
       <!-- Sources accordion -->
-      <Accordion.Root type="multiple" bind:value={accValue} style="border-bottom:1px solid {T.bd0};">
+      <Accordion.Root type="multiple" bind:value={accValue} class="border-b border-bd-0">
         <Accordion.Item value="sources">
           <Accordion.Header>
             <Accordion.Trigger
               onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }}
               onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              style="display:flex;align-items:center;gap:4px;padding:6px 12px;width:100%;background:transparent;border:none;cursor:pointer;text-align:left;"
+              class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3"
               aria-label={`Sources for ${activeGroupLabel}`}
             >
-              <span style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;flex:1;">sources</span>
-              <span style="font:10px/1 {T.mono};color:{T.ink2};">{groupSources.length}</span>
+              <span class="uppercase flex-1 text-ink-3 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
+              <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
               <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
             </Accordion.Trigger>
           </Accordion.Header>
-          <Accordion.Content style="padding:0 8px 6px;">
+          <Accordion.Content class="p-[0_8px_6px]">
             {#each groupSources as s}
               <button
                 onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }}
@@ -353,19 +354,20 @@
                 onmouseleave={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                 onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
                 onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
-                style="display:flex;align-items:center;gap:6px;padding:4px 6px;width:100%;background:{activeSource===s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;border-left:2px solid {activeSource===s.id ? T.cyan : 'transparent'};cursor:pointer;text-align:left;"
+                class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1"
+                style="background:{activeSource===s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border-left:2px solid {activeSource===s.id ? T.cyan : 'transparent'}"
                 aria-current={activeSource===s.id ? 'true' : undefined}
               >
                 <StatusDot status={s.status} size={5} />
-                <span style="font:11px/1.2 {T.mono};color:{activeSource===s.id ? T.ink0 : T.ink1};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{s.name}</span>
-                {#if s.unread > 0}<span style="font:10px/1 {T.mono};color:{T.cyan};">{s.unread}</span>{/if}
+                <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-[11px] leading-[1.2] font-mono" style="color:{activeSource===s.id ? T.ink0 : T.ink1};">{s.name}</span>
+                {#if s.unread > 0}<span class="text-cyan text-[10px] leading-none font-mono">{s.unread}</span>{/if}
               </button>
             {/each}
             <button
               onclick={() => { showSources = !showSources; }}
               onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }}
               onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              style="display:flex;align-items:center;gap:4px;padding:4px 6px;width:100%;background:transparent;border:none;color:{T.ink3};font:10px/1 {T.mono};cursor:pointer;text-align:left;margin-top:2px;"
+              class="flex items-center gap-1 w-full bg-transparent border-none text-ink-3 cursor-pointer text-left px-1.5 py-1 mt-0.5 text-[10px] leading-none font-mono"
             >
               <Icon name="plus" size={10} color={T.ink3} />
               <span>Manage Sources</span>
@@ -375,7 +377,7 @@
       </Accordion.Root>
 
       <!-- Spacer -->
-      <div style="flex:1;"></div>
+      <div class="flex-1"></div>
 
       <!-- Bottom utilities -->
       <BottomTools
@@ -393,31 +395,31 @@
     <DragHandle edge="left" {onDragStart} {dragging} />
 
     <!-- Timeline pane -->
-    <div style="width:{timelineWidth}px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid {T.bd0};overflow:hidden;background:{T.bg0};">
-      <div style="display:flex;flex-direction:column;border-bottom:1px solid {T.bd0};background:{T.bg1};flex-shrink:0;">
-        <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;font:10px/1 {T.mono};color:{T.ink2};">
-          <span style="color:{T.ink0};">{activeSource ? (sources.find(s => s.id === activeSource)?.name ?? activeGroupLabel) : activeGroupLabel}</span>
-          <span style="color:{T.ink3};">·</span>
-          <span><span style="color:{T.cyan};">{unreadCount}</span><span style="color:{T.ink3};"> unread</span></span>
-          {#if searchQuery}<span style="color:{T.ink3};">·</span><span style="color:{T.amber};">"{searchQuery}"</span>{/if}
-          <span style="flex:1;"></span>
+    <div class="shrink-0 flex flex-col border-r border-bd-0 overflow-hidden bg-bg-0" style="width:{timelineWidth}px">
+      <div class="flex flex-col border-b border-bd-0 bg-bg-1 shrink-0">
+        <div class="flex items-center gap-2.5 text-ink-2 px-2.5 py-1.5 text-[10px] leading-none font-mono">
+          <span class="text-ink-0">{activeSource ? (sources.find(s => s.id === activeSource)?.name ?? activeGroupLabel) : activeGroupLabel}</span>
+          <span class="text-ink-3">·</span>
+          <span><span class="text-cyan">{unreadCount}</span><span class="text-ink-3"> unread</span></span>
+          {#if searchQuery}<span class="text-ink-3">·</span><span class="text-amber">"{searchQuery}"</span>{/if}
+          <span class="flex-1"></span>
           {#if unreadCount > 0}
-            <button onclick={() => markAllRead(displayItems.map(i => i.id))} style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink2};">mark all read</button>
+            <button onclick={() => markAllRead(displayItems.map(i => i.id))} class="bg-transparent border-none cursor-pointer text-ink-2 text-[10px] leading-none font-mono">mark all read</button>
           {/if}
         </div>
         {#if activeTag || topTags.length > 0}
-          <div style="display:flex;align-items:center;gap:6px;padding:0 8px 6px;overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;">
+          <div class="flex items-center gap-1.5 overflow-x-auto flex-nowrap px-2 pb-1.5" style="scrollbar-width:none">
             {#if activeTag}
               {@const tc = TAG_COLORS[activeTag] ?? { fg: T.cyan, bg: 'rgba(78,205,214,0.10)', bd: 'rgba(78,205,214,0.30)' }}
-              <button onclick={() => setTagFilter(null)} style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;background:{tc.bg};border:1px solid {tc.bd};border-radius:2px;font:10px/1 {T.mono};color:{tc.fg};cursor:pointer;letter-spacing:0.2px;white-space:nowrap;">
-                <span style="color:{T.ink3};">tag:</span>{activeTag} ×
+              <button onclick={() => setTagFilter(null)} class="shrink-0 inline-flex items-center whitespace-nowrap cursor-pointer gap-1 px-1.75 py-0.5 rounded tracking-[0.2px] text-[10px] leading-none font-mono" style="background:{tc.bg};border:1px solid {tc.bd};color:{tc.fg}">
+                <span class="text-ink-3">tag:</span>{activeTag} ×
               </button>
-              {#if topTags.length > 0}<span style="flex-shrink:0;color:{T.ink3};font:10px/1 {T.mono};">·</span>{/if}
+              {#if topTags.length > 0}<span class="shrink-0 text-ink-3 text-[10px] leading-none font-mono">·</span>{/if}
             {/if}
             {#each topTags as tag}
               {#if tag !== activeTag}
                 {@const tc = TAG_COLORS[tag] ?? { fg: T.ink2, bg: 'transparent', bd: T.bd1 }}
-                <button onclick={() => setActiveTag(tag)} style="flex-shrink:0;display:inline-flex;align-items:center;padding:2px 7px;background:transparent;border:1px solid {T.bd1};border-radius:2px;font:10px/1 {T.mono};color:{tc.fg};cursor:pointer;white-space:nowrap;">{tag}</button>
+                <button onclick={() => setActiveTag(tag)} class="shrink-0 inline-flex items-center bg-transparent whitespace-nowrap cursor-pointer px-1.75 py-0.5 rounded text-[10px] leading-none font-mono border border-bd-1" style="color:{tc.fg}">{tag}</button>
               {/if}
             {/each}
           </div>
@@ -438,99 +440,103 @@
 
     <!-- Detail pane -->
     {#if openItem}
-      <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:{T.bg0};overflow:hidden;">
-        <div style="padding:6px 14px;border-bottom:1px solid {T.bd0};font:10px/1 {T.mono};color:{T.ink2};background:{T.bg1};display:flex;align-items:center;gap:8px;flex-shrink:0;">
+      <div class="flex-1 min-w-0 flex flex-col bg-bg-0 overflow-hidden">
+        <div class="border-b border-bd-0 bg-bg-1 flex items-center gap-2 shrink-0 text-ink-2 px-3.5 py-1.5 text-[10px] leading-none font-mono">
           {#if openSource}
             <SourceGlyph kind={openSource.kind} />
-            <span style="color:{T.ink1};">{openSource.name}</span>
-            <span style="color:{T.ink3};">·</span>
+            <span class="text-ink-1">{openSource.name}</span>
+            <span class="text-ink-3">·</span>
           {/if}
           <span>{openItem.author}</span>
-          <span style="color:{T.ink3};">·</span>
+          <span class="text-ink-3">·</span>
           <span>{openItem.age}</span>
-          {#if openItem.score > 0}<span style="color:{T.ink3};">·</span><span style="color:{T.amber};">▲{openItem.score}</span>{/if}
-          {#if openItem.n > 0}<span style="color:{T.ink3};">·</span><span style="color:{T.ink2};">{openItem.n}c</span>{/if}
+          {#if openItem.score > 0}<span class="text-ink-3">·</span><span class="text-amber">▲{openItem.score}</span>{/if}
+          {#if openItem.n > 0}<span class="text-ink-3">·</span><span class="text-ink-2">{openItem.n}c</span>{/if}
         </div>
 
         <ReaderView itemId={openItem.id} noteMode="inline" onTagClick={setActiveTag} onPopoverChange={(open) => { popoverOpen = open; }} showMetadata={false} isDesktop={true} />
 
-        <div style="display:flex;border-top:1px solid {T.bd1};background:{T.bg1};flex-shrink:0;">
+        <div class="flex border-t border-bd-1 bg-bg-1 shrink-0">
           <button
             onclick={() => markRead(openItem!.id, !openItem!.read)}
-            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;background:transparent;border:none;color:{openItem.read ? T.green : T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;"
+            class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer gap-0.75 py-2 tracking-[0.3px] text-[10px] leading-none font-mono"
+            class:text-green={openItem.read}
+            class:text-ink-2={!openItem.read}
           >
-            <div style="display:flex;align-items:center;gap:4px;">
+            <div class="flex items-center gap-1">
               <Icon name="check" size={14} color={openItem.read ? T.green : T.ink1} />
               <KeyCap k="m" dim />
             </div>
-            <span style="text-transform:uppercase;">{openItem.read ? 'unread' : 'read'}</span>
+            <span class="uppercase">{openItem.read ? 'unread' : 'read'}</span>
           </button>
           <button
             onclick={() => toggleSaved(openItem!.id)}
-            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;background:transparent;border:none;color:{openItem.saved ? T.amber : T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;"
+            class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer gap-0.75 py-2 tracking-[0.3px] text-[10px] leading-none font-mono"
+            class:text-amber={openItem.saved}
+            class:text-ink-2={!openItem.saved}
           >
-            <div style="display:flex;align-items:center;gap:4px;">
+            <div class="flex items-center gap-1">
               <Icon name="bookmark" size={14} color={openItem.saved ? T.amber : T.ink1} />
               <KeyCap k="s" dim />
             </div>
-            <span style="text-transform:uppercase;">{openItem.saved ? 'saved' : 'save'}</span>
+            <span class="uppercase">{openItem.saved ? 'saved' : 'save'}</span>
           </button>
           {#if openItem.url}
             <button
-              onclick={() => openExternal(openItem!.url!)}
-              style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;background:transparent;border:none;color:{T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;"
+            onclick={() => openExternal(openItem!.url!)}
+            class="flex-1 flex flex-col items-center bg-transparent border-none text-ink-2 cursor-pointer gap-0.75 py-2 tracking-[0.3px] text-[10px] leading-none font-mono"
             >
-              <div style="display:flex;align-items:center;gap:4px;">
+              <div class="flex items-center gap-1">
                 <Icon name="ext" size={14} color={T.ink1} />
                 <KeyCap k="o" dim />
               </div>
-              <span style="text-transform:uppercase;">open</span>
+              <span class="uppercase">open</span>
             </button>
           {/if}
           <button
             onclick={() => shareItem(openItem!.title, openItem!.url ?? openItem!.externalUrl)}
-            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;background:transparent;border:none;color:{T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;"
-          >
-            <div style="display:flex;align-items:center;gap:4px;">
-              <Icon name="share" size={14} color={T.ink1} />
-            </div>
-            <span style="text-transform:uppercase;">share</span>
-          </button>
+            class="flex-1 flex flex-col items-center bg-transparent border-none text-ink-2 cursor-pointer gap-0.75 py-2 tracking-[0.3px] text-[10px] leading-none font-mono"
+            >
+              <div class="flex items-center gap-1">
+                <Icon name="share" size={14} color={T.ink1} />
+              </div>
+              <span class="uppercase">share</span>
+            </button>
           <button
             onclick={() => { const cur = displayItems.findIndex(i => i.id === openItem!.id); const fallback = displayItems[Math.max(0, cur - 1)]; hideItem(openItem!.id); openId = (fallback && fallback.id !== openItem!.id) ? fallback.id : ''; }}
-            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;background:transparent;border:none;color:{T.red};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.3px;"
+            class="flex-1 flex flex-col items-center bg-transparent border-none text-red cursor-pointer gap-0.75 py-2 tracking-[0.3px] text-[10px] leading-none font-mono"
           >
-            <div style="display:flex;align-items:center;gap:4px;">
+            <div class="flex items-center gap-1">
               <Icon name="eye-off" size={14} color={T.red} />
               <KeyCap k="x" dim />
             </div>
-            <span style="text-transform:uppercase;">hide</span>
+            <span class="uppercase">hide</span>
           </button>
         </div>
       </div>
     {:else}
-      <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:{T.ink3};font:11px/1 {T.mono};">
+      <div class="flex-1 flex items-center justify-center flex-col gap-2 text-ink-3 text-[11px] leading-none font-mono">
         <span>select an item</span>
-        <span style="font:10px/1 {T.mono};color:{T.ink4};">j/k to navigate · / to search</span>
+        <span class="text-ink-4 text-[10px] leading-none font-mono">j/k to navigate · / to search</span>
       </div>
     {/if}
 
     <!-- AI signal modal -->
     <Modal open={showAI} title="AI Signal" onClose={() => { showAI = false; }} width="480px">
       {#if openItem && openItem.tags.length > 0}
-        <div style="padding:10px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;margin-bottom:14px;">
-          <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:8px;">current item</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <span style="font:10px/1 {T.mono};color:{T.ink2};">signal</span>
-            <div style="flex:1;height:3px;background:{T.bg3};border-radius:2px;overflow:hidden;">
-              <div style="height:100%;width:{openItem.aiScore * 100}%;background:{T.cyan};border-radius:2px;"></div>
+        <div class="bg-bg-1 border border-bd-0 rounded p-2.5 mb-3.5">
+          <div class="text-ink-3 uppercase mb-2 tracking-[0.6px] text-[10px] leading-none font-mono">current item</div>
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-ink-2 text-[10px] leading-none font-mono">signal</span>
+            <div class="flex-1 bg-bg-3 overflow-hidden rounded-sm h-[3px]">
+              <div class="h-full bg-cyan rounded-sm" style="width:{openItem.aiScore * 100}%"></div>
             </div>
-            <span style="font:10px/1 {T.mono};color:{T.amber};font-variant-numeric:tabular-nums;">{openItem.aiScore.toFixed(2)}</span>
+            <span class="text-amber tabular-nums text-[10px] leading-none font-mono">{openItem.aiScore.toFixed(2)}</span>
           </div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px;">
+          <div class="flex flex-wrap gap-1.25">
             {#each openItem.tags as tag}
               {@const tc = TAG_COLORS[tag] ?? { fg: T.ink2, bg: 'transparent', bd: T.bd1 }}
-              <span style="font:10px/1 {T.mono};color:{tc.fg};background:{tc.bg};border:1px solid {tc.bd};border-radius:3px;padding:3px 7px;">{tag}</span>
+              <span class="rounded px-1.75 py-0.75 text-[10px] leading-none font-mono" style="color:{tc.fg};background:{tc.bg};border:1px solid {tc.bd}">{tag}</span>
             {/each}
           </div>
         </div>
@@ -550,7 +556,7 @@
 
     <!-- Keyboard shortcut cheatsheet -->
     <Modal open={showCheatsheet} title="Keyboard Shortcuts" onClose={() => showCheatsheet = false} width="440px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">
+      <div class="grid grid-cols-2 gap-x-6">
         {#each [
           { k: '/',       desc: 'focus search'      },
           { k: 'j / ↓',  desc: 'next item'         },
@@ -563,13 +569,13 @@
           { k: 'r',       desc: 'sources'           },
           { k: 'Esc',     desc: 'clear / close'     },
         ] as sc}
-          <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid {T.bd0};">
+          <div class="flex items-center gap-2.5 border-b border-bd-0 py-1.5">
             <KeyCap k={sc.k} />
-            <span style="font:11px/1 {T.mono};color:{T.ink2};">{sc.desc}</span>
+            <span class="text-ink-2 text-[11px] leading-none font-mono">{sc.desc}</span>
           </div>
         {/each}
       </div>
-      <div style="margin-top:12px;font:10px/1 {T.mono};color:{T.ink3};text-align:center;">press ? or Esc to close</div>
+      <div class="mt-3 text-ink-3 text-center text-[10px] leading-none font-mono">press ? or Esc to close</div>
     </Modal>
   </div>
 

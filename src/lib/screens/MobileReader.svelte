@@ -139,29 +139,30 @@
 <svelte:window onkeydown={handleKey} />
 
 {#if item}
-  <div style="position:relative;display:flex;flex-direction:column;height:100%;background:{T.bg0};color:{T.ink0};">
+  <div class="relative flex flex-col h-full bg-bg-0 text-ink-0">
 
     <!-- Top bar -->
-    <div style="height:44px;display:flex;align-items:center;padding:0 8px;border-bottom:1px solid {T.bd0};background:{T.bg1};flex-shrink:0;gap:6px;">
+    <div class="h-11 flex items-center gap-1.5 shrink-0 bg-bg-1 border-b border-bd-0 px-2">
       <button
         onclick={onBack}
-        style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:4px;">
+        class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-8.5 h-8.5">
         <Icon name="arrow-l" size={18} color={T.ink1} />
       </button>
-      <span style="font:11px/1 {T.mono};color:{T.ink2};flex:1;">
-        reader · {idx + 1}<span style="color:{T.ink3};">/{allIds.length}</span>
+      <span class="text-ink-2 flex-1 text-[11px] leading-none font-mono">
+        reader · {idx + 1}<span class="text-ink-3">/{allIds.length}</span>
       </span>
-      <button onclick={goPrev} disabled={!hasPrev} style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:4px;opacity:{hasPrev ? 1 : 0.3};">
+      <button onclick={goPrev} disabled={!hasPrev} class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-8.5 h-8.5" style="opacity:{hasPrev ? 1 : 0.3};">
         <Icon name="arrow-up" size={18} color={T.ink1} />
       </button>
-      <button onclick={goNext} disabled={!hasNext} style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:4px;opacity:{hasNext ? 1 : 0.3};">
+      <button onclick={goNext} disabled={!hasNext} class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-8.5 h-8.5" style="opacity:{hasNext ? 1 : 0.3};">
         <Icon name="arrow-dn" size={18} color={T.ink1} />
       </button>
     </div>
 
     <!-- Scrollable body -->
     <div
-      style="flex:1;overflow-y:auto;touch-action:pan-y;
+      class="flex-1 overflow-y-auto touch-pan-y"
+      style="
         transform: translateX({navDir ? 0 : swipeX}px);
         transition: transform {swipeTransition && !navDir ? '0.2s ease-out' : 'none'};
         animation: {navDir > 0 ? 'reader-slide-in-next' : navDir < 0 ? 'reader-slide-in-prev' : 'none'} 0.22s ease-out;"
@@ -175,11 +176,11 @@
 
     <!-- Save toast -->
     {#if saveToast}
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid {T.bd0};background:{T.bg1};font:11px/1 {T.mono};color:{T.ink1};flex-shrink:0;">
-        <span>Saved <span style="color:{T.amber};">{source?.name ?? item.src}</span> post</span>
+      <div class="flex items-center justify-between bg-bg-1 text-ink-1 shrink-0 p-2 px-3 border-t border-t-bd-0 text-[11px] leading-none font-mono">
+        <span>Saved <span class="text-amber">{source?.name ?? item.src}</span> post</span>
         <button
           onclick={() => { saveToast = false; noteDraft = item?.note ?? ''; noteSheetOpen = true; }}
-          style="background:transparent;border:none;cursor:pointer;font:11px/1 {T.mono};color:{T.cyan};padding:2px 6px;"
+          class="bg-transparent border-none cursor-pointer text-cyan py-0.5 px-1.5 text-[11px] leading-none font-mono"
         >
           add note
         </button>
@@ -187,87 +188,87 @@
     {/if}
 
     <!-- Action bar -->
-    <div style="display:flex;border-top:1px solid {T.bd1};background:{T.bg1};flex-shrink:0;">
+    <div class="flex bg-bg-1 shrink-0 border-t border-t-bd-1">
       <button
         onclick={() => markRead(item.id, !item.read)}
-        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{item.read ? T.green : T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono" style="color:{item.read ? T.green : T.ink2};"
       >
-        <div style="display:flex;align-items:center;gap:4px;">
+        <div class="flex items-center gap-1">
           <Icon name="check" size={16} color={item.read ? T.green : T.ink1} />
           <KeyCap k="m" dim />
         </div>
-        <span style="text-transform:uppercase;">{item.read ? 'unread' : 'read'}</span>
+        <span class="uppercase">{item.read ? 'unread' : 'read'}</span>
       </button>
       <button
         onclick={() => { toggleSaved(item.id); showSaveToast(); }}
         ontouchstart={startSavePress}
         ontouchend={endSavePress}
         ontouchcancel={cancelSavePress}
-        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{item.saved ? T.amber : T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono" style="color:{item.saved ? T.amber : T.ink2};"
       >
-        <div style="display:flex;align-items:center;gap:4px;">
+        <div class="flex items-center gap-1">
           <Icon name="bookmark" size={16} color={item.saved ? T.amber : T.ink1} />
-          {#if item.note}<span style="font:10px/1 {T.mono};color:{T.amber};">*</span>{/if}
+          {#if item.note}<span class="text-amber text-[10px] leading-none font-mono">*</span>{/if}
           <KeyCap k="s" dim />
         </div>
-        <span style="text-transform:uppercase;">{item.saved ? 'saved' : 'save'}</span>
+        <span class="uppercase">{item.saved ? 'saved' : 'save'}</span>
       </button>
       <button
         onclick={() => item.url && openExternal(item.url)}
-        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer text-ink-2 gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono"
         title={item.domain ? `Open https://${item.domain}` : undefined}
       >
-        <div style="display:flex;align-items:center;gap:4px;">
+        <div class="flex items-center gap-1">
           <Icon name="ext" size={16} color={T.ink1} />
           <KeyCap k="o" dim />
         </div>
-        <span style="text-transform:uppercase;">open</span>
+        <span class="uppercase">open</span>
       </button>
       <button
         onclick={() => shareItem(item.title, item.url ?? item.externalUrl)}
-        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.ink2};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer text-ink-2 gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono"
       >
-        <div style="display:flex;align-items:center;gap:4px;">
+        <div class="flex items-center gap-1">
           <Icon name="share" size={16} color={T.ink1} />
         </div>
-        <span style="text-transform:uppercase;">share</span>
+        <span class="uppercase">share</span>
       </button>
       <button
         onclick={() => { hideItem(item.id); onBack(); }}
-        style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:transparent;border:none;color:{T.red};cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;min-height:52px;"
+        class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer text-red gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono"
       >
-        <div style="display:flex;align-items:center;gap:4px;">
+        <div class="flex items-center gap-1">
           <Icon name="eye-off" size={16} color={T.red} />
           <KeyCap k="h" dim />
         </div>
-        <span style="text-transform:uppercase;">hide</span>
+        <span class="uppercase">hide</span>
       </button>
     </div>
 
     <!-- Note input sheet -->
       <Dialog.Root open={noteSheetOpen} onOpenChange={(open) => { if (!open) noteSheetOpen = false; }}>
         <Dialog.Portal>
-          <Dialog.Overlay style="position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:20;" />
+          <Dialog.Overlay class="absolute inset-0 bg-black/55 z-20" />
           <Dialog.Content
             preventScroll={false}
-            style="position:absolute;bottom:0;left:0;right:0;width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};z-index:20;"
+            class="absolute bg-bg-2 text-ink-0 bottom-0 left-0 right-0 w-full p-[14px_14px_24px] z-20 border-t border-t-bd-1 text-[12px] leading-[1.4] font-sans"
           >
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-              <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.5px;">note</span>
-              <Dialog.Close style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
+            <div class="flex items-center justify-between mb-2.5">
+              <span class="uppercase tracking-[0.5px] text-[10px] leading-none font-mono text-ink-3">note</span>
+              <Dialog.Close class="bg-transparent border-none text-ink-2 cursor-pointer flex">
                 <Icon name="x" size={14} />
               </Dialog.Close>
             </div>
             <textarea
               bind:value={noteDraft}
               placeholder="Add a note about this post…"
-              style="width:100%;min-height:80px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;padding:10px;font:12px/1.5 {T.sans};color:{T.ink0};resize:vertical;box-sizing:border-box;"
+              class="w-full box-border min-h-20 rounded p-2.5 resize-y bg-bg-0 border border-bd-1 text-[12px] leading-normal font-sans text-ink-0"
             ></textarea>
-            <div style="margin-top:12px;display:flex;gap:8px;">
-              <Dialog.Close style="flex:1;padding:10px 0;background:transparent;color:{T.ink1};border:1px solid {T.bd2};border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;">cancel</Dialog.Close>
+            <div class="flex gap-2 mt-3">
+              <Dialog.Close class="flex-1 bg-transparent text-ink-1 border border-bd-2 cursor-pointer py-2.5 rounded tracking-[0.3px] text-[11px] leading-none font-mono">cancel</Dialog.Close>
               <button
                 onclick={saveWithNote}
-                style="flex:1;padding:10px 0;background:{T.amber};color:{T.bg0};border:none;border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;"
+                class="flex-1 bg-amber text-bg-0 border-none cursor-pointer py-2.5 rounded tracking-[0.3px] text-[11px] leading-none font-mono"
               >save with note</button>
             </div>
           </Dialog.Content>
@@ -275,7 +276,7 @@
       </Dialog.Root>
   </div>
 {:else}
-  <div style="height:100%;display:flex;align-items:center;justify-content:center;color:{T.ink3};font:11px/1 {T.mono};">
+  <div class="h-full flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">
     item not found
   </div>
 {/if}

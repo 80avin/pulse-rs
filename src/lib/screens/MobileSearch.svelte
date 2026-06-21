@@ -10,7 +10,7 @@
   } = $props();
 </script>
 
-<div style="display:flex;flex-direction:column;height:100%;background:{T.bg0};color:{T.ink0};">
+<div class="flex flex-col h-full bg-bg-0 text-ink-0">
   <SearchView onItemOpen={(id, ids) => onOpen(id, ids)} />
   <PulseBottomNav active={tab} onChange={onTabChange} />
 </div>

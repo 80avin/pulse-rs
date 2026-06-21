@@ -8,6 +8,8 @@
   import KeyCap from '$lib/components/KeyCap.svelte';
   import ThemeSection from '$lib/components/ThemeSection.svelte';
   import SettingsSection from '$lib/components/SettingsSection.svelte';
+  import ToggleSwitch from '$lib/components/ToggleSwitch.svelte';
+  import SegmentedControl from '$lib/components/SegmentedControl.svelte';
   import { version } from '$app/environment';
   import { openExternal, shareItem } from '$lib/utils';
 
@@ -135,40 +137,17 @@
   }
 </script>
 
-{#snippet toggle(on: boolean, change: () => void)}
-  <button
-    onclick={change}
-    role="switch"
-    aria-checked={on}
-    aria-label={on ? 'on' : 'off'}
-    style="width:44px;height:24px;border-radius:12px;border:none;cursor:pointer;background:{on ? T.cyan : T.bg3};position:relative;flex-shrink:0;transition:background 0.15s;"
-  >
-    <span style="position:absolute;top:3px;left:{on ? '23px' : '3px'};width:18px;height:18px;border-radius:9px;background:{on ? T.bg0 : T.ink3};transition:left 0.15s;"></span>
-  </button>
-{/snippet}
-
-{#snippet seg(options: string[], active: string, change: (v: string) => void)}
-  <div style="display:flex;gap:3px;background:{T.bg0};border:1px solid {T.bd1};border-radius:4px;padding:2px;">
-    {#each options as opt}
-      <button
-        onclick={() => change(opt)}
-        style="flex:1;padding:5px 4px;border:none;border-radius:3px;cursor:pointer;font:10px/1 {T.mono};letter-spacing:0.4px;text-transform:uppercase;background:{opt === active ? T.bg3 : 'transparent'};color:{opt === active ? T.cyan : T.ink2};"
-      >{opt}</button>
-    {/each}
-  </div>
-{/snippet}
-
 <SettingsSection label="overview">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+  <div class="grid grid-cols-2 gap-2">
     {#each [
       { label: 'items',       val: String(dbStats.totalItems),   color: T.cyan  },
       { label: 'unread',      val: String(dbStats.unreadItems),  color: T.cyan  },
       { label: 'saved',       val: String(dbStats.savedItems),   color: T.amber },
       { label: 'sources ok',  val: `${okCount}/${sources.length}`, color: errCount > 0 ? T.amber : T.green },
     ] as stat}
-      <div style="padding:8px;background:{T.bg0};border:1px solid {T.bd0};border-radius:3px;">
-        <div style="font:16px/1 {T.mono};color:{stat.color};font-variant-numeric:tabular-nums;">{stat.val}</div>
-        <div style="margin-top:5px;font:10px/1 {T.mono};color:{T.ink3};">{stat.label}</div>
+      <div class="p-2 bg-bg-0 border border-bd-0 rounded">
+        <div class="tabular-nums text-[16px] leading-none font-mono" style="color:{stat.color};">{stat.val}</div>
+        <div class="mt-1.5 text-ink-3 text-[10px] leading-none font-mono">{stat.label}</div>
       </div>
     {/each}
   </div>
@@ -179,114 +158,110 @@
 </SettingsSection>
 
 <SettingsSection label="reading">
-  <div style="display:flex;flex-direction:column;gap:10px;">
+  <div class="flex flex-col gap-2.5">
     <div>
-      <div style="font:11px/1 {T.mono};color:{T.ink1};margin-bottom:6px;">Mark as read</div>
-      {@render seg(['open','never'], settings.markReadOn, v => { settings.markReadOn = v as typeof settings.markReadOn; })}
+      <div class="text-ink-1 mb-1.5 text-[11px] leading-none font-mono">Mark as read</div>
+      <SegmentedControl options={['open','never']} active={settings.markReadOn} onChange={v => { settings.markReadOn = v as typeof settings.markReadOn; }} />
     </div>
   </div>
 </SettingsSection>
 
 <SettingsSection label="sync">
-  <div style="display:flex;flex-direction:column;gap:10px;">
+  <div class="flex flex-col gap-2.5">
     <div>
-      <div style="font:11px/1 {T.mono};color:{T.ink1};margin-bottom:6px;">Interval (minutes)</div>
-      {@render seg(['5','15','30','60'], String(settings.syncIntervalMin), v => { settings.syncIntervalMin = Number(v) as typeof settings.syncIntervalMin; })}
+      <div class="text-ink-1 mb-1.5 text-[11px] leading-none font-mono">Interval (minutes)</div>
+      <SegmentedControl options={['5','15','30','60']} active={String(settings.syncIntervalMin)} onChange={v => { settings.syncIntervalMin = Number(v) as typeof settings.syncIntervalMin; }} />
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="flex:1;font:11px/1 {T.mono};color:{T.ink1};">Wi-Fi only</span>
-      {@render toggle(settings.wifiOnly, () => { settings.wifiOnly = !settings.wifiOnly; })}
+    <div class="flex items-center gap-2">
+      <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">Wi-Fi only</span>
+      <ToggleSwitch on={settings.wifiOnly} change={() => { settings.wifiOnly = !settings.wifiOnly; }} />
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="flex:1;font:11px/1 {T.mono};color:{T.ink1};">Background sync</span>
-      {@render toggle(settings.backgroundSync, () => { settings.backgroundSync = !settings.backgroundSync; })}
+    <div class="flex items-center gap-2">
+      <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">Background sync</span>
+      <ToggleSwitch on={settings.backgroundSync} change={() => { settings.backgroundSync = !settings.backgroundSync; }} />
     </div>
   </div>
 </SettingsSection>
 
 <!-- AI -->
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-    <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">ai tagging</div>
-    <div style="font:10px/1 {T.mono};color:{T.amber};letter-spacing:0.5px;text-transform:uppercase;padding:2px 5px;border:1px solid {T.amber};border-radius:2px;opacity:0.8;">experimental</div>
+<SettingsSection label="ai tagging">
+  <div class="flex items-center gap-2 mb-2.5">
+    <div class="text-ink-3 uppercase text-[10px] leading-none font-mono tracking-[0.6px]">ai tagging</div>
+    <div class="text-amber uppercase opacity-80 text-[10px] leading-none font-mono tracking-[0.5px] p-[2px_5px] border border-amber rounded-sm">experimental</div>
   </div>
-  <div style="margin-bottom:10px;font:10px/1.5 {T.mono};color:{T.ink3};">Tags may be inaccurate. Raise the confidence threshold or disable tagging if results look wrong.</div>
-  <div style="display:flex;flex-direction:column;gap:10px;">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="flex:1;font:11px/1 {T.mono};color:{T.ink1};">AI tagging</span>
-      {@render toggle(settings.aiTagging, () => { settings.aiTagging = !settings.aiTagging; })}
+  <div class="mb-2.5 text-ink-3 text-[10px] leading-normal font-mono">Tags may be inaccurate. Raise the confidence threshold or disable tagging if results look wrong.</div>
+  <div class="flex flex-col gap-2.5">
+    <div class="flex items-center gap-2">
+      <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">AI tagging</span>
+      <ToggleSwitch on={settings.aiTagging} change={() => { settings.aiTagging = !settings.aiTagging; }} />
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="flex:1;font:11px/1 {T.mono};color:{T.ink1};">Model</span>
-      <span style="font:11px/1 {T.mono};color:{aiStatus.taggingMode !== 'none' ? T.cyan : T.amber};">{aiStatus.taggingMode === 'none' ? 'not loaded' : aiStatus.taggingMode}</span>
+    <div class="flex items-center gap-2">
+      <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">Model</span>
+      <span class="text-[11px] leading-none font-mono" style="color:{aiStatus.taggingMode !== 'none' ? T.cyan : T.amber};">{aiStatus.taggingMode === 'none' ? 'not loaded' : aiStatus.taggingMode}</span>
     </div>
     <div>
-      <div style="font:11px/1 {T.mono};color:{T.ink1};margin-bottom:6px;">Confidence threshold: <span style="color:{T.cyan};">{settings.confidenceThreshold.toFixed(2)}</span></div>
-      <input type="range" min="0.1" max="0.9" step="0.05" bind:value={settings.confidenceThreshold} style="width:100%;accent-color:{T.cyan};" />
+      <div class="text-ink-1 mb-1.5 text-[11px] leading-none font-mono">Confidence threshold: <span class="text-cyan">{settings.confidenceThreshold.toFixed(2)}</span></div>
+      <input type="range" min="0.1" max="0.9" step="0.05" bind:value={settings.confidenceThreshold} class="w-full" style="accent-color:{T.cyan};" />
     </div>
   </div>
-</div>
+</SettingsSection>
 
 <!-- Notifications -->
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">notifications</div>
-  <div style="display:flex;flex-direction:column;gap:10px;">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="flex:1;font:11px/1 {T.mono};color:{T.ink1};">High-signal items</span>
-      {@render toggle(settings.notifyHighSignal, () => { settings.notifyHighSignal = !settings.notifyHighSignal; })}
+<SettingsSection label="notifications">
+  <div class="flex flex-col gap-2.5">
+    <div class="flex items-center gap-2">
+      <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">High-signal items</span>
+      <ToggleSwitch on={settings.notifyHighSignal} change={() => { settings.notifyHighSignal = !settings.notifyHighSignal; }} />
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="flex:1;font:11px/1 {T.mono};color:{T.ink1};">Saved item updates</span>
-      {@render toggle(settings.notifySaved, () => { settings.notifySaved = !settings.notifySaved; })}
+    <div class="flex items-center gap-2">
+      <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">Saved item updates</span>
+      <ToggleSwitch on={settings.notifySaved} change={() => { settings.notifySaved = !settings.notifySaved; }} />
     </div>
   </div>
-</div>
+</SettingsSection>
 
 <!-- Keyboard shortcuts (desktop only) -->
 {#if showShortcuts}
-  <div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-    <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">keyboard shortcuts</div>
-    <div style="display:flex;flex-direction:column;gap:6px;">
+  <SettingsSection label="keyboard shortcuts">
+    <div class="flex flex-col gap-1.5">
       {#each [['j / k', 'navigate items'], ['m', 'toggle read'], ['s', 'save / unsave'], ['o', 'open link'], ['h', 'hide item'], ['a', 'toggle ai panel'], ['/', 'focus search'], ['Esc', 'clear / close']] as [k, label]}
-        <div style="display:flex;align-items:center;gap:8px;font:10px/1 {T.mono};color:{T.ink2};">
+        <div class="flex items-center gap-2 text-ink-2 text-[10px] leading-none font-mono">
           <KeyCap {k} dim />
           <span>{label}</span>
         </div>
       {/each}
     </div>
-  </div>
+  </SettingsSection>
 {/if}
 
-<!-- Storage + About -->
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">storage</div>
-  <div style="font:11px/1.4 {T.mono};color:{T.ink1};">{dbStats.totalItems} items · {sources.length} sources</div>
-  <div style="margin-top:4px;font:10px/1.4 {T.mono};color:{T.ink3};">SQLite WAL{dbStats.dbSizeKb > 0 ? ` · ${dbStats.dbSizeKb >= 1024 ? (dbStats.dbSizeKb/1024).toFixed(1)+' MB' : dbStats.dbSizeKb+' KB'}` : ''}</div>
-</div>
+<!-- Storage -->
+<SettingsSection label="storage">
+  <div class="text-ink-1 text-[11px] leading-[1.4] font-mono">{dbStats.totalItems} items · {sources.length} sources</div>
+  <div class="mt-1 text-ink-3 text-[10px] leading-[1.4] font-mono">SQLite WAL{dbStats.dbSizeKb > 0 ? ` · ${dbStats.dbSizeKb >= 1024 ? (dbStats.dbSizeKb/1024).toFixed(1)+' MB' : dbStats.dbSizeKb+' KB'}` : ''}</div>
+</SettingsSection>
 
 <!-- Diagnostics -->
 {#if IS_TAURI}
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">diagnostics</div>
-  <div style="display:flex;flex-direction:column;gap:10px;">
+<SettingsSection label="diagnostics">
+  <div class="flex flex-col gap-2.5">
 
     <!-- Verbose logging toggle -->
-    <div style="display:flex;align-items:center;gap:8px;">
-      <div style="flex:1;">
-        <div style="font:11px/1 {T.mono};color:{T.ink1};">Verbose logging</div>
-        <div style="margin-top:3px;font:10px/1.4 {T.mono};color:{T.ink3};">Logs per-item tagging, sync steps, and inference calls. Enable before reproducing a bug.</div>
+    <div class="flex items-center gap-2">
+      <div class="flex-1">
+        <div class="text-ink-1 text-[11px] leading-none font-mono">Verbose logging</div>
+        <div class="mt-0.75 text-ink-3 text-[10px] leading-[1.4] font-mono">Logs per-item tagging, sync steps, and inference calls. Enable before reproducing a bug.</div>
       </div>
-      {@render toggle(settings.verboseLogging, () => { settings.verboseLogging = !settings.verboseLogging; })}
+      <ToggleSwitch on={settings.verboseLogging} change={() => { settings.verboseLogging = !settings.verboseLogging; }} />
     </div>
 
     <!-- Desktop: show log path + open folder -->
     {#if IS_DESKTOP}
       {#if logPath}
-        <div style="font:10px/1.4 {T.mono};color:{T.ink3};word-break:break-all;">Logs: {logPath}</div>
+        <div class="text-ink-3 wrap-break-word text-[10px] leading-[1.4] font-mono">Logs: {logPath}</div>
       {/if}
       <button
         onclick={handleOpenLogsFolder}
-        style="display:flex;align-items:center;gap:6px;width:100%;padding:8px 10px;background:transparent;border:1px solid {T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{T.ink1};cursor:pointer;text-align:left;"
+        class="flex items-center gap-1.5 w-full py-2 px-2.5 bg-transparent border border-bd-1 rounded text-ink-1 cursor-pointer text-left text-[10px] leading-none font-mono"
       >
         <Icon name="ext" size={11} color={T.ink2} />
         Open logs folder
@@ -298,7 +273,7 @@
       <button
         onclick={handleShareLogs}
         disabled={sharingLogs}
-        style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px 10px;background:transparent;border:1px solid {T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{sharingLogs ? T.ink3 : shareStatus === 'error' ? T.amber : T.ink1};cursor:{sharingLogs ? 'default' : 'pointer'};"
+        class="flex items-center justify-center gap-1.5 w-full py-2 px-2.5 bg-transparent border border-bd-1 rounded text-left text-[10px] leading-none font-mono" style="color:{sharingLogs ? T.ink3 : shareStatus === 'error' ? T.amber : T.ink1};cursor:{sharingLogs ? 'default' : 'pointer'};"
       >
         {#if sharingLogs}
           <span class="syncing"><Icon name="sync" size={11} color={T.ink3} /></span>
@@ -308,86 +283,84 @@
     {/if}
 
   </div>
-</div>
+</SettingsSection>
 {/if}
 
 <!-- Performance -->
 {#if IS_TAURI}
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">performance</div>
+<SettingsSection label="performance">
   {#if coldstartTiming.data}
     {@const d = coldstartTiming.data}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div class="grid grid-cols-2 gap-2">
       {#each [
         { label: 'cold start',  val: `${d.totalMs} ms`, color: d.totalMs < 300 ? T.green : d.totalMs < 700 ? T.amber : T.red },
         { label: 'ipc latency', val: `${d.ipcMs} ms`,   color: d.ipcMs   < 200 ? T.green : d.ipcMs   < 500 ? T.amber : T.red },
         { label: 'items',       val: String(d.itemCount),   color: T.cyan },
         { label: 'sources',     val: String(d.sourceCount), color: T.cyan },
       ] as stat}
-        <div style="padding:8px;background:{T.bg0};border:1px solid {T.bd0};border-radius:3px;">
-          <div style="font:16px/1 {T.mono};color:{stat.color};font-variant-numeric:tabular-nums;">{stat.val}</div>
-          <div style="margin-top:5px;font:10px/1 {T.mono};color:{T.ink3};">{stat.label}</div>
+        <div class="p-2 bg-bg-0 border border-bd-0 rounded">
+          <div class="tabular-nums text-[16px] leading-none font-mono" style="color:{stat.color};">{stat.val}</div>
+          <div class="mt-1.5 text-ink-3 text-[10px] leading-none font-mono">{stat.label}</div>
         </div>
       {/each}
     </div>
     {#if d.attempt > 0}
-      <div style="margin-top:8px;font:10px/1.4 {T.mono};color:{T.amber};">loaded on retry {d.attempt} (bridge delay: {d.waitMs} ms)</div>
+      <div class="mt-2 text-amber text-[10px] leading-[1.4] font-mono">loaded on retry {d.attempt} (bridge delay: {d.waitMs} ms)</div>
     {/if}
   {:else}
-    <div style="font:10px/1.4 {T.mono};color:{T.ink3};">loading…</div>
+    <div class="text-ink-3 text-[10px] leading-[1.4] font-mono">loading…</div>
   {/if}
-</div>
+</SettingsSection>
 {/if}
 
 <!-- About -->
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
-  <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">about</div>
-  <div style="font:11px/1.5 {T.mono};color:{T.ink2};">Pulse <span style="color:{T.cyan};">{version}</span></div>
-  <div style="margin-top:2px;font:10px/1.5 {T.mono};color:{T.ink3};">Tauri 2 · Svelte 5 · Rust · MIT</div>
-  <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
+<SettingsSection label="about">
+  <div class="text-ink-2 text-[11px] leading-normal font-mono">Pulse <span class="text-cyan">{version}</span></div>
+  <div class="mt-0.5 text-ink-3 text-[10px] leading-normal font-mono">Tauri 2 · Svelte 5 · Rust · MIT</div>
+  <div class="mt-2.5 flex flex-col gap-1.5">
     <button
       onclick={() => openExternal('https://github.com/80avin/pulse-rs')}
-      style="display:flex;align-items:center;gap:6px;background:transparent;border:none;cursor:pointer;padding:0;font:10px/1 {T.mono};color:{T.cyan};text-align:left;"
+      class="flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 text-cyan text-left text-[10px] leading-none font-mono"
     >
       <Icon name="ext" size={11} color={T.cyan} />
       github.com/80avin/pulse-rs
     </button>
     <button
       onclick={() => openExternal('https://github.com/80avin/pulse-rs/issues')}
-      style="display:flex;align-items:center;gap:6px;background:transparent;border:none;cursor:pointer;padding:0;font:10px/1 {T.mono};color:{T.ink2};text-align:left;"
+      class="flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 text-ink-2 text-left text-[10px] leading-none font-mono"
     >
       <Icon name="ext" size={11} color={T.ink2} />
       report an issue
     </button>
   </div>
-  <div style="margin-top:10px;font:10px/1.4 {T.mono};color:{T.ink3};">No telemetry. All data stays on your device.</div>
-</div>
+  <div class="mt-2.5 text-ink-3 text-[10px] leading-[1.4] font-mono">No telemetry. All data stays on your device.</div>
+</SettingsSection>
 
 <!-- Advanced -->
-<div style="padding:12px;background:{T.bg1};border:1px solid {T.bd0};border-radius:4px;">
+<SettingsSection label="advanced">
   <button
     onclick={() => { showAdvanced = !showAdvanced; if (showAdvanced) exportSources(); }}
-    style="display:flex;align-items:center;gap:6px;width:100%;background:transparent;border:none;cursor:pointer;padding:0;text-align:left;"
+    class="flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 text-left"
   >
     <Icon name={showAdvanced ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
-    <div style="font:10px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;text-transform:uppercase;">advanced</div>
+    <span class="text-ink-3 text-[10px] leading-none font-mono">{showAdvanced ? 'hide' : 'show'} import / export</span>
   </button>
 
   {#if showAdvanced}
-    <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
-      <div style="font:10px/1.4 {T.mono};color:{T.ink3};">Export your sources as JSON to back them up or share them. Paste JSON below to import.</div>
+    <div class="mt-3 flex flex-col gap-2.5">
+      <div class="text-ink-3 text-[10px] leading-[1.4] font-mono">Export your sources as JSON to back them up or share them. Paste JSON below to import.</div>
 
       <textarea
         bind:value={sourceJson}
         placeholder={importPlaceholder}
         rows={6}
-        style="width:100%;padding:8px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:10px/1.4 {T.mono};color:{T.ink1};resize:vertical;outline:none;box-sizing:border-box;"
+        class="w-full p-2 bg-bg-0 border border-bd-1 rounded text-ink-1 resize-y outline-none box-border text-[10px] leading-[1.4] font-mono"
       ></textarea>
 
-      <div style="display:flex;gap:8px;">
+      <div class="flex gap-2">
         <button
           onclick={handleShareExport}
-          style="flex:1;padding:8px;background:transparent;border:1px solid {T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{T.ink1};cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"
+          class="flex-1 p-2 bg-transparent border border-bd-1 rounded text-ink-1 cursor-pointer flex items-center justify-center gap-1.5 text-[10px] leading-none font-mono"
         >
           <Icon name="share" size={11} color={T.ink2} />
           share
@@ -395,7 +368,7 @@
         <button
           onclick={handleImport}
           disabled={importStatus === 'loading'}
-          style="flex:1;padding:8px;background:{importStatus === 'loading' ? T.bg0 : 'transparent'};border:1px solid {T.bd1};border-radius:3px;font:10px/1 {T.mono};color:{importStatus === 'loading' ? T.ink3 : T.ink1};cursor:{importStatus === 'loading' ? 'default' : 'pointer'};display:flex;align-items:center;justify-content:center;gap:6px;"
+          class="flex-1 p-2 border border-bd-1 rounded flex items-center justify-center gap-1.5 text-[10px] leading-none font-mono" style="background:{importStatus === 'loading' ? T.bg0 : 'transparent'};color:{importStatus === 'loading' ? T.ink3 : T.ink1};cursor:{importStatus === 'loading' ? 'default' : 'pointer'};"
         >
           <Icon name="import" size={11} color={importStatus === 'loading' ? T.ink3 : T.ink2} />
           {importStatus === 'loading' ? 'importing…' : 'import'}
@@ -403,27 +376,29 @@
       </div>
 
       {#if importMsg}
-        <div style="font:10px/1 {T.mono};color:{importStatus === 'error' ? T.red : T.green};">{importMsg}</div>
+        <div class="text-[10px] leading-none font-mono" style="color:{importStatus === 'error' ? T.red : T.green};">{importMsg}</div>
       {/if}
     </div>
   {/if}
-</div>
+</SettingsSection>
 
 <!-- Actions -->
-<div style="display:flex;flex-direction:column;gap:8px;">
-  <button
-    onclick={() => loadMockData()}
-    style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;background:transparent;border:1px solid {T.bd1};border-radius:4px;font:12px/1 {T.mono};color:{T.amber};cursor:pointer;"
-  >
-    <Icon name="list" size={14} color={T.amber} />
-    load sample data
-  </button>
-  <button
-    onclick={handleClearItems}
-    disabled={clearing}
-    style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;background:transparent;border:1px solid {T.bd1};border-radius:4px;font:12px/1 {T.mono};color:{clearing ? T.ink3 : T.red};cursor:{clearing ? 'default' : 'pointer'};"
-  >
-    <Icon name="trash" size={14} color={clearing ? T.ink3 : T.red} />
-    {clearing ? 'clearing…' : 'clear all cached items'}
-  </button>
-</div>
+<SettingsSection label="actions">
+  <div class="flex flex-col gap-2">
+    <button
+      onclick={() => loadMockData()}
+      class="flex items-center justify-center gap-2 w-full p-3 bg-transparent border border-bd-1 rounded text-amber cursor-pointer text-[12px] leading-none font-mono"
+    >
+      <Icon name="list" size={14} color={T.amber} />
+      load sample data
+    </button>
+    <button
+      onclick={handleClearItems}
+      disabled={clearing}
+      class="flex items-center justify-center gap-2 w-full p-3 bg-transparent border border-bd-1 rounded cursor-pointer text-[12px] leading-none font-mono" style="color:{clearing ? T.ink3 : T.red};cursor:{clearing ? 'default' : 'pointer'};"
+    >
+      <Icon name="trash" size={14} color={clearing ? T.ink3 : T.red} />
+      {clearing ? 'clearing…' : 'clear all cached items'}
+    </button>
+  </div>
+</SettingsSection>

@@ -7,6 +7,8 @@
   import SourceGlyph from '$lib/components/SourceGlyph.svelte';
   import Sparkline from '$lib/components/Sparkline.svelte';
   import Icon from '$lib/components/Icon.svelte';
+  import SegmentedControl from '$lib/components/SegmentedControl.svelte';
+  import { longpress } from '$lib/components/longpress.svelte';
 
   let {
     onSourceSelect,
@@ -96,48 +98,6 @@
     editingSourceId = null;
   }
 
-  let pressTimer: ReturnType<typeof setTimeout> | null = null;
-  let longPressed  = false;
-  let touchMoved   = false;
-  let touchStartX  = 0;
-  let touchStartY  = 0;
-
-  function startPress(e: TouchEvent, sourceId: string) {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    touchMoved  = false;
-    longPressed = false;
-    pressTimer = setTimeout(() => {
-      if (touchMoved) return;
-      longPressed = true;
-      pressTimer  = null;
-      actionSheet = sourceId;
-      ctxMenuPos = null;
-    }, 450);
-  }
-
-  function handleTouchMove(e: TouchEvent) {
-    const dx = Math.abs(e.touches[0].clientX - touchStartX);
-    const dy = Math.abs(e.touches[0].clientY - touchStartY);
-    if (dx > 8 || dy > 8) {
-      touchMoved = true;
-      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    }
-  }
-
-  function cancelPress() {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    touchMoved  = false;
-    longPressed = false;
-  }
-
-  function handleTouchEnd(e: TouchEvent, sourceId: string) {
-    e.preventDefault();
-    const wasLong  = longPressed;
-    const wasMoved = touchMoved;
-    cancelPress();
-    if (!wasLong && !wasMoved) onSourceSelect(sourceId);
-  }
   function handleContextMenu(e: MouseEvent, sourceId: string) {
     e.preventDefault();
     ctxMenuPos = { x: e.clientX, y: e.clientY };
@@ -191,37 +151,37 @@
   }
 </script>
 
-<div style="display:flex;flex-direction:column;flex:1;min-height:0;background:{T.bg0};color:{T.ink0};">
+<div class="flex flex-col flex-1 min-h-0 bg-bg-0 text-ink-0">
   <!-- Status summary -->
   {#if !compact}
-    <div style="display:flex;gap:12px;padding:8px 12px;border-bottom:1px solid {T.bd0};background:{T.bg1};font:10px/1 {T.mono};color:{T.ink2};flex-shrink:0;">
-      <span><span style="color:{T.green};">● </span>ok {okCount}</span>
-      <span><span style="color:{T.amber};">● </span>stale {staleCount}</span>
-      <span><span style="color:{T.red};">● </span>err {errCount}</span>
-      <span style="flex:1;"></span>
-      <span style="color:{T.ink3};">{sources.length} feeds</span>
+    <div class="flex gap-3 py-2 px-3 border-b border-bd-0 bg-bg-1 text-ink-2 shrink-0 text-[10px] leading-none font-mono">
+      <span><span class="text-green">● </span>ok {okCount}</span>
+      <span><span class="text-amber">● </span>stale {staleCount}</span>
+      <span><span class="text-red">● </span>err {errCount}</span>
+      <span class="flex-1"></span>
+      <span class="text-ink-3">{sources.length} feeds</span>
     </div>
   {/if}
 
-  <div style="flex:1;overflow-y:auto;">
+  <div class="flex-1 overflow-y-auto">
     <!-- Add source card -->
-    <div class="add-source-target" style="margin:12px 10px;padding:10px 12px;background:{T.bg1};border:1px dashed {T.bd2};border-radius:3px;font:11px/1.4 {T.mono};color:{T.ink1};">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <div class="add-source-target mx-2.5 my-3 p-2.5 px-3 bg-bg-1 border border-dashed border-bd-2 rounded text-ink-1 text-[11px] leading-[1.4] font-mono">
+      <div class="flex items-center gap-2 mb-2">
         <Icon name="plus" size={13} color={T.cyan} />
-        <span style="color:{T.ink0};letter-spacing:0.4px;">ADD SOURCE</span>
+        <span class="text-ink-0 tracking-[0.4px]">ADD SOURCE</span>
       </div>
-      <div style="display:flex;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;margin-bottom:8px;">
-        <div style="padding:6px 8px;font:11px/1 {T.mono};color:{T.cyan};border-right:1px solid {T.bd1};">$</div>
+      <div class="flex bg-bg-0 border border-bd-1 rounded mb-2">
+        <div class="px-2 py-1.5 text-cyan border-r border-bd-1 text-[11px] leading-none font-mono">$</div>
         <input
           bind:this={addInputEl}
           bind:value={addUrl}
           placeholder="https://example.com/feed.xml"
           onkeydown={(e) => { if (e.key === 'Enter') submitAddSource(); }}
-          style="flex:1;padding:6px 8px;font:11px/1 {T.mono};color:{T.ink0};"
+          class="flex-1 px-2 py-1.5 text-ink-0 text-[11px] leading-none font-mono"
         />
       </div>
-      <div style="display:flex;gap:6px;">
-        <select bind:value={addGroup} style="flex:1;background:{T.bg0};color:{T.ink1};border:1px solid {T.bd1};border-radius:3px;padding:6px 8px;font:11px/1 {T.mono};">
+      <div class="flex gap-1.5">
+        <select bind:value={addGroup} class="flex-1 bg-bg-0 text-ink-1 border border-bd-1 rounded px-2 py-1.5 text-[11px] leading-none font-mono">
           {#each groups as g}
             <option value={g.id}>group: {g.name}</option>
           {/each}
@@ -229,16 +189,16 @@
         </select>
         <button
           onclick={submitAddSource}
-          style="padding:0 14px;background:{T.cyan};color:{T.bg0};border:none;border-radius:3px;font:600 11px/1 {T.mono};letter-spacing:0.4px;cursor:pointer;"
+          class="px-3.5 bg-cyan text-bg-0 border-none rounded cursor-pointer font-semibold tracking-[0.4px] text-[11px] leading-none font-mono"
         >+ ADD</button>
       </div>
       {#if addGroup === '__new__'}
-        <div style="margin-top:4px;">
+        <div class="mt-1">
           <input
             bind:value={newGroupName}
             placeholder="new group name"
             onkeydown={(e) => { if (e.key === 'Enter') submitAddSource(); }}
-            style="width:100%;padding:6px 8px;background:{T.bg0};color:{T.ink0};border:1px solid {T.cyan};border-radius:3px;font:11px/1 {T.mono};box-sizing:border-box;outline:none;"
+            class="w-full px-2 py-1.5 bg-bg-0 text-ink-0 border border-cyan rounded box-border outline-none text-[11px] leading-none font-mono"
           />
         </div>
       {/if}
@@ -246,46 +206,43 @@
 
     <!-- Hint -->
     {#if !compact}
-      <div style="padding:4px 12px 8px;font:10px/1.4 {T.mono};color:{T.ink3};text-align:center;">
+      <div class="pt-1 px-3 pb-2 text-ink-3 text-center text-[10px] leading-[1.4] font-mono">
         tap to view · hold for actions
       </div>
     {/if}
 
     {#each byGroup as g}
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid {T.bd0};border-bottom:1px solid {T.bd0};background:{T.bg1};font:10px/1 {T.mono};color:{T.ink2};letter-spacing:0.8px;text-transform:uppercase;">
+      <div class="flex items-center justify-between py-2 px-3 border-t border-b border-bd-0 bg-bg-1 text-ink-2 uppercase tracking-[0.8px] text-[10px] leading-none font-mono">
         <span>{g.name}</span>
-        <span style="color:{T.cyan};">{g.sources.length}</span>
+        <span class="text-cyan">{g.sources.length}</span>
       </div>
       {#each g.sources as s}
         {@const spark = sparkData(s.id)}
         <div
           role="button"
           tabindex="0"
-          ontouchstart={(e) => startPress(e, s.id)}
-          ontouchmove={handleTouchMove}
-          ontouchend={(e) => handleTouchEnd(e, s.id)}
-          ontouchcancel={cancelPress}
+          use:longpress={{ onLongpress: () => { actionSheet = s.id; ctxMenuPos = null; } }}
           onclick={() => onSourceSelect?.(s.id)}
           oncontextmenu={(e) => handleContextMenu(e, s.id)}
           onkeydown={(e) => { if (e.key === 'Enter') onSourceSelect?.(s.id); }}
-          style="display:grid;grid-template-columns:auto 1fr auto;gap:10px;padding:10px 12px;border-bottom:1px solid {T.bd0};cursor:pointer;align-items:center;user-select:none;-webkit-user-select:none;"
+          class="grid gap-2.5 p-2.5 px-3 border-b border-bd-0 cursor-pointer items-center select-none grid-cols-[auto_1fr_auto]"
         >
-          <div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:{T.bg2};border:1px solid {T.bd1};border-radius:3px;">
+          <div class="flex items-center justify-center bg-bg-2 border border-bd-1 rounded w-7.5 h-7.5">
             <SourceGlyph kind={s.kind} size={12} />
           </div>
-          <div style="min-width:0;">
-            <div style="display:flex;align-items:center;gap:6px;font:13px/1.2 {T.mono};color:{T.ink0};">
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5 text-ink-0 text-[13px] leading-[1.2] font-mono">
               <StatusDot status={s.status} />
-              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{s.name}</span>
+              <span class="truncate">{s.name}</span>
             </div>
-            <div style="margin-top:3px;font:10px/1 {T.mono};color:{T.ink2};display:flex;align-items:center;gap:6px;">
-              <span style="color:{T.ink3};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px;">{s.host}</span>
-              <span style="color:{T.ink3};">·</span>
-              <span><span style="color:{T.cyan};">{s.unread}</span>{#if s.items > 0}<span style="color:{T.ink3};">/{s.items}</span>{/if}</span>
-              <span style="color:{T.ink3};">·</span>
+            <div class="text-ink-2 flex items-center gap-1.5 mt-0.75 text-[10px] leading-none font-mono">
+              <span class="text-ink-3 truncate max-w-25">{s.host}</span>
+              <span class="text-ink-3">·</span>
+              <span><span class="text-cyan">{s.unread}</span>{#if s.items > 0}<span class="text-ink-3">/{s.items}</span>{/if}</span>
+              <span class="text-ink-3">·</span>
               <span>{s.lastSync}</span>
               {#if s.latencyMs > 0}
-                <span style="color:{T.ink3};">·</span>
+                <span class="text-ink-3">·</span>
                 <span style="color:{s.latencyMs > 250 ? T.amber : T.ink2};">{s.latencyMs}ms</span>
               {/if}
             </div>
@@ -294,37 +251,30 @@
         </div>
       {/each}
     {/each}
-    <div style="height:12px;"></div>
+    <div class="h-3"></div>
   </div>
 
   <!-- Long-press action sheet / Desktop context menu -->
     <Dialog.Root open={actionSheet !== null && actionSource !== undefined} onOpenChange={(open) => { if (!open) { actionSheet = null; ctxMenuPos = null; } }}>
       <Dialog.Portal>
         {#if isDesktop && ctxMenuPos}
-          <Dialog.Overlay style="position:fixed;inset:0;z-index:210;" />
+          <Dialog.Overlay class="fixed inset-0 z-210" />
           <Dialog.Content
             preventScroll={false}
+            class="fixed overflow-hidden bg-bg-2 border border-bd-1 rounded w-55 shadow-[0_8px_32px_rgba(0,0,0,0.6)] z-210"
             style="
-              position:fixed;
               top:{Math.min(ctxMenuPos.y, (typeof window !== 'undefined' ? window.innerHeight : 600) - 280)}px;
               left:{Math.min(ctxMenuPos.x, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 220)}px;
-              width:220px;
-              background:{T.bg2};
-              border:1px solid {T.bd1};
-              border-radius:4px;
-              box-shadow:0 8px 32px rgba(0,0,0,0.6);
-              overflow:hidden;
-              z-index:210;
             "
           >
             {#if actionSource}
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid {T.bd0};">
-              <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;">
+            <div class="flex items-center gap-2.5 p-2.5 px-3 border-b border-bd-0">
+              <div class="w-6 h-6 flex items-center justify-center bg-bg-1 border border-bd-1 rounded">
                 <SourceGlyph kind={actionSource.kind} size={11} />
               </div>
-              <div style="min-width:0;">
-                <div style="font:11px/1 {T.mono};color:{T.ink0};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{actionSource.name}</div>
-                <div style="font:9px/1 {T.mono};color:{T.ink3};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{actionSource.host}</div>
+              <div class="min-w-0">
+                <div class="text-ink-0 truncate text-[11px] leading-none font-mono">{actionSource.name}</div>
+                <div class="text-ink-3 truncate text-[9px] leading-none font-mono">{actionSource.host}</div>
               </div>
             </div>
             {#each [
@@ -336,7 +286,8 @@
             ] as act}
               <button
                 onclick={act.action}
-                style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd0};font:11px/1 {T.mono};color:{act.label === 'Remove source' ? T.red : T.ink0};cursor:pointer;text-align:left;"
+                class="flex items-center gap-2.5 w-full px-3 bg-transparent border-none border-b border-bd-0 cursor-pointer text-left pt-2.25 pb-2.25 text-[11px] leading-none font-mono"
+                style="color:{act.label === 'Remove source' ? T.red : T.ink0};"
               >
                 <Icon name={act.icon} size={13} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
                 {act.label}
@@ -345,25 +296,21 @@
             {/if}
           </Dialog.Content>
         {:else}
-          <Dialog.Overlay style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:210;" />
+          <Dialog.Overlay class="fixed inset-0 z-210 bg-black/60" />
           <Dialog.Content
             preventScroll={false}
-            style="
-              position:fixed;bottom:0;left:0;right:0;
-              width:100%;background:{T.bg2};border-top:1px solid {T.bd1};
-              padding:0 0 24px;z-index:210;
-            "
+            class="fixed bottom-0 left-0 right-0 w-full bg-bg-2 border-t border-bd-1 pb-6 z-210"
           >
             {#if actionSource}
-            <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid {T.bd0};">
-              <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:4px;">
+            <div class="flex items-center gap-2.5 px-4 py-3.5 border-b border-bd-0">
+              <div class="w-8 h-8 flex items-center justify-center bg-bg-1 border border-bd-1 rounded">
                 <SourceGlyph kind={actionSource.kind} size={14} />
               </div>
               <div>
-                <div style="font:13px/1 {T.mono};color:{T.ink0};">{actionSource.name}</div>
-                <div style="margin-top:4px;font:10px/1 {T.mono};color:{T.ink3};">{actionSource.host}</div>
+                <div class="text-ink-0 text-[13px] leading-none font-mono">{actionSource.name}</div>
+                <div class="mt-1 text-ink-3 text-[10px] leading-none font-mono">{actionSource.host}</div>
               </div>
-              <span style="flex:1;"></span>
+              <span class="flex-1"></span>
               <StatusDot status={actionSource.status} />
             </div>
             {#each [
@@ -375,14 +322,15 @@
             ] as act}
               <button
                 onclick={act.action}
-                style="display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;background:transparent;border:none;border-bottom:1px solid {T.bd0};font:13px/1 {T.mono};color:{act.label === 'Remove source' ? T.red : T.ink0};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent;"
+                class="flex items-center gap-3.5 w-full px-4 bg-transparent border-none border-b border-bd-0 cursor-pointer text-left pt-3.5 pb-3.5 text-[13px] leading-none font-mono"
+                style="color:{act.label === 'Remove source' ? T.red : T.ink0};-webkit-tap-highlight-color:transparent;"
               >
                 <Icon name={act.icon} size={16} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
                 {act.label}
               </button>
             {/each}
             <Dialog.Close
-              style="display:flex;align-items:center;justify-content:center;width:100%;padding:14px 16px;background:transparent;border:none;font:12px/1 {T.mono};color:{T.ink2};cursor:pointer;"
+              class="flex items-center justify-center w-full px-4 bg-transparent border-none text-ink-2 cursor-pointer pt-3.5 pb-3.5 text-[12px] leading-none font-mono"
             >cancel</Dialog.Close>
             {/if}
           </Dialog.Content>
@@ -394,13 +342,13 @@
     <Dialog.Root open={editingSourceId !== null} onOpenChange={(open) => { if (!open) editingSourceId = null; }}>
       <Dialog.Portal>
         {#if isDesktop}
-          <Dialog.Overlay style="position:fixed;inset:0;z-index:210;background:rgba(0,0,0,0.5);" />
-          <Dialog.Content preventScroll={false} style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:210;background:{T.bg1};border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:12px;width:400px;max-width:90vw;max-height:90vh;overflow-y:auto;">
+          <Dialog.Overlay class="fixed inset-0 z-210 bg-black/50" />
+          <Dialog.Content preventScroll={false} class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-210 bg-bg-1 rounded-lg p-5 flex flex-col gap-3 w-100 max-w-[90vw] max-h-[90vh] overflow-y-auto">
             {@render editForm()}
           </Dialog.Content>
         {:else}
-          <Dialog.Overlay style="position:fixed;inset:0;z-index:210;background:rgba(0,0,0,0.5);display:flex;flex-direction:column;justify-content:flex-end;" />
-          <Dialog.Content preventScroll={false} style="position:relative;background:{T.bg1};border-top-left-radius:12px;border-top-right-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:max(16px, env(safe-area-inset-bottom));">
+          <Dialog.Overlay class="fixed inset-0 z-210 flex flex-col justify-end bg-black/50" />
+          <Dialog.Content preventScroll={false} class="relative bg-bg-1 rounded-t-xl p-4 flex flex-col gap-3" style="padding-bottom:max(16px, env(safe-area-inset-bottom));">
             {@render editForm()}
           </Dialog.Content>
         {/if}
@@ -409,92 +357,83 @@
 </div>
 
 {#snippet editForm()}
-  <div style="font:11px/1 {T.mono};color:{T.ink2};letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">edit source</div>
+  <div class="text-ink-2 uppercase mb-1 tracking-[0.5px] text-[11px] leading-none font-mono">edit source</div>
 
-  <div style="display:flex;flex-direction:column;gap:6px;">
-    <label for="edit-url" style="font:10px/1 {T.mono};color:{T.ink3};">URL</label>
+  <div class="flex flex-col gap-1.5">
+    <label for="edit-url" class="text-ink-3 text-[10px] leading-none font-mono">URL</label>
     <input
       id="edit-url"
       bind:value={editUrl}
       placeholder="https://example.com/feed.xml"
-      style="width:100%;padding:10px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:12px/1 {T.mono};color:{T.ink0};outline:none;box-sizing:border-box;"
+      class="w-full p-2.5 bg-bg-0 border border-bd-1 rounded text-ink-0 outline-none box-border text-[12px] leading-none font-mono"
       oninput={() => { editKind = inferSourceMeta(editUrl).kind; }}
     />
   </div>
 
-  <div style="display:flex;flex-direction:column;gap:6px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <label for="edit-name" style="font:10px/1 {T.mono};color:{T.ink3};">NAME</label>
+  <div class="flex flex-col gap-1.5">
+    <div class="flex items-center justify-between">
+      <label for="edit-name" class="text-ink-3 text-[10px] leading-none font-mono">NAME</label>
       <button
         onclick={() => fetchTitleForUrl(editUrl)}
         disabled={fetchingTitle}
-        style="background:transparent;border:1px solid {T.bd1};border-radius:3px;padding:2px 8px;font:9px/1 {T.mono};color:{fetchingTitle ? T.ink3 : T.cyan};cursor:{fetchingTitle ? 'default' : 'pointer'};"
+        class="bg-transparent border border-bd-1 rounded p-[2px_8px] text-[9px] leading-none font-mono" style="color:{fetchingTitle ? T.ink3 : T.cyan};cursor:{fetchingTitle ? 'default' : 'pointer'};"
       >{fetchingTitle ? 'fetching…' : 'fetch title'}</button>
     </div>
     <input
       id="edit-name"
       bind:value={editName}
       placeholder="Display name"
-      style="width:100%;padding:10px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:12px/1 {T.mono};color:{T.ink0};outline:none;box-sizing:border-box;"
+      class="w-full p-2.5 bg-bg-0 border border-bd-1 rounded text-ink-0 outline-none box-border text-[12px] leading-none font-mono"
     />
   </div>
 
-  <div style="display:flex;gap:8px;">
-    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
-      <label style="font:10px/1 {T.mono};color:{T.ink3};">TYPE</label>
-      <div style="display:flex;gap:3px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;padding:2px;">
-        {#each (['rss', 'hn', 'reddit'] as const) as k}
-          <button
-            onclick={() => editKind = k}
-            style="flex:1;padding:6px 4px;border:none;border-radius:2px;cursor:pointer;font:9px/1 {T.mono};text-transform:uppercase;background:{editKind===k ? T.bg3 : 'transparent'};color:{editKind===k ? T.cyan : T.ink2};"
-          >{k}</button>
-        {/each}
-      </div>
+  <div class="flex gap-2">
+    <div class="flex-1 flex flex-col gap-1.5">
+      <label class="text-ink-3 text-[10px] leading-none font-mono">TYPE</label>
+        <SegmentedControl options={['rss','hn','reddit']} active={editKind} onChange={v => { editKind = v as typeof editKind; }} />
     </div>
-    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
-      <label style="font:10px/1 {T.mono};color:{T.ink3};">GROUP</label>
+    <div class="flex-1 flex flex-col gap-1.5">
+      <label class="text-ink-3 text-[10px] leading-none font-mono">GROUP</label>
       <select
         bind:value={editGroup}
-        style="width:100%;padding:8px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;font:12px/1 {T.mono};color:{T.ink0};cursor:pointer;"
+        class="w-full p-2 bg-bg-0 border border-bd-1 rounded text-ink-0 cursor-pointer text-[12px] leading-none font-mono"
       >
         {#each groups as g}<option value={g.id}>{g.name}</option>{/each}
       </select>
     </div>
   </div>
 
-  <div style="display:flex;flex-direction:column;gap:6px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <label style="font:10px/1 {T.mono};color:{T.ink3};">COLOUR</label>
+  <div class="flex flex-col gap-1.5">
+    <div class="flex items-center justify-between">
+      <label class="text-ink-3 text-[10px] leading-none font-mono">COLOUR</label>
       {#if editHue != null}
         <button
           onclick={() => editHue = undefined}
-          style="background:transparent;border:none;color:{T.ink3};font:9px/1 {T.mono};cursor:pointer;padding:0;"
+          class="bg-transparent border-none text-ink-3 cursor-pointer p-0 text-[9px] leading-none font-mono"
         >reset</button>
       {/if}
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
+    <div class="flex items-center gap-2">
       <input
         type="range"
         min="0" max="360"
         value={editHue ?? 200}
         oninput={(e) => editHue = parseInt((e.target as HTMLInputElement).value)}
-        style="flex:1;accent-color:{T.cyan};height:6px;"
+        class="flex-1 h-1.5" style="accent-color:{T.cyan};"
       />
-      <div style="
-        width:28px;height:28px;border-radius:3px;flex-shrink:0;
+      <div class="w-7 h-7 rounded-[3px] shrink-0 border border-bd-1" style="
         background:{editHue != null ? `oklch(0.45 0.14 ${editHue})` : T.ink4};
-        border:1px solid {T.bd1};
       "></div>
     </div>
   </div>
 
-  <div style="display:flex;gap:8px;margin-top:4px;">
+  <div class="flex gap-2 mt-1">
     <Dialog.Close
-      style="flex:1;padding:12px;background:transparent;border:1px solid {T.bd1};border-radius:4px;font:12px/1 {T.mono};color:{T.ink2};cursor:pointer;"
+      class="flex-1 p-3 bg-transparent border border-bd-1 rounded text-ink-2 cursor-pointer text-[12px] leading-none font-mono"
     >cancel</Dialog.Close>
     <button
       onclick={submitEditSource}
-      style="flex:2;padding:12px;background:{T.cyan};border:none;border-radius:4px;font:12px/1 {T.mono};color:{T.bg0};cursor:pointer;font-weight:600;"
+      class="flex-2 p-3 bg-cyan border-none rounded text-bg-0 cursor-pointer font-semibold text-[12px] leading-none font-mono"
     >save changes</button>
   </div>
 {/snippet}

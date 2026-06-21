@@ -22,18 +22,18 @@
   );
 </script>
 
-<div style="display:flex;flex-direction:column;height:100%;background:{T.bg0};color:{T.ink0};">
+<div class="flex flex-col h-full bg-bg-0 text-ink-0">
   <!-- Header -->
-  <div style="height:44px;display:flex;align-items:center;padding:0 14px;border-bottom:1px solid {T.bd0};background:{T.bg1};flex-shrink:0;gap:10px;">
+  <div class="h-[44px] flex items-center px-3.5 border-b border-b-bd-0 bg-bg-1 shrink-0 gap-2.5">
     <Icon name="cpu" size={15} color={T.cyan} />
-    <span style="font:12px/1 {T.mono};color:{T.ink0};letter-spacing:0.5px;">ai signal</span>
-    <span style="flex:1;"></span>
-    <span style="font:10px/1 {T.mono};color:{modeColor};">{modeLabel}</span>
+    <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px]">ai signal</span>
+    <span class="flex-1"></span>
+    <span class="text-[10px] leading-none font-mono" style="color:{modeColor};">{modeLabel}</span>
   </div>
 
-  <div style="flex:1;overflow-y:auto;padding:12px 10px;">
+  <div class="flex-1 overflow-y-auto p-3 px-2.5">
     <AiPanelContent compact={false} {onTagFilter} onItemClick={onItemOpen} {onSourceFilter} />
-    <div style="height:12px;"></div>
+    <div class="h-3"></div>
   </div>
 
   <PulseBottomNav active={tab} onChange={onTabChange} />

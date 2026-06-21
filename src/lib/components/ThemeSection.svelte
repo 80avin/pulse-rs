@@ -1,7 +1,10 @@
 <script lang="ts">
-  import { T, SOURCE_KIND } from '$lib/tokens';
+  import { T } from '$lib/tokens';
   import { settings } from '$lib/settings.svelte';
   import Icon from './Icon.svelte';
+
+  const TAB_BTN = 'flex-1 flex items-center justify-center gap-2 rounded cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-cyan)] focus-visible:outline-none';
+  const TOGGLE_BTN = 'flex-1 rounded cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-cyan)] focus-visible:outline-none';
 
   const ACCENT_OPTIONS = [
     { id: 'cyan',   light: '#155e75', dark: '#4ecdd6', label: 'Cyan' },
@@ -14,16 +17,16 @@
 
 <div>
   <!-- Theme mode -->
-  <div style="display:flex;flex-direction:column;gap:8px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <label style="font:11px/1 {T.mono};color:{T.ink1};">Theme</label>
+  <div class="flex flex-col gap-2">
+    <div class="flex items-center justify-between">
+      <label class="text-[11px] leading-none font-mono text-ink-1">Theme</label>
     </div>
-    <div style="display:flex;gap:6px;" role="group" aria-label="Theme mode">
+    <div class="flex gap-1.5" role="group" aria-label="Theme mode">
       <button
         onclick={() => { settings.theme = 'system'; }}
         aria-pressed={settings.theme === 'system'}
-        class="flex-1 flex items-center justify-center gap-2 rounded cursor-pointer"
-        style="padding:8px 6px;border:1px solid {settings.theme==='system' ? T.cyan : T.bd1};background:{settings.theme==='system' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{settings.theme==='system' ? T.cyan : T.ink2};font:10px/1 {T.mono};"
+        class={TAB_BTN + ' p-[8px_6px] text-[10px] leading-none font-mono'}
+        style="border:1px solid {settings.theme==='system' ? T.cyan : T.bd1};background:{settings.theme==='system' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{settings.theme==='system' ? T.cyan : T.ink2};"
       >
         <Icon name="sync" size={12} color={settings.theme === 'system' ? T.cyan : T.ink2} />
         System
@@ -31,8 +34,8 @@
       <button
         onclick={() => { settings.theme = 'dark'; }}
         aria-pressed={settings.theme === 'dark'}
-        class="flex-1 flex items-center justify-center gap-2 rounded cursor-pointer"
-        style="padding:8px 6px;border:1px solid {settings.theme==='dark' ? T.cyan : T.bd1};background:{settings.theme==='dark' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{settings.theme==='dark' ? T.cyan : T.ink2};font:10px/1 {T.mono};"
+        class={TAB_BTN + ' p-[8px_6px] text-[10px] leading-none font-mono'}
+        style="border:1px solid {settings.theme==='dark' ? T.cyan : T.bd1};background:{settings.theme==='dark' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{settings.theme==='dark' ? T.cyan : T.ink2};"
       >
         <Icon name="moon" size={12} color={settings.theme === 'dark' ? T.cyan : T.ink2} />
         Dark
@@ -40,8 +43,8 @@
       <button
         onclick={() => { settings.theme = 'light'; }}
         aria-pressed={settings.theme === 'light'}
-        class="flex-1 flex items-center justify-center gap-2 rounded cursor-pointer"
-        style="padding:8px 6px;border:1px solid {settings.theme==='light' ? T.cyan : T.bd1};background:{settings.theme==='light' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{settings.theme==='light' ? T.cyan : T.ink2};font:10px/1 {T.mono};"
+        class={TAB_BTN + ' p-[8px_6px] text-[10px] leading-none font-mono'}
+        style="border:1px solid {settings.theme==='light' ? T.cyan : T.bd1};background:{settings.theme==='light' ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{settings.theme==='light' ? T.cyan : T.ink2};"
       >
         <Icon name="sun" size={12} color={settings.theme === 'light' ? T.cyan : T.ink2} />
         Light
@@ -50,17 +53,17 @@
   </div>
 
   <!-- Accent color -->
-  <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <label style="font:11px/1 {T.mono};color:{T.ink1};">Accent Color</label>
+  <div class="flex flex-col gap-2 mt-4">
+    <div class="flex items-center justify-between">
+      <label class="text-[11px] leading-none font-mono text-ink-1">Accent Color</label>
     </div>
-    <div style="display:flex;gap:6px;" role="group" aria-label="Accent color">
+    <div class="flex gap-1.5" role="group" aria-label="Accent color">
       {#each ACCENT_OPTIONS as opt}
         <button
           onclick={() => { settings.accentColor = opt.id; }}
           aria-label={opt.label}
           aria-pressed={settings.accentColor === opt.id}
-          class="flex-1 rounded cursor-pointer"
+          class={TOGGLE_BTN}
           style="height:32px;border:2px solid {settings.accentColor===opt.id ? opt.dark : T.bd1};background:{`${opt.dark}cc`};"
         >
         </button>
@@ -69,17 +72,17 @@
   </div>
 
   <!-- Density -->
-  <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <label style="font:11px/1 {T.mono};color:{T.ink1};">Density</label>
+  <div class="flex flex-col gap-2 mt-4">
+    <div class="flex items-center justify-between">
+      <label class="text-[11px] leading-none font-mono text-ink-1">Density</label>
     </div>
-    <div style="display:flex;gap:6px;" role="group" aria-label="Density">
+    <div class="flex gap-1.5" role="group" aria-label="Density">
       {#each (['dense', 'normal', 'roomy'] as const) as d}
         <button
           onclick={() => { settings.density = d; }}
           aria-pressed={settings.density === d}
-          class="flex-1 rounded cursor-pointer"
-          style="padding:6px 8px;border:1px solid {settings.density===d ? T.cyan : T.bd1};background:{settings.density===d ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{settings.density===d ? T.cyan : T.ink2};font:10px/1 {T.mono};text-transform:uppercase;letter-spacing:0.3px;"
+          class={TOGGLE_BTN + ' p-[6px_8px] text-[10px] leading-none font-mono uppercase tracking-[0.3px]'}
+          style="border:1px solid {settings.density===d ? T.cyan : T.bd1};background:{settings.density===d ? 'rgba(78,205,214,0.10)' : 'transparent'};color:{settings.density===d ? T.cyan : T.ink2};"
         >
           {d}
         </button>

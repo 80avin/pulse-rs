@@ -22,13 +22,13 @@
 <button
   {onclick}
   aria-label={ariaLabel}
-  class="inline-flex items-center justify-center rounded cursor-pointer border-none p-0"
+  class="inline-flex items-center justify-center rounded cursor-pointer border-none p-0
+    focus-visible:ring-2 focus-visible:ring-[var(--color-cyan)] focus-visible:outline-none
+    hover:bg-[var(--color-bg-2)]"
   style="
     width:{minSide}px;height:{minSide}px;
     background:{active ? 'var(--color-bg-3)' : 'transparent'};
   "
-  onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-2)'; }}
-  onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = active ? 'var(--color-bg-3)' : 'transparent'; }}
 >
   <Icon {name} size={iconSize} color={active ? 'var(--color-cyan)' : 'var(--color-ink-1)'} />
 </button>

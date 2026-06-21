@@ -26,24 +26,24 @@
   });
 </script>
 
-<div style="display:flex;flex-direction:column;height:100%;background:{T.bg0};color:{T.ink0};">
-  <div style="padding:8px 10px;border-bottom:1px solid {T.bd0};background:{T.bg1};flex-shrink:0;">
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:{T.bg0};border:1px solid {T.bd1};border-radius:4px;">
+<div class="flex flex-col h-full bg-bg-0 text-ink-0">
+  <div class="shrink-0 border-b border-bd-0 bg-bg-1 p-2 px-2.5">
+    <div class="flex items-center gap-2 bg-bg-0 border border-bd-1 rounded p-2 px-2.5">
       <Icon name="search" size={15} color={T.ink3} />
-      <input bind:this={searchInputEl} bind:value={query} placeholder="search all items…" autofocus style="flex:1;font:13px/1 {T.mono};background:transparent;border:none;outline:none;color:{T.ink0};" />
-      {#if searching}<span style="font:10px/1 {T.mono};color:{T.ink3};">…</span>
-      {:else if query}<button onclick={() => { query = ''; results = []; searchInputEl?.focus(); }} style="background:transparent;border:none;cursor:pointer;display:flex;padding:2px;"><Icon name="x" size={14} color={T.ink3} /></button>{/if}
+      <input bind:this={searchInputEl} bind:value={query} placeholder="search all items…" autofocus class="flex-1 bg-transparent border-none outline-none text-ink-0 text-[13px] leading-none font-mono" />
+      {#if searching}<span class="text-ink-3 text-[10px] leading-none font-mono">…</span>
+      {:else if query}<button onclick={() => { query = ''; results = []; searchInputEl?.focus(); }} class="bg-transparent border-none cursor-pointer flex p-0.5"><Icon name="x" size={14} color={T.ink3} /></button>{/if}
     </div>
   </div>
-  <div style="flex:1;overflow-y:auto;">
+  <div class="flex-1 overflow-y-auto">
     {#if query.trim().length < 2}
-      <div style="padding:40px 20px;text-align:center;font:11px/1.6 {T.mono};color:{T.ink3};"><div>search titles, body text, and tags</div><div style="margin-top:6px;font:10px/1 {T.mono};color:{T.ink4};">type at least 2 characters</div></div>
+      <div class="text-center text-ink-3 py-10 px-5 text-[11px] leading-[1.6] font-mono"><div>search titles, body text, and tags</div><div class="mt-1.5 text-ink-4 text-[10px] leading-none font-mono">type at least 2 characters</div></div>
     {:else if searching}
-      <div style="padding:40px 20px;text-align:center;font:11px/1.6 {T.mono};color:{T.ink3};">searching…</div>
+      <div class="text-center text-ink-3 py-10 px-5 text-[11px] leading-[1.6] font-mono">searching…</div>
     {:else if results.length === 0}
-      <div style="padding:40px 20px;text-align:center;font:11px/1.6 {T.mono};color:{T.ink3};">no results for "<span style="color:{T.ink2};">{query}</span>"</div>
+      <div class="text-center text-ink-3 py-10 px-5 text-[11px] leading-[1.6] font-mono">no results for "<span class="text-ink-2">{query}</span>"</div>
     {:else}
-      <div style="padding:6px 12px;font:9px/1 {T.mono};color:{T.ink3};letter-spacing:0.6px;border-bottom:1px solid {T.bd0};">{results.length} result{results.length === 1 ? '' : 's'}</div>
+      <div class="text-ink-3 border-b border-bd-0 p-1.5 px-3 tracking-[0.6px] text-[9px] leading-none font-mono">{results.length} result{results.length === 1 ? '' : 's'}</div>
       {#each results as item}
         {@const source = sources.find(s => s.id === item.src)}
         <ItemRow {item} {source} isFocused={false} density="normal" onclick={() => onItemOpen?.(item.id, results.map(i => i.id))} />

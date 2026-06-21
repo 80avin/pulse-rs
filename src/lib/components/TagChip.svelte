@@ -11,14 +11,6 @@
   tabindex={onclick ? 0 : undefined}
   {onclick}
   onkeydown={onclick ? (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onclick!(); } } : undefined}
-  style="
-    display:inline-flex;align-items:center;
-    font:{size}px/1 {T.mono};
-    color:{dim ? T.ink2 : c.fg};
-    background:{dim ? 'transparent' : c.bg};
-    border:1px solid {dim ? T.bd1 : c.bd};
-    padding:2px 5px;border-radius:2px;
-    letter-spacing:0.2px;white-space:nowrap;
-    cursor:{onclick ? 'pointer' : 'default'};
-  "
+  class="inline-flex items-center p-[2px_5px] rounded-sm tracking-[0.2px] whitespace-nowrap leading-none font-mono"
+  style="font-size:{size}px;color:{dim ? T.ink2 : c.fg};background:{dim ? 'transparent' : c.bg};border:1px solid {dim ? T.bd1 : c.bd};cursor:{onclick ? 'pointer' : 'default'};"
 >{tag}</span>

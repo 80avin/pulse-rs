@@ -3,6 +3,7 @@
   import type { Group } from '$lib/types';
   import { createGroup, renameGroup, deleteGroup } from '$lib/stores/data.svelte';
   import Icon from './Icon.svelte';
+  import { longpress } from './longpress.svelte';
   import { Tabs } from 'bits-ui';
 
   let { groups, active, onSelect, counts = {}, orientation = 'horizontal' }: {
@@ -14,18 +15,10 @@
   } = $props();
 
   let editing = $state(false);
-  let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let newName = $state('');
   let showNewInput = $state(false);
   let renamingId = $state<string | null>(null);
   let renameVal = $state('');
-
-  function startPress(_id: string) {
-    pressTimer = setTimeout(() => { pressTimer = null; editing = true; }, 480);
-  }
-  function cancelPress() {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-  }
 
   function startRename(g: Group) {
     renamingId = g.id;
@@ -55,27 +48,27 @@
 </script>
 
 {#if editing}
-  <div style="background:{T.bg1};border-bottom:1px solid {T.bd0};">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;font:10px/1 {T.mono};color:{T.cyan};letter-spacing:0.6px;text-transform:uppercase;background:rgba(78,205,214,0.06);">
-      <span style="display:inline-flex;align-items:center;gap:6px;">
+  <div class="bg-bg-1 border-b border-bd-0">
+    <div class="flex items-center justify-between text-cyan uppercase px-2.5 py-1.5 text-[10px] leading-none font-mono tracking-[0.6px] bg-[rgba(78,205,214,0.06)]">
+      <span class="inline-flex items-center gap-1.5">
         <Icon name="edit" size={11} />
         edit groups
       </span>
       <button
         onclick={() => { editing = false; showNewInput = false; renamingId = null; }}
-        style="background:transparent;border:1px solid {T.cyanDim};color:{T.cyan};padding:3px 8px;font:10px/1 {T.mono};letter-spacing:0.4px;border-radius:2px;cursor:pointer;"
+        class="bg-transparent text-cyan cursor-pointer rounded-sm border border-cyan-dim p-[3px_8px] text-[10px] leading-none font-mono tracking-[0.4px]"
       >DONE</button>
     </div>
 
     {#each groups as g}
       {#if g.id === 'all'}
-        <div style="display:grid;grid-template-columns:20px 1fr auto;gap:8px;align-items:center;padding:8px 10px;border-top:1px solid {T.bd0};opacity:0.4;">
+        <div class="grid items-center gap-2 border-t border-bd-0 grid-cols-[20px_1fr_auto] p-2 px-2.5 opacity-40">
           <Icon name="grip" size={14} color={T.ink3} />
-          <span style="font:13px/1.2 {T.mono};color:{T.ink0};">{g.name}</span>
-          <span style="font:10px/1 {T.mono};color:{T.ink2};">{counts[g.id] ?? g.n}</span>
+          <span class="text-ink-0 text-[13px] leading-[1.2] font-mono">{g.name}</span>
+          <span class="text-ink-2 text-[10px] leading-none font-mono">{counts[g.id] ?? g.n}</span>
         </div>
       {:else}
-        <div style="display:grid;grid-template-columns:20px 1fr auto auto auto;gap:8px;align-items:center;padding:8px 10px;border-top:1px solid {T.bd0};">
+        <div class="grid items-center gap-2 border-t border-bd-0 grid-cols-[20px_1fr_auto_auto_auto] p-2 px-2.5">
           <Icon name="grip" size={14} color={T.ink3} />
           {#if renamingId === g.id}
             <input
@@ -83,22 +76,22 @@
               oninput={(e) => renameVal = (e.target as HTMLInputElement).value}
               onkeydown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') renamingId = null; }}
               onblur={commitRename}
-              style="font:13px/1.2 {T.mono};color:{T.ink0};padding:4px 6px;background:{T.bg0};border:1px solid {T.cyan};border-radius:2px;outline:none;width:100%;"
+              class="text-ink-0 bg-bg-0 border border-cyan outline-none w-full px-1.5 py-1 rounded-sm text-[13px] leading-[1.2] font-mono"
               autofocus
             />
           {:else}
-            <span style="font:13px/1.2 {T.mono};color:{T.ink0};padding:4px 6px;background:{T.bg0};border:1px solid {T.bd1};border-radius:2px;">{g.name}</span>
+            <span class="text-ink-0 bg-bg-0 border border-bd-1 px-1.5 py-1 rounded-sm text-[13px] leading-[1.2] font-mono">{g.name}</span>
           {/if}
-          <span style="font:10px/1 {T.mono};color:{T.ink2};font-variant-numeric:tabular-nums;">{counts[g.id] ?? g.n}</span>
+          <span class="text-ink-2 tabular-nums text-[10px] leading-none font-mono">{counts[g.id] ?? g.n}</span>
           <button
             onclick={() => startRename(g)}
-            style="width:30px;height:30px;padding:0;background:transparent;border:1px solid {T.bd1};border-radius:2px;color:{T.ink1};display:flex;align-items:center;justify-content:center;cursor:pointer;"
+            class="p-0 bg-transparent border border-bd-1 text-ink-1 flex items-center justify-center cursor-pointer rounded-sm w-7.5 h-7.5"
           >
             <Icon name="edit" size={13} />
           </button>
           <button
             onclick={() => handleDelete(g.id)}
-            style="width:30px;height:30px;padding:0;background:transparent;border:1px solid {T.redDim};border-radius:2px;color:{T.red};display:flex;align-items:center;justify-content:center;cursor:pointer;"
+            class="p-0 bg-transparent text-red flex items-center justify-center cursor-pointer rounded-sm w-7.5 h-7.5 border border-red-dim"
           >
             <Icon name="trash" size={13} />
           </button>
@@ -107,21 +100,21 @@
     {/each}
 
     {#if showNewInput}
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid {T.bd0};">
+      <div class="flex items-center gap-2 border-t border-bd-0 p-2 px-2.5">
         <Icon name="plus" size={13} color={T.cyan} />
         <input
           bind:value={newName}
           placeholder="group name"
           onkeydown={(e) => { if (e.key === 'Enter') commitNewGroup(); if (e.key === 'Escape') { showNewInput = false; newName = ''; } }}
           onblur={commitNewGroup}
-          style="flex:1;font:12px/1 {T.mono};color:{T.ink0};background:{T.bg0};border:1px solid {T.cyan};border-radius:2px;padding:6px 8px;outline:none;"
+          class="flex-1 text-ink-0 bg-bg-0 border border-cyan outline-none rounded-sm px-2 py-1.5 text-[12px] leading-none font-mono"
           autofocus
         />
       </div>
     {:else}
       <button
         onclick={() => { showNewInput = true; }}
-        style="width:100%;padding:10px 12px;background:transparent;border:none;border-top:1px solid {T.bd0};color:{T.cyan};font:11px/1 {T.mono};letter-spacing:0.4px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;"
+        class="w-full bg-transparent border-none border-t border-bd-0 text-cyan text-left cursor-pointer flex items-center gap-2 px-3 py-2.5 text-[11px] leading-none font-mono tracking-[0.4px]"
       >
         <Icon name="plus" size={13} />
         NEW GROUP
@@ -129,8 +122,8 @@
     {/if}
   </div>
 {:else if orientation === 'vertical'}
-  <Tabs.Root bind:value={activeTab} orientation="vertical" style="display:flex;flex-direction:column;padding:4px 0;background:{T.bg1};flex-shrink:0;">
-    <Tabs.List style="display:flex;flex-direction:column;">
+  <Tabs.Root bind:value={activeTab} orientation="vertical" class="flex flex-col shrink-0 bg-bg-1 py-1">
+    <Tabs.List class="flex flex-col">
       {#each groups as g}
         <Tabs.Trigger value={g.id}
           onclick={() => onSelect(g.id)}
@@ -139,17 +132,15 @@
           onmouseleave={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           onfocus={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
           onblur={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
-          style="
-            display:flex;align-items:center;gap:8px;padding:6px 12px;
+          class="flex items-center gap-2 cursor-pointer text-left w-full border-none px-3 py-1.5" style="
             background:{activeTab === g.id ? 'rgba(78,205,214,0.06)' : 'transparent'};
-            border:none;border-left:2px solid {activeTab === g.id ? T.cyan : 'transparent'};
+            border-left:2px solid {activeTab === g.id ? T.cyan : 'transparent'};
             color:{activeTab === g.id ? T.ink0 : T.ink1};
             font:{activeTab === g.id ? '600' : '400'} 13px/1.2 {T.mono};
-            cursor:pointer;text-align:left;width:100%;
           "
         >
-          <span style="flex:1;">{g.name}</span>
-          <span style="font:10px/1 {T.mono};color:{activeTab === g.id ? T.cyan : T.ink3};font-variant-numeric:tabular-nums;">{counts[g.id] ?? g.n}</span>
+          <span class="flex-1">{g.name}</span>
+          <span class="tabular-nums text-[10px] leading-none font-mono" style="color:{activeTab === g.id ? T.cyan : T.ink3};">{counts[g.id] ?? g.n}</span>
         </Tabs.Trigger>
       {/each}
     </Tabs.List>
@@ -157,41 +148,40 @@
       onclick={() => { editing = true; }}
       onmouseenter={(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }}
       onmouseleave={(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-      style="display:flex;align-items:center;gap:6px;padding:5px 12px;background:transparent;border:none;color:{T.ink3};font:10px/1 {T.mono};cursor:pointer;text-align:left;width:100%;margin-top:2px;"
+      class="flex items-center gap-1.5 bg-transparent border-none text-ink-3 cursor-pointer text-left w-full mt-0.5 p-[5px_12px] text-[10px] leading-none font-mono"
     >
       <Icon name="plus" size={10} color={T.ink3} />
       <span>New Group</span>
     </button>
   </Tabs.Root>
 {:else}
-  <Tabs.Root bind:value={activeTab} orientation="horizontal" style="display:flex;overflow-x:auto;flex-shrink:0;border-bottom:1px solid {T.bd0};background:{T.bg1};scrollbar-width:none;">
-    <Tabs.List style="display:flex;">
+  <Tabs.Root bind:value={activeTab} orientation="horizontal" class="flex overflow-x-auto shrink-0 border-b border-bd-0 bg-bg-1" style="scrollbar-width:none;">
+    <Tabs.List class="flex">
       {#each groups as g}
         <Tabs.Trigger value={g.id}
           onclick={() => onSelect(g.id)}
-          onpointerdown={() => startPress(g.id)}
-          onpointerup={cancelPress}
-          onpointercancel={cancelPress}
+          // onpointerdown={() => startPress(g.id)}
+          // onpointerup={cancelPress}
+          // onpointercancel={cancelPress}
           onmouseenter={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
           onmouseleave={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-          style="
-            flex-shrink:0;padding:13px 14px;min-height:44px;
-            background:transparent;border:none;
+          class="shrink-0 bg-transparent border-none cursor-pointer flex items-center gap-1.5" style="
+            padding:13px 14px;min-height:44px;
             border-bottom:2px solid {activeTab === g.id ? T.cyan : 'transparent'};
             color:{activeTab === g.id ? T.ink0 : T.ink2};
             font:{activeTab === g.id ? '600' : '400'} 13px/1.2 {T.mono};
-            cursor:pointer;display:flex;align-items:center;gap:6px;letter-spacing:0.3px;
+            letter-spacing:0.3px;
           "
         >
-          <span>{g.name}</span>
-          <span style="font:10px/1 {T.mono};color:{activeTab === g.id ? T.cyan : T.ink3};font-variant-numeric:tabular-nums;">{counts[g.id] ?? g.n}</span>
+          <span use:longpress={{ onLongpress: () => {editing=true;}}}>{g.name}</span>
+          <span use:longpress={{ onLongpress: () => {editing=true;}}} class="tabular-nums text-[10px] leading-none font-mono" style="color:{activeTab === g.id ? T.cyan : T.ink3};">{counts[g.id] ?? g.n}</span>
         </Tabs.Trigger>
       {/each}
     </Tabs.List>
-    <div style="flex:1;min-width:8px;"></div>
+    <div class="flex-1 min-w-2"></div>
     <button
       onclick={() => { editing = true; }}
-      style="flex-shrink:0;padding:0 12px;background:transparent;border:none;border-left:1px solid {T.bd0};color:{T.ink2};display:flex;align-items:center;cursor:pointer;"
+      class="shrink-0 bg-transparent border-none border-l border-bd-0 text-ink-2 flex items-center cursor-pointer px-3"
     >
       <Icon name="edit" size={14} />
     </button>

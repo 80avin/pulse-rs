@@ -68,15 +68,15 @@
   const feedFilterName = $derived(sources.find(s => s.id === timelineFilter.feedId)?.name ?? timelineFilter.feedId);
 </script>
 
-<div style="display:flex;flex-direction:column;height:100%;background:{T.bg0};color:{T.ink0};">
+<div class="flex flex-col h-full bg-bg-0 text-ink-0">
   <!-- Top bar -->
-  <div style="height:44px;display:flex;align-items:center;padding:0 8px;border-bottom:1px solid {T.bd0};background:{T.bg1};flex-shrink:0;gap:6px;">
-    <div style="display:flex;align-items:center;gap:6px;flex:1;">
-      <span style="font:600 14px/1 {T.mono};color:{T.ink0};letter-spacing:1px;">PULSE<span style="color:{T.cyan};">.</span></span>
+  <div class="h-11 flex items-center gap-1.5 shrink-0 bg-bg-1 border-b border-bd-0 px-2">
+    <div class="flex items-center gap-1.5 flex-1">
+      <span class="font-semibold text-[14px] leading-none font-mono text-ink-0 tracking-[1px]">PULSE<span class="text-cyan">.</span></span>
     </div>
     <button
       onclick={doSync}
-      style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:4px;"
+      class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-8.5 h-8.5"
     >
       <span class={syncState.syncing ? 'syncing' : ''}>
         <Icon name="sync" size={18} color={syncState.syncing ? T.cyan : T.ink1} />
@@ -84,46 +84,46 @@
     </button>
     <button
       onclick={() => { showFilter = !showFilter; }}
-      style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;background:{showFilter ? 'rgba(78,205,214,0.06)' : 'transparent'};border:none;cursor:pointer;border-radius:4px;"
+      class="inline-flex items-center justify-center border-none cursor-pointer rounded w-8.5 h-8.5" style="background:{showFilter ? 'rgba(78,205,214,0.06)' : 'transparent'};"
       title={showFilter ? 'Hide filter bar' : 'Show filter bar'}
     >
       <Icon name="filter" size={18} color={showFilter ? T.cyan : T.ink1} />
     </button>
-    <button style="width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;border-radius:4px;" onclick={() => onTabChange('search')}>
+    <button class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-8.5 h-8.5" onclick={() => onTabChange('search')}>
       <Icon name="search" size={18} color={T.ink1} />
     </button>
   </div>
 
   <!-- Status strip -->
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-bottom:1px solid {T.bd0};background:{T.bg0};font:10px/1 {T.mono};color:{T.ink2};flex-shrink:0;">
-    <div style="display:flex;align-items:center;gap:10px;">
+  <div class="flex items-center justify-between bg-bg-0 text-ink-2 shrink-0 p-1.25 px-2.5 border-b border-b-bd-0 text-[10px] leading-none font-mono">
+    <div class="flex items-center gap-2.5">
       <span>
-        <span style="color:{T.ink3};">sync</span>
+        <span class="text-ink-3">sync</span>
         <span style="color:{syncState.syncing ? T.amber : T.green};"> ●</span>
-        <span style="color:{T.ink1};"> {syncState.lastSyncAt}</span>
+        <span class="text-ink-1"> {syncState.lastSyncAt}</span>
       </span>
       {#if syncState.lastNewCount > 0}
-        <span style="color:{T.ink3};">·</span>
-        <span><span style="color:{T.ink3};">new</span> <span style="color:{T.cyan};">+{syncState.lastNewCount}</span></span>
+        <span class="text-ink-3">·</span>
+        <span><span class="text-ink-3">new</span> <span class="text-cyan">+{syncState.lastNewCount}</span></span>
       {/if}
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span><span style="color:{T.ink3};">ai</span> <span style="color:{settings.aiTagging ? T.amber : T.ink3};">{settings.aiTagging ? 'on' : 'off'}</span></span>
-      <span style="color:{T.ink3};">·</span>
-      <span style="color:{T.ink1};">{pageCounts.unread}</span>
-      <span style="color:{T.ink3};">unread</span>
+    <div class="flex items-center gap-2">
+      <span><span class="text-ink-3">ai</span> <span style="color:{settings.aiTagging ? T.amber : T.ink3};">{settings.aiTagging ? 'on' : 'off'}</span></span>
+      <span class="text-ink-3">·</span>
+      <span class="text-ink-1">{pageCounts.unread}</span>
+      <span class="text-ink-3">unread</span>
     </div>
   </div>
 
   <!-- Source filter banner (when browsing a specific source) -->
   {#if timelineFilter.feedId}
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;background:rgba(78,205,214,0.06);border-bottom:1px solid {T.bd0};font:10px/1 {T.mono};flex-shrink:0;">
-      <span style="color:{T.ink3};">filtered by source:</span>
-      <span style="color:{T.cyan};">{feedFilterName}</span>
-      <span style="flex:1;"></span>
+    <div class="flex items-center gap-2 shrink-0 p-1.5 px-3 bg-[rgba(78,205,214,0.06)] border-b border-b-bd-0 text-[10px] leading-none font-mono">
+      <span class="text-ink-3">filtered by source:</span>
+      <span class="text-cyan">{feedFilterName}</span>
+      <span class="flex-1"></span>
       <button
         onclick={() => setFeedFilter(null)}
-        style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;font:10px/1 {T.mono};color:{T.ink2};"
+        class="bg-transparent border-none cursor-pointer flex items-center gap-1 text-[10px] leading-none font-mono text-ink-2"
       >
         <Icon name="x" size={11} color={T.ink2} /> clear
       </button>
@@ -135,13 +135,13 @@
 
   <!-- Tag filter banner -->
   {#if timelineFilter.tag}
-    <div style="display:flex;align-items:center;gap:8px;padding:5px 12px;background:rgba(78,205,214,0.06);border-bottom:1px solid {T.bd0};font:10px/1 {T.mono};flex-shrink:0;">
-      <span style="color:{T.ink3};">tag:</span>
-      <span style="color:{T.cyan};">{timelineFilter.tag}</span>
-      <span style="flex:1;"></span>
+    <div class="flex items-center gap-2 shrink-0 p-1.25 px-3 bg-[rgba(78,205,214,0.06)] border-b border-b-bd-0 text-[10px] leading-none font-mono">
+      <span class="text-ink-3">tag:</span>
+      <span class="text-cyan">{timelineFilter.tag}</span>
+      <span class="flex-1"></span>
       <button
         onclick={() => setTagFilter(null)}
-        style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;font:10px/1 {T.mono};color:{T.ink2};"
+        class="bg-transparent border-none cursor-pointer flex items-center gap-1 text-[10px] leading-none font-mono text-ink-2"
       >
         <Icon name="x" size={11} color={T.ink2} /> clear
       </button>
@@ -183,17 +183,17 @@
 <!-- Long-press action sheet -->
   <Dialog.Root open={actionSheetItem !== null} onOpenChange={(open) => { if (!open) actionSheetItem = null; }}>
     <Dialog.Portal>
-      <Dialog.Overlay style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:100;" />
+      <Dialog.Overlay class="fixed inset-0 bg-black/55 z-[100]" />
       <Dialog.Content
         preventScroll={false}
-        style="position:fixed;bottom:0;left:0;right:0;width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};max-height:70vh;overflow-y:auto;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;z-index:100;"
+        class="fixed bg-bg-2 text-ink-0 select-none overflow-y-auto bottom-0 left-0 right-0 w-full p-[14px_14px_24px] border-t border-t-bd-1 text-[12px] leading-[1.4] font-sans max-h-[70vh] z-[100]" style="-webkit-touch-callout:none;"
       >
         {#if actionSheetItem}
           {@const ci = actionSheetItem}
           {@const isHnSelf = ci.url?.includes('news.ycombinator.com/item') ?? false}
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.5px;">actions</span>
-          <Dialog.Close style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
+        <div class="flex items-center justify-between mb-3">
+          <span class="uppercase text-[10px] leading-none font-mono text-ink-3 tracking-[0.5px]">actions</span>
+          <Dialog.Close class="bg-transparent border-none text-ink-2 cursor-pointer flex">
             <Icon name="x" size={14} />
           </Dialog.Close>
         </div>
@@ -201,7 +201,7 @@
         {#if ci.url && !isHnSelf}
           <button
             onclick={() => { openExternal(ci.url!); actionSheetItem = null; }}
-            style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+            class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-ink-0 border-b border-b-bd-0"
           >
             <Icon name="ext" size={13} color={T.ink2} />
             <span>Open in browser</span>
@@ -210,7 +210,7 @@
         {#if ci.url}
           <button
             onclick={() => { navigator.clipboard.writeText(ci.url!); actionSheetItem = null; }}
-            style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+            class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-ink-0 border-b border-b-bd-0"
           >
             <Icon name="link" size={13} color={T.ink2} />
             <span>Copy URL</span>
@@ -218,7 +218,7 @@
         {/if}
         <button
           onclick={() => { navigator.clipboard.writeText(ci.title); actionSheetItem = null; }}
-          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+          class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-ink-0 border-b border-b-bd-1"
         >
           <Icon name="edit" size={13} color={T.ink2} />
           <span>Copy title</span>
@@ -226,42 +226,42 @@
         {#if ci.title && (ci.url || ci.externalUrl)}
           <button
             onclick={() => { shareItem(ci.title, ci.url ?? ci.externalUrl); actionSheetItem = null; }}
-            style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.ink0};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+            class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-ink-0 border-b border-b-bd-1"
           >
             <Icon name="share" size={13} color={T.ink2} />
             <span>Share</span>
           </button>
         {/if}
 
-        <div style="height:1px;background:{T.bd0};margin:4px 0;"></div>
+        <div class="bg-bd-0 h-px my-1"></div>
 
         <button
           onclick={() => { markRead(ci.id, !ci.read); actionSheetItem = null; }}
-          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{ci.read ? T.ink1 : T.cyan};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+          class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans border-b border-b-bd-0" style="color:{ci.read ? T.ink1 : T.cyan};"
         >
           <Icon name="check" size={13} color={ci.read ? T.ink2 : T.cyan} />
           <span>{ci.read ? 'Mark as unread' : 'Mark as read'}</span>
         </button>
         <button
           onclick={() => { toggleSaved(ci.id); actionSheetItem = null; }}
-          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd0};color:{ci.saved ? T.amber : T.ink1};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+          class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans border-b border-b-bd-0" style="color:{ci.saved ? T.amber : T.ink1};"
         >
           <Icon name="bookmark" size={13} color={ci.saved ? T.amber : T.ink2} />
           <span>{ci.saved ? 'Unsave' : 'Save'}</span>
         </button>
         <button
           onclick={() => { hideItem(ci.id); actionSheetItem = null; }}
-          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;border-bottom:1px solid {T.bd1};color:{T.red};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+          class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-red border-b border-b-bd-1"
         >
           <Icon name="eye-off" size={13} color={T.red} />
           <span>Hide</span>
         </button>
 
-        <div style="height:1px;background:{T.bd0};margin:4px 0;"></div>
+        <div class="bg-bd-0 h-px my-1"></div>
 
         <button
           onclick={() => { onOpen(ci.id, displayItems.map(i => i.id)); actionSheetItem = null; }}
-          style="display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;background:transparent;border:none;color:{T.ink1};cursor:pointer;text-align:left;font:12px/1 {T.sans};"
+          class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-ink-1"
         >
           <Icon name="cpu" size={13} color={T.ink2} />
           <span>Tag info</span>

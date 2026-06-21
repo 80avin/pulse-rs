@@ -3,14 +3,7 @@
   let { k, dim = false }: { k: string; dim?: boolean } = $props();
 </script>
 
-<span style="
-  display:inline-block;
-  font:600 10px/1 {T.mono};
-  color:{dim ? T.ink2 : T.ink0};
-  background:{dim ? 'transparent' : T.bg3};
-  border:1px solid {T.bd2};
-  border-radius:3px;
-  padding:2px 4px;
-  min-width:12px;
-  text-align:center;
-">{k}</span>
+<span
+  class="inline-block font-semibold text-[10px] leading-none font-mono border border-bd-2 rounded p-[2px_4px] min-w-[12px] text-center"
+  style="color:{dim ? T.ink2 : T.ink0};background:{dim ? 'transparent' : T.bg3};"
+>{k}</span>

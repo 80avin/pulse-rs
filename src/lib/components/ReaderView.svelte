@@ -51,109 +51,107 @@
     Math.max(1, Math.round((item?.body || '').split(/\s+/).filter(Boolean).length / 238))
   );
 
-
-
 </script>
 
 {#if item}
-  <div style="position:relative;display:flex;flex-direction:column;height:100%;background:{T.bg0};color:{T.ink0};">
-    <div style="flex:1;overflow-y:auto;padding:20px 28px 32px;">
+  <div class="relative flex flex-col h-full bg-bg-0 text-ink-0">
+    <div class="flex-1 overflow-y-auto p-[20px_28px_32px]">
       {#if showMetadata && source}
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font:11px/1 {T.mono};color:{T.ink2};">
-          <span style="font-weight:600;color:{T.ink1};">{source.name}</span>
-          <span style="color:{T.ink3};">·</span>
+        <div class="flex items-center gap-2 mb-2.5 text-[11px] leading-none font-mono text-ink-2">
+          <span class="font-semibold text-ink-1">{source.name}</span>
+          <span class="text-ink-3">·</span>
           <span>{item.author}</span>
-          <span style="color:{T.ink3};">·</span>
+          <span class="text-ink-3">·</span>
           <span>{item.age}</span>
           {#if item.score > 0}
-            <span style="color:{T.ink3};">·</span>
-            <span style="color:{T.amber};">▲{item.score}</span>
+            <span class="text-ink-3">·</span>
+            <span class="text-amber">▲{item.score}</span>
           {/if}
           {#if item.n > 0}
-            <span style="color:{T.ink3};">·</span>
+            <span class="text-ink-3">·</span>
             <span>{item.n}c</span>
           {/if}
         </div>
       {/if}
-      <h1 style="margin:0;font:600 22px/1.25 {T.sans};color:{T.ink0};letter-spacing:-0.3px;max-width:720px;">{item.title}</h1>
+      <h1 class="text-ink-0 m-0 max-w-180 tracking-[-0.3px] text-[22px] leading-tight font-sans" style="font-weight:600;">{item.title}</h1>
 
       {#if item.url}
         {@const primaryDomain = new URL(item.url).hostname.replace(/^www\./, '')}
-        <button onclick={() => openExternal(item.url!)} style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;background:transparent;border:none;cursor:pointer;padding:0;font:11px/1 {T.mono};color:{T.ink2};">
+        <button onclick={() => openExternal(item.url!)} class="inline-flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 mt-2 text-[11px] leading-none font-mono text-ink-2">
           <Icon name="ext" size={11} color={T.ink3} />
-          <span style="text-decoration:underline;text-underline-offset:2px;text-decoration-color:{T.bd2};">{primaryDomain}</span>
+          <span class="underline underline-offset-2" style="text-decoration-color:{T.bd2};">{primaryDomain}</span>
         </button>
       {/if}
 
       {#if item.externalUrl}
-        <button onclick={() => openExternal(item.externalUrl!)} style="margin-top:4px;display:block;font:11px/1.4 {T.mono};color:{T.cyan};background:transparent;border:none;cursor:pointer;padding:0;text-align:left;">
+        <button onclick={() => openExternal(item.externalUrl!)} class="block bg-transparent border-none cursor-pointer p-0 text-left mt-1 text-[11px] leading-[1.4] font-mono text-cyan">
           <Icon name="ext" size={11} color={T.cyan} />
-          <span style="margin-left:4px;text-decoration:underline;text-underline-offset:2px;">{item.externalUrl}</span>
+          <span class="underline ml-1 underline-offset-2">{item.externalUrl}</span>
         </button>
       {/if}
 
-      <div style="margin-top:9px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <div class="flex items-center gap-2 flex-wrap mt-2.25">
         {#each item.tags as tag}
           <TagChip {tag} size={10} onclick={() => { onTagClick ? onTagClick(tag) : (popoverTag = tag); }} />
         {/each}
-        <span style="flex:1;min-width:12px;"></span>
-        <span style="font:10px/1 {T.mono};color:{T.ink2};">signal</span>
+        <span class="flex-1 min-w-[12px]"></span>
+        <span class="text-ink-2 text-[10px] leading-none font-mono">signal</span>
         <ScoreBar value={item.aiScore} w={36} />
-        {#if item.score > 0}<span style="font:11px/1 {T.mono};color:{T.amber};">▲ {item.score}</span>{/if}
-        {#if item.n > 0}<span style="font:11px/1 {T.mono};color:{T.ink1};">{item.n} comments</span>{/if}
+        {#if item.score > 0}<span class="text-amber text-[11px] leading-none font-mono">▲ {item.score}</span>{/if}
+        {#if item.n > 0}<span class="text-ink-1 text-[11px] leading-none font-mono">{item.n} comments</span>{/if}
       </div>
 
       {#if noteMode === 'inline'}
         {#if noteEditing}
-          <div style="margin-top:14px;padding:10px;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;">
-            <textarea bind:value={noteDraft} placeholder="Add a note about this post…" style="width:100%;min-height:60px;background:transparent;border:none;outline:none;font:12px/1.5 {T.sans};color:{T.ink0};resize:vertical;"></textarea>
-            <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px;">
-              <button onclick={() => { noteEditing = false; }} style="padding:4px 10px;background:transparent;color:{T.ink2};border:1px solid {T.bd2};border-radius:2px;font:10px/1 {T.mono};cursor:pointer;">cancel</button>
-              <button onclick={saveNote} style="padding:4px 10px;background:{T.amber};color:{T.bg0};border:none;border-radius:2px;font:10px/1 {T.mono};cursor:pointer;">save note</button>
+          <div class="bg-bg-1 border border-bd-1 p-2.5 rounded mt-3.5">
+            <textarea bind:value={noteDraft} placeholder="Add a note about this post…" class="w-full bg-transparent border-none outline-none min-h-15 resize-y text-[12px] leading-normal font-sans text-ink-0"></textarea>
+            <div class="flex gap-1.5 justify-end mt-1.5">
+              <button onclick={() => { noteEditing = false; }} class="bg-transparent text-ink-2 border border-bd-2 cursor-pointer p-[4px_10px] rounded-sm text-[10px] leading-none font-mono">cancel</button>
+              <button onclick={saveNote} class="bg-amber text-bg-0 border-none cursor-pointer p-[4px_10px] rounded-sm text-[10px] leading-none font-mono">save note</button>
             </div>
           </div>
         {:else if item.note}
-          <div style="margin-top:14px;padding:10px 12px;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-              <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.4px;">note</span>
-              <button onclick={startNoteEdit} style="background:transparent;border:none;cursor:pointer;font:10px/1 {T.mono};color:{T.ink2};padding:2px 6px;">edit</button>
+          <div class="bg-bg-1 border border-bd-1 px-3 py-2.5 rounded mt-3.5">
+            <div class="flex items-center justify-between mb-1">
+              <span class="uppercase tracking-[0.4px] text-[10px] leading-none font-mono text-ink-3">note</span>
+              <button onclick={startNoteEdit} class="bg-transparent border-none cursor-pointer p-[2px_6px] text-[10px] leading-none font-mono text-ink-2">edit</button>
             </div>
-            <p style="margin:0;font:12px/1.5 {T.sans};color:{T.ink1};white-space:pre-wrap;">{item.note}</p>
+            <p class="m-0 whitespace-pre-wrap text-[12px] leading-normal font-sans text-ink-1">{item.note}</p>
           </div>
         {:else}
-          <div style="margin-top:14px;">
-            <button onclick={startNoteEdit} style="background:transparent;border:1px dashed {T.bd1};border-radius:3px;padding:6px 10px;cursor:pointer;font:10px/1 {T.mono};color:{T.ink3};">+ add note</button>
+          <div class="mt-3.5">
+            <button onclick={startNoteEdit} class="bg-transparent border border-dashed border-bd-1 cursor-pointer rounded p-[6px_10px] text-[10px] leading-none font-mono text-ink-3">+ add note</button>
           </div>
         {/if}
       {:else if noteMode === 'sheet'}
         {#if item.note}
-          <div style="padding:10px 12px;margin-top:14px;background:{T.bg1};border-left:3px solid {T.amber};border-radius:0 3px 3px 0;font:11px/1.5 {T.mono};color:{T.ink1};white-space:pre-wrap;">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          <div class="bg-bg-1 border-l-[3px] border-amber p-[10px_12px] mt-3.5 whitespace-pre-wrap rounded-r rounded-sm text-[11px] leading-normal font-mono text-ink-1">
+            <div class="flex items-center gap-1.5 mb-1">
               <Icon name="bookmark" size={11} color={T.amber} />
-              <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.4px;">note</span>
+              <span class="uppercase tracking-[0.4px] text-[10px] leading-none font-mono text-ink-3">note</span>
             </div>
             {item.note}
           </div>
         {/if}
       {/if}
 
-      <div style="margin-top:22px;font:15px/1.65 {T.sans};color:{T.ink0};max-width:720px;" class="item-body">
-        {#if item.bodyHtml}{@html sanitizeHtml(item.bodyHtml)}{:else if item.body}<p style="margin:0;white-space:pre-line;">{item.body}</p>{/if}
+      <div class="item-body mt-5.5 max-w-180 text-[15px] leading-[1.65] font-sans text-ink-0">
+        {#if item.bodyHtml}{@html sanitizeHtml(item.bodyHtml)}{:else if item.body}<p class="m-0 whitespace-pre-line">{item.body}</p>{/if}
         {#if item.url}
-          <div style="margin-top:24px;padding-top:16px;border-top:1px solid {T.bd0};display:flex;gap:8px;flex-wrap:wrap;">
-            <button onclick={() => openExternal(item.url!)} style="display:inline-flex;align-items:center;gap:8px;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;padding:10px 16px;cursor:pointer;font:12px/1 {T.mono};color:{T.cyan};"><Icon name="ext" size={13} color={T.cyan} /><span>open post</span></button>
+          <div class="flex gap-2 flex-wrap mt-6 pt-4 border-t border-t-bd-0">
+            <button onclick={() => openExternal(item.url!)} class="inline-flex items-center gap-2 bg-bg-1 border border-bd-1 cursor-pointer rounded p-[10px_16px] text-[12px] leading-none font-mono text-cyan"><Icon name="ext" size={13} color={T.cyan} /><span>open post</span></button>
             {#if item.externalUrl}
-              <button onclick={() => openExternal(item.externalUrl!)} style="display:inline-flex;align-items:center;gap:8px;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;padding:10px 16px;cursor:pointer;font:12px/1 {T.mono};color:{T.ink1};"><Icon name="ext" size={13} color={T.ink2} /><span>open link</span></button>
+              <button onclick={() => openExternal(item.externalUrl!)} class="inline-flex items-center gap-2 bg-bg-1 border border-bd-1 cursor-pointer rounded p-[10px_16px] text-[12px] leading-none font-mono text-ink-1"><Icon name="ext" size={13} color={T.ink2} /><span>open link</span></button>
             {/if}
           </div>
         {/if}
       </div>
     </div>
 
-    <div style="padding:4px 14px;border-top:1px solid {T.bd0};background:{T.bg1};font:10px/1 {T.mono};color:{T.ink3};display:flex;align-items:center;gap:12px;flex-shrink:0;">
+    <div class="bg-bg-1 text-ink-3 flex items-center gap-3 shrink-0 px-3.5 py-1 border-t border-t-bd-0 text-[10px] leading-none font-mono">
       <span>~{readTimeMin}min read</span>
-      <span style="flex:1;"></span>
-      {#if noteMode === 'inline'}<span style="color:{T.green};">● readable view</span>{/if}
+      <span class="flex-1"></span>
+      {#if noteMode === 'inline'}<span class="text-green">● readable view</span>{/if}
     </div>
 
     <!-- Tag explanation popover -->
@@ -162,21 +160,22 @@
       {@const evidence = TAG_EVIDENCE[popoverTag] ?? ['title-token match', 'body-token match']}
       <Dialog.Root open={popoverTag !== null} onOpenChange={(open) => { if (!open) popoverTag = null; }}>
         <Dialog.Portal>
-          <Dialog.Overlay style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:20;" />
+          <Dialog.Overlay class="fixed inset-0 bg-black/55 z-20" />
           <Dialog.Content
             preventScroll={false}
-            style="{isDesktop ? 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:380px;max-width:90vw;border-radius:8px;' : 'position:fixed;bottom:0;left:0;right:0;width:100%;border-radius:0;'}background:{T.bg2};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};z-index:20;"
+            class="bg-bg-2 text-ink-0"
+            style="{isDesktop ? 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:380px;max-width:90vw;border-radius:8px;' : 'position:fixed;bottom:0;left:0;right:0;width:100%;border-radius:0;'}padding:14px 14px 24px;font:12px/1.4 {T.sans};z-index:20;"
           >
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-              <div style="display:flex;align-items:center;gap:8px;">
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex items-center gap-2">
                 <TagChip tag={popoverTag} size={11} />
-                <span style="font:10px/1 {T.mono};color:{T.ink3};">tagged by {aiStatus.modelName ?? aiStatus.taggingMode} · {Math.round((item.aiScore ?? 0.8) * 100)}% conf</span>
+                <span class="text-[10px] leading-none font-mono text-ink-3">tagged by {aiStatus.modelName ?? aiStatus.taggingMode} · {Math.round((item.aiScore ?? 0.8) * 100)}% conf</span>
               </div>
-              <Dialog.Close style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;"><Icon name="x" size={14} /></Dialog.Close>
+              <Dialog.Close class="bg-transparent border-none text-ink-2 cursor-pointer flex"><Icon name="x" size={14} /></Dialog.Close>
             </div>
-            <div style="color:{T.ink1};margin-bottom:8px;">Why tagged <b style="color:{c.fg};">{popoverTag}</b>:</div>
-            <ul style="margin:0;padding:0 0 0 14px;color:{T.ink1};font:12px/1.55 {T.sans};">
-              {#each evidence as ev}<li style="margin-bottom:2px;">{ev}</li>{/each}
+            <div class="text-ink-1 mb-2">Why tagged <b style="color:{c.fg};">{popoverTag}</b>:</div>
+            <ul class="m-0 p-[0_0_0_14px] text-ink-1 text-[12px] leading-[1.55] font-sans">
+              {#each evidence as ev}<li class="mb-0.5">{ev}</li>{/each}
             </ul>
           </Dialog.Content>
         </Dialog.Portal>
@@ -184,5 +183,5 @@
     {/if}
   </div>
 {:else}
-  <div style="height:100%;display:flex;align-items:center;justify-content:center;color:{T.ink3};font:11px/1 {T.mono};">item not found</div>
+  <div class="h-full flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">item not found</div>
 {/if}

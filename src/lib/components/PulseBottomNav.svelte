@@ -21,40 +21,26 @@
   ] as const;
 </script>
 
-<Toolbar.Root loop={false} orientation="horizontal" style="display:flex;flex-direction:column;border-top:1px solid {T.bd1};background:{T.bg1};flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0px);">
-  <div style="display:flex;">
+<Toolbar.Root loop={false} orientation="horizontal" class="flex flex-col shrink-0 border-t border-t-bd-1 bg-bg-1" style="padding-bottom:env(safe-area-inset-bottom,0px);">
+  <div class="flex">
   {#each tabs as tab}
     {@const a = tab.id === active}
     <Toolbar.Button
       onclick={() => onChange(tab.id)}
+      class="flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer tracking-[0.5px] relative min-h-13 pt-[10px] pb-[12px] text-[9px] leading-none font-mono"
       style="
-        flex:1;padding:10px 0 12px;
-        display:flex;flex-direction:column;align-items:center;gap:4px;
-        background:transparent;border:none;
         border-top:2px solid {a ? T.cyan : 'transparent'};
         color:{a ? T.cyan : T.ink2};
-        cursor:pointer;font:9px/1 {T.mono};letter-spacing:0.5px;
-        position:relative;min-height:52px;
       "
     >
-      <div style="position:relative;">
+      <div class="relative">
         <Icon name={tab.icon} size={18}
           color={tab.id === 'ai' && taggingProgress.active ? T.amber : (a ? T.cyan : T.ink2)} />
         {#if tab.id === 'timeline' && totalUnread > 0}
-          <span style="
-            position:absolute;top:-5px;right:-8px;
-            background:{T.cyan};color:{T.bg0};
-            font:600 8px/1 {T.mono};
-            padding:1px 4px;border-radius:6px;
-            min-width:14px;text-align:center;
-          ">{totalUnread > 99 ? '99+' : totalUnread}</span>
+          <span class="absolute top-[-5px] right-[-8px] px-1 py-[1px] rounded-[6px] min-w-[14px] text-center bg-cyan text-bg-0 font-semibold text-[8px] leading-none font-mono">{totalUnread > 99 ? '99+' : totalUnread}</span>
         {/if}
         {#if tab.id === 'ai' && taggingProgress.active}
-          <span class="tagging-dot" style="
-            position:absolute;top:-4px;right:-6px;
-            width:7px;height:7px;border-radius:50%;
-            background:{T.amber};
-          "></span>
+          <span class="tagging-dot absolute top-[-4px] right-[-6px] w-[7px] h-[7px] rounded-full bg-amber"></span>
         {/if}
       </div>
       <span>{tab.label}</span>

@@ -76,12 +76,12 @@
        drawn here, so nothing is hidden under the system status bar.
     3. Inner (flex:1): every mobile screen fills this region.
 -->
-<div style="display:flex;flex-direction:column;width:100%;height:100%;background:{T.bg1};overflow:hidden;">
-  <div style="height:var(--sat);flex-shrink:0;"></div>
+<div class="flex flex-col w-full h-full bg-bg-1 overflow-hidden">
+  <div class="shrink-0 h-[var(--sat)]"></div>
 
-  <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;position:relative;">
+  <div class="flex-1 overflow-hidden flex flex-col relative">
     {#if storeReady.error}
-      <div style="flex:1;display:flex;align-items:center;justify-content:center;font:11px/1 {T.mono};color:{T.red};">
+      <div class="flex-1 flex items-center justify-center text-red text-[11px] leading-none font-mono">
         failed to load data — restart the app
       </div>
     {:else}
@@ -109,14 +109,14 @@
       {:else if tab === 'settings'}
         <MobileSettings {tab} onTabChange={changeTab} />
       {:else}
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;color:{T.ink3};font:11px/1 {T.mono};">
+        <div class="flex-1 flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">
           {tab}
         </div>
       {/if}
 
       <!-- Reader overlays tab content via absolute positioning — tab underneath stays alive -->
       {#if openItemId}
-        <div style="position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;">
+        <div class="absolute inset-0 z-10 flex flex-col">
           <MobileReader
             itemId={openItemId}
             allIds={timelineIds}
