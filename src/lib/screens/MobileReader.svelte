@@ -36,7 +36,6 @@
   let navDir = $state(0);
   let popoverOpen = $state(false);
 
-
   function onSwipeStart(e: TouchEvent) {
     if (noteSheetOpen || popoverOpen) return;
     swipeStartX = e.touches[0].clientX;
@@ -246,7 +245,6 @@
     </div>
 
     <!-- Note input sheet -->
-    {#if noteSheetOpen}
       <Dialog.Root open={noteSheetOpen} onOpenChange={(open) => { if (!open) noteSheetOpen = false; }}>
         <Dialog.Portal>
           <Dialog.Overlay style="position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:20;" />
@@ -275,7 +273,6 @@
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    {/if}
   </div>
 {:else}
   <div style="height:100%;display:flex;align-items:center;justify-content:center;color:{T.ink3};font:11px/1 {T.mono};">

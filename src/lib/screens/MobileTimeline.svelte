@@ -26,7 +26,6 @@
   let actionSheetItem = $state<FeedItem | null>(null);
   let signalActive = $state(false);
 
-
   // Group, feed, tag, read, and saved filters are applied server-side in `items`.
   // Signal filtering is client-side for now (TODO: move to server-side).
   const displayItems = $derived.by(() => {
@@ -182,9 +181,6 @@
 </div>
 
 <!-- Long-press action sheet -->
-{#if actionSheetItem}
-  {@const ci = actionSheetItem}
-  {@const isHnSelf = ci.url?.includes('news.ycombinator.com/item') ?? false}
   <Dialog.Root open={actionSheetItem !== null} onOpenChange={(open) => { if (!open) actionSheetItem = null; }}>
     <Dialog.Portal>
       <Dialog.Overlay style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:100;" />
@@ -192,6 +188,9 @@
         preventScroll={false}
         style="position:fixed;bottom:0;left:0;right:0;width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};max-height:70vh;overflow-y:auto;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;z-index:100;"
       >
+        {#if actionSheetItem}
+          {@const ci = actionSheetItem}
+          {@const isHnSelf = ci.url?.includes('news.ycombinator.com/item') ?? false}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.5px;">actions</span>
           <Dialog.Close style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
@@ -267,7 +266,7 @@
           <Icon name="cpu" size={13} color={T.ink2} />
           <span>Tag info</span>
         </button>
+        {/if}
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
-{/if}

@@ -42,7 +42,7 @@
       <!-- Header -->
       <div style="display:flex;align-items:center;gap:8px;">
         <Dialog.Title style="flex:1;font:600 12px/1 {T.mono};color:{T.ink0};letter-spacing:0.3px;margin:0;">ADD FEED FROM SHARE</Dialog.Title>
-        <Dialog.Close onclick={dismissShare} style="background:transparent;border:none;cursor:pointer;padding:4px;color:{T.ink2};font-size:16px;">&#x2715;</Dialog.Close>
+        <Dialog.Close style="background:transparent;border:none;cursor:pointer;padding:4px;color:{T.ink2};font-size:16px;">&#x2715;</Dialog.Close>
       </div>
 
     {#if shareSheet.loading}

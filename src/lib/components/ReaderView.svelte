@@ -55,9 +55,6 @@
 
 </script>
 
-
-
-
 {#if item}
   <div style="position:relative;display:flex;flex-direction:column;height:100%;background:{T.bg0};color:{T.ink0};">
     <div style="flex:1;overflow-y:auto;padding:20px 28px 32px;">

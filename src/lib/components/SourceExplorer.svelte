@@ -56,8 +56,6 @@
   let actionSheet = $state<string | null>(null);
   let ctxMenuPos = $state<{ x: number; y: number } | null>(null);
 
-
-
   let editingSourceId = $state<string | null>(null);
   let editUrl  = $state('');
   let editName = $state('');
@@ -65,8 +63,6 @@
   let editGroup = $state('all');
   let editHue  = $state<number | undefined>(undefined);
   let fetchingTitle = $state(false);
-
-
 
   function openEditSheet(id: string) {
     const s = sources.find(s => s.id === id);
@@ -302,11 +298,10 @@
   </div>
 
   <!-- Long-press action sheet / Desktop context menu -->
-  {#if actionSheet && actionSource}
-    <Dialog.Root open={actionSheet !== null} onOpenChange={(open) => { if (!open) { actionSheet = null; ctxMenuPos = null; } }}>
+    <Dialog.Root open={actionSheet !== null && actionSource !== undefined} onOpenChange={(open) => { if (!open) { actionSheet = null; ctxMenuPos = null; } }}>
       <Dialog.Portal>
         {#if isDesktop && ctxMenuPos}
-          <Dialog.Overlay style="position:fixed;inset:0;z-index:100;" />
+          <Dialog.Overlay style="position:fixed;inset:0;z-index:210;" />
           <Dialog.Content
             preventScroll={false}
             style="
@@ -319,9 +314,10 @@
               border-radius:4px;
               box-shadow:0 8px 32px rgba(0,0,0,0.6);
               overflow:hidden;
-              z-index:100;
+              z-index:210;
             "
           >
+            {#if actionSource}
             <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid {T.bd0};">
               <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;">
                 <SourceGlyph kind={actionSource.kind} size={11} />
@@ -346,17 +342,19 @@
                 {act.label}
               </button>
             {/each}
+            {/if}
           </Dialog.Content>
         {:else}
-          <Dialog.Overlay style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;" />
+          <Dialog.Overlay style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:210;" />
           <Dialog.Content
             preventScroll={false}
             style="
               position:fixed;bottom:0;left:0;right:0;
               width:100%;background:{T.bg2};border-top:1px solid {T.bd1};
-              padding:0 0 24px;z-index:100;
+              padding:0 0 24px;z-index:210;
             "
           >
+            {#if actionSource}
             <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid {T.bd0};">
               <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:4px;">
                 <SourceGlyph kind={actionSource.kind} size={14} />
@@ -386,30 +384,28 @@
             <Dialog.Close
               style="display:flex;align-items:center;justify-content:center;width:100%;padding:14px 16px;background:transparent;border:none;font:12px/1 {T.mono};color:{T.ink2};cursor:pointer;"
             >cancel</Dialog.Close>
+            {/if}
           </Dialog.Content>
         {/if}
       </Dialog.Portal>
     </Dialog.Root>
-  {/if}
 
   <!-- Edit source sheet / Desktop popover -->
-  {#if editingSourceId}
     <Dialog.Root open={editingSourceId !== null} onOpenChange={(open) => { if (!open) editingSourceId = null; }}>
       <Dialog.Portal>
         {#if isDesktop}
-          <Dialog.Overlay style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);" />
-          <Dialog.Content preventScroll={false} style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;background:{T.bg1};border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:12px;width:400px;max-width:90vw;max-height:90vh;overflow-y:auto;">
+          <Dialog.Overlay style="position:fixed;inset:0;z-index:210;background:rgba(0,0,0,0.5);" />
+          <Dialog.Content preventScroll={false} style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:210;background:{T.bg1};border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:12px;width:400px;max-width:90vw;max-height:90vh;overflow-y:auto;">
             {@render editForm()}
           </Dialog.Content>
         {:else}
-          <Dialog.Overlay style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);display:flex;flex-direction:column;justify-content:flex-end;" />
+          <Dialog.Overlay style="position:fixed;inset:0;z-index:210;background:rgba(0,0,0,0.5);display:flex;flex-direction:column;justify-content:flex-end;" />
           <Dialog.Content preventScroll={false} style="position:relative;background:{T.bg1};border-top-left-radius:12px;border-top-right-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:max(16px, env(safe-area-inset-bottom));">
             {@render editForm()}
           </Dialog.Content>
         {/if}
       </Dialog.Portal>
     </Dialog.Root>
-  {/if}
 </div>
 
 {#snippet editForm()}

@@ -43,7 +43,7 @@
     >
       <div style="padding:12px 16px;border-bottom:1px solid {T.bd0};display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
         <Dialog.Title style="font:600 12px/1 {T.mono};color:{T.ink0};letter-spacing:0.6px;text-transform:uppercase;margin:0;">{title}</Dialog.Title>
-        <Dialog.Close onclick={onClose} style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;border-radius:3px;" aria-label="Close dialog">
+        <Dialog.Close style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;border-radius:3px;" aria-label="Close dialog">
           <Icon name="x" size={14} color={T.ink1} />
         </Dialog.Close>
       </div>
