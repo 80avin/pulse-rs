@@ -397,8 +397,8 @@
     <Dialog.Root open={editingSourceId !== null} onOpenChange={(open) => { if (!open) editingSourceId = null; }}>
       <Dialog.Portal>
         {#if isDesktop}
-          <Dialog.Overlay style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;" />
-          <Dialog.Content preventScroll={false} style="background:{T.bg1};border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:12px;width:400px;max-width:90vw;max-height:90vh;overflow-y:auto;">
+          <Dialog.Overlay style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);" />
+          <Dialog.Content preventScroll={false} style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;background:{T.bg1};border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:12px;width:400px;max-width:90vw;max-height:90vh;overflow-y:auto;">
             {@render editForm()}
           </Dialog.Content>
         {:else}

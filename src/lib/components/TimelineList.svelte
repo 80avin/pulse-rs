@@ -14,7 +14,6 @@
     emptyMessage = '',
     openId = '',
     onItemClick,
-    onItemContextMenu,
     onTagClick,
     onLongPress,
   }: {
@@ -23,7 +22,6 @@
     emptyMessage?: string;
     openId?: string;
     onItemClick: (id: string, allIds: string[]) => void;
-    onItemContextMenu?: (e: MouseEvent, item: FeedItem) => void;
     onTagClick?: (tag: string) => void;
     onLongPress?: (item: FeedItem) => void;
   } = $props();
@@ -86,7 +84,6 @@
             data-index={vItem.index}
             use:measureItem
             style="position:absolute;top:0;left:0;width:100%;transform:translateY({vItem.start}px);"
-            oncontextmenu={(e) => onItemContextMenu?.(e, item)}
           >
             <ItemRow
               {item}
