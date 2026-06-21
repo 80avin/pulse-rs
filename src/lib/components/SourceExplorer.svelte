@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { createDialog, melt } from '@melt-ui/svelte';
+  import { Dialog } from 'bits-ui';
   import { sources, groups, items, markSourceRead, addSource as storeAddSource, removeSource as storeRemoveSource, updateSource as storeUpdateSource, syncSource as storeSyncSource, createGroup, detectFeed } from '$lib/stores/data.svelte';
   import { logger } from '$lib/logger';
   import StatusDot from '$lib/components/StatusDot.svelte';
@@ -56,12 +56,7 @@
   let actionSheet = $state<string | null>(null);
   let ctxMenuPos = $state<{ x: number; y: number } | null>(null);
 
-  const actSheet = createDialog({
-    defaultOpen: true,
-    preventScroll: false,
-    onOpenChange: ({ next }) => { if (!next) { actionSheet = null; ctxMenuPos = null; } return next; },
-  });
-  const { overlay: actOverlay, content: actContent, close: actClose } = actSheet.elements;
+
 
   let editingSourceId = $state<string | null>(null);
   let editUrl  = $state('');
@@ -71,12 +66,7 @@
   let editHue  = $state<number | undefined>(undefined);
   let fetchingTitle = $state(false);
 
-  const editSheet = createDialog({
-    defaultOpen: true,
-    preventScroll: false,
-    onOpenChange: ({ next }) => { if (!next) editingSourceId = null; return next; },
-  });
-  const { overlay: editOverlay, content: editContent, close: editClose } = editSheet.elements;
+
 
   function openEditSheet(id: string) {
     const s = sources.find(s => s.id === id);
@@ -313,101 +303,112 @@
 
   <!-- Long-press action sheet / Desktop context menu -->
   {#if actionSheet && actionSource}
-    {#if isDesktop && ctxMenuPos}
-      <div {...$actOverlay} use:melt={$actOverlay} style="position:fixed;inset:0;z-index:100;">
-        <div
-          {...$actContent} use:melt={$actContent}
-          style="
-            position:absolute;
-            top:{Math.min(ctxMenuPos.y, (typeof window !== 'undefined' ? window.innerHeight : 600) - 280)}px;
-            left:{Math.min(ctxMenuPos.x, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 220)}px;
-            width:220px;
-            background:{T.bg2};
-            border:1px solid {T.bd1};
-            border-radius:4px;
-            box-shadow:0 8px 32px rgba(0,0,0,0.6);
-            overflow:hidden;
-          "
-        >
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid {T.bd0};">
-            <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;">
-              <SourceGlyph kind={actionSource.kind} size={11} />
+    <Dialog.Root open={actionSheet !== null} onOpenChange={(open) => { if (!open) { actionSheet = null; ctxMenuPos = null; } }}>
+      <Dialog.Portal>
+        {#if isDesktop && ctxMenuPos}
+          <Dialog.Overlay style="position:fixed;inset:0;z-index:100;" />
+          <Dialog.Content
+            preventScroll={false}
+            style="
+              position:fixed;
+              top:{Math.min(ctxMenuPos.y, (typeof window !== 'undefined' ? window.innerHeight : 600) - 280)}px;
+              left:{Math.min(ctxMenuPos.x, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 220)}px;
+              width:220px;
+              background:{T.bg2};
+              border:1px solid {T.bd1};
+              border-radius:4px;
+              box-shadow:0 8px 32px rgba(0,0,0,0.6);
+              overflow:hidden;
+              z-index:100;
+            "
+          >
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid {T.bd0};">
+              <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:3px;">
+                <SourceGlyph kind={actionSource.kind} size={11} />
+              </div>
+              <div style="min-width:0;">
+                <div style="font:11px/1 {T.mono};color:{T.ink0};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{actionSource.name}</div>
+                <div style="font:9px/1 {T.mono};color:{T.ink3};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{actionSource.host}</div>
+              </div>
             </div>
-            <div style="min-width:0;">
-              <div style="font:11px/1 {T.mono};color:{T.ink0};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{actionSource.name}</div>
-              <div style="font:9px/1 {T.mono};color:{T.ink3};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{actionSource.host}</div>
+            {#each [
+              { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
+              { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
+              { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
+              { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
+              { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
+            ] as act}
+              <button
+                onclick={act.action}
+                style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd0};font:11px/1 {T.mono};color:{act.label === 'Remove source' ? T.red : T.ink0};cursor:pointer;text-align:left;"
+              >
+                <Icon name={act.icon} size={13} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
+                {act.label}
+              </button>
+            {/each}
+          </Dialog.Content>
+        {:else}
+          <Dialog.Overlay style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;" />
+          <Dialog.Content
+            preventScroll={false}
+            style="
+              position:fixed;bottom:0;left:0;right:0;
+              width:100%;background:{T.bg2};border-top:1px solid {T.bd1};
+              padding:0 0 24px;z-index:100;
+            "
+          >
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid {T.bd0};">
+              <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:4px;">
+                <SourceGlyph kind={actionSource.kind} size={14} />
+              </div>
+              <div>
+                <div style="font:13px/1 {T.mono};color:{T.ink0};">{actionSource.name}</div>
+                <div style="margin-top:4px;font:10px/1 {T.mono};color:{T.ink3};">{actionSource.host}</div>
+              </div>
+              <span style="flex:1;"></span>
+              <StatusDot status={actionSource.status} />
             </div>
-          </div>
-          {#each [
-            { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
-            { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
-            { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
-            { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
-            { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
-          ] as act}
-            <button
-              onclick={act.action}
-              style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:transparent;border:none;border-bottom:1px solid {T.bd0};font:11px/1 {T.mono};color:{act.label === 'Remove source' ? T.red : T.ink0};cursor:pointer;text-align:left;"
-            >
-              <Icon name={act.icon} size={13} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
-              {act.label}
-            </button>
-          {/each}
-        </div>
-      </div>
-    {:else}
-      <div {...$actOverlay} use:melt={$actOverlay} style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;display:flex;align-items:flex-end;">
-        <div {...$actContent} use:melt={$actContent} style="width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:0 0 24px;">
-          <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid {T.bd0};">
-            <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:{T.bg1};border:1px solid {T.bd1};border-radius:4px;">
-              <SourceGlyph kind={actionSource.kind} size={14} />
-            </div>
-            <div>
-              <div style="font:13px/1 {T.mono};color:{T.ink0};">{actionSource.name}</div>
-              <div style="margin-top:4px;font:10px/1 {T.mono};color:{T.ink3};">{actionSource.host}</div>
-            </div>
-            <span style="flex:1;"></span>
-            <StatusDot status={actionSource.status} />
-          </div>
-          {#each [
-            { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
-            { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
-            { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
-            { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
-            { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
-          ] as act}
-            <button
-              onclick={act.action}
-              style="display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;background:transparent;border:none;border-bottom:1px solid {T.bd0};font:13px/1 {T.mono};color:{act.label === 'Remove source' ? T.red : T.ink0};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent;"
-            >
-              <Icon name={act.icon} size={16} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
-              {act.label}
-            </button>
-          {/each}
-          <button
-            use:melt={$actClose}
-            style="display:flex;align-items:center;justify-content:center;width:100%;padding:14px 16px;background:transparent;border:none;font:12px/1 {T.mono};color:{T.ink2};cursor:pointer;"
-          >cancel</button>
-        </div>
-      </div>
-    {/if}
+            {#each [
+              { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
+              { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
+              { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
+              { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
+              { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
+            ] as act}
+              <button
+                onclick={act.action}
+                style="display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;background:transparent;border:none;border-bottom:1px solid {T.bd0};font:13px/1 {T.mono};color:{act.label === 'Remove source' ? T.red : T.ink0};cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent;"
+              >
+                <Icon name={act.icon} size={16} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
+                {act.label}
+              </button>
+            {/each}
+            <Dialog.Close
+              style="display:flex;align-items:center;justify-content:center;width:100%;padding:14px 16px;background:transparent;border:none;font:12px/1 {T.mono};color:{T.ink2};cursor:pointer;"
+            >cancel</Dialog.Close>
+          </Dialog.Content>
+        {/if}
+      </Dialog.Portal>
+    </Dialog.Root>
   {/if}
 
   <!-- Edit source sheet / Desktop popover -->
   {#if editingSourceId}
-    {#if isDesktop}
-      <div {...$editOverlay} use:melt={$editOverlay} style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">
-        <div {...$editContent} use:melt={$editContent} style="background:{T.bg1};border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:12px;width:400px;max-width:90vw;max-height:90vh;overflow-y:auto;">
-          {@render editForm()}
-        </div>
-      </div>
-    {:else}
-      <div {...$editOverlay} use:melt={$editOverlay} style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);display:flex;flex-direction:column;justify-content:flex-end;">
-        <div {...$editContent} use:melt={$editContent} style="position:relative;background:{T.bg1};border-top-left-radius:12px;border-top-right-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:max(16px, env(safe-area-inset-bottom));">
-          {@render editForm()}
-        </div>
-      </div>
-    {/if}
+    <Dialog.Root open={editingSourceId !== null} onOpenChange={(open) => { if (!open) editingSourceId = null; }}>
+      <Dialog.Portal>
+        {#if isDesktop}
+          <Dialog.Overlay style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;" />
+          <Dialog.Content preventScroll={false} style="background:{T.bg1};border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:12px;width:400px;max-width:90vw;max-height:90vh;overflow-y:auto;">
+            {@render editForm()}
+          </Dialog.Content>
+        {:else}
+          <Dialog.Overlay style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.5);display:flex;flex-direction:column;justify-content:flex-end;" />
+          <Dialog.Content preventScroll={false} style="position:relative;background:{T.bg1};border-top-left-radius:12px;border-top-right-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:max(16px, env(safe-area-inset-bottom));">
+            {@render editForm()}
+          </Dialog.Content>
+        {/if}
+      </Dialog.Portal>
+    </Dialog.Root>
   {/if}
 </div>
 
@@ -492,10 +493,9 @@
   </div>
 
   <div style="display:flex;gap:8px;margin-top:4px;">
-    <button
-      use:melt={$editClose}
+    <Dialog.Close
       style="flex:1;padding:12px;background:transparent;border:1px solid {T.bd1};border-radius:4px;font:12px/1 {T.mono};color:{T.ink2};cursor:pointer;"
-    >cancel</button>
+    >cancel</Dialog.Close>
     <button
       onclick={submitEditSource}
       style="flex:2;padding:12px;background:{T.cyan};border:none;border-radius:4px;font:12px/1 {T.mono};color:{T.bg0};cursor:pointer;font-weight:600;"

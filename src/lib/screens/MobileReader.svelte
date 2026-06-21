@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { T } from '$lib/tokens';
-  import { createDialog, melt } from '@melt-ui/svelte';
+  import { Dialog } from 'bits-ui';
   import { items, sources, markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, shareItem } from '$lib/utils';
@@ -36,12 +36,6 @@
   let navDir = $state(0);
   let popoverOpen = $state(false);
 
-  const noteSheetDialog = createDialog({
-    defaultOpen: true,
-    preventScroll: false,
-    onOpenChange: ({ next }) => { if (!next) noteSheetOpen = false; return next; },
-  });
-  const { overlay: noteOverlay, content: noteContent, close: noteClose } = noteSheetDialog.elements;
 
   function onSwipeStart(e: TouchEvent) {
     if (noteSheetOpen || popoverOpen) return;
@@ -253,32 +247,34 @@
 
     <!-- Note input sheet -->
     {#if noteSheetOpen}
-      <div {...$noteOverlay} use:melt={$noteOverlay} style="position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:20;">
-        <div {...$noteContent} use:melt={$noteContent} style="width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};"
-        >
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.5px;">note</span>
-            <button use:melt={$noteClose} style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
-              <Icon name="x" size={14} />
-            </button>
-          </div>
-          <textarea
-            bind:value={noteDraft}
-            placeholder="Add a note about this post…"
-            style="width:100%;min-height:80px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;padding:10px;font:12px/1.5 {T.sans};color:{T.ink0};resize:vertical;box-sizing:border-box;"
-          ></textarea>
-          <div style="margin-top:12px;display:flex;gap:8px;">
-            <button
-              use:melt={$noteClose}
-              style="flex:1;padding:10px 0;background:transparent;color:{T.ink1};border:1px solid {T.bd2};border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;"
-            >cancel</button>
-            <button
-              onclick={saveWithNote}
-              style="flex:1;padding:10px 0;background:{T.amber};color:{T.bg0};border:none;border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;"
-            >save with note</button>
-          </div>
-        </div>
-      </div>
+      <Dialog.Root open={noteSheetOpen} onOpenChange={(open) => { if (!open) noteSheetOpen = false; }}>
+        <Dialog.Portal>
+          <Dialog.Overlay style="position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:20;" />
+          <Dialog.Content
+            preventScroll={false}
+            style="position:absolute;bottom:0;left:0;right:0;width:100%;background:{T.bg2};border-top:1px solid {T.bd1};padding:14px 14px 24px;font:12px/1.4 {T.sans};color:{T.ink0};z-index:20;"
+          >
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <span style="font:10px/1 {T.mono};color:{T.ink3};text-transform:uppercase;letter-spacing:0.5px;">note</span>
+              <Dialog.Close style="background:transparent;border:none;color:{T.ink2};cursor:pointer;display:flex;">
+                <Icon name="x" size={14} />
+              </Dialog.Close>
+            </div>
+            <textarea
+              bind:value={noteDraft}
+              placeholder="Add a note about this post…"
+              style="width:100%;min-height:80px;background:{T.bg0};border:1px solid {T.bd1};border-radius:3px;padding:10px;font:12px/1.5 {T.sans};color:{T.ink0};resize:vertical;box-sizing:border-box;"
+            ></textarea>
+            <div style="margin-top:12px;display:flex;gap:8px;">
+              <Dialog.Close style="flex:1;padding:10px 0;background:transparent;color:{T.ink1};border:1px solid {T.bd2};border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;">cancel</Dialog.Close>
+              <button
+                onclick={saveWithNote}
+                style="flex:1;padding:10px 0;background:{T.amber};color:{T.bg0};border:none;border-radius:3px;font:11px/1 {T.mono};cursor:pointer;letter-spacing:0.3px;"
+              >save with note</button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     {/if}
   </div>
 {:else}

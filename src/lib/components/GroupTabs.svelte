@@ -3,7 +3,7 @@
   import type { Group } from '$lib/types';
   import { createGroup, renameGroup, deleteGroup } from '$lib/stores/data.svelte';
   import Icon from './Icon.svelte';
-  import { createTabs, melt } from '@melt-ui/svelte';
+  import { Tabs } from 'bits-ui';
 
   let { groups, active, onSelect, counts = {}, orientation = 'horizontal' }: {
     groups: Group[];
@@ -50,35 +50,8 @@
     if (active === id) onSelect('all');
   }
 
-  const tabs = createTabs({
-    activateOnFocus: true,
-    loop: false,
-    orientation: orientation,
-    defaultValue: active,
-  });
-  const { root, list, trigger } = tabs.elements;
-
-  $effect(() => {
-    if (!active) return;
-    if (tabs.states.value.get() !== active) {
-      tabs.states.value.set(active);
-    }
-  });
-
-  let pendingSelect = $state<string | null>(null);
-  $effect(() => {
-    const val = tabs.states.value.get();
-    if (val && val !== active) {
-      pendingSelect = val;
-    }
-  });
-  $effect(() => {
-    if (pendingSelect) {
-      const id = pendingSelect;
-      pendingSelect = null;
-      onSelect(id);
-    }
-  });
+  let activeTab = $state(active);
+  $effect(() => { activeTab = active; });
 </script>
 
 {#if editing}
@@ -156,33 +129,30 @@
     {/if}
   </div>
 {:else if orientation === 'vertical'}
-  <div use:melt={$root} style="display:flex;flex-direction:column;padding:4px 0;background:{T.bg1};flex-shrink:0;">
-    <div use:melt={$list} style="display:flex;flex-direction:column;">
+  <Tabs.Root bind:value={activeTab} orientation="vertical" style="display:flex;flex-direction:column;padding:4px 0;background:{T.bg1};flex-shrink:0;">
+    <Tabs.List style="display:flex;flex-direction:column;">
       {#each groups as g}
-        {@const triggerAttrs = $trigger(g.id)}
-        <button
-          {...triggerAttrs}
-          use:melt={triggerAttrs}
+        <Tabs.Trigger value={g.id}
           onclick={() => onSelect(g.id)}
           oncontextmenu={(e: MouseEvent) => { e.preventDefault(); editing = true; }}
-          onmouseenter={(e: MouseEvent) => { if (g.id !== active)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
-          onmouseleave={(e: MouseEvent) => { if (g.id !== active)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          onmouseenter={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
+          onmouseleave={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           onfocus={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
           onblur={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
           style="
             display:flex;align-items:center;gap:8px;padding:6px 12px;
-            background:{g.id === active ? 'rgba(78,205,214,0.06)' : 'transparent'};
-            border:none;border-left:2px solid {g.id === active ? T.cyan : 'transparent'};
-            color:{g.id === active ? T.ink0 : T.ink1};
-            font:{g.id === active ? '600' : '400'} 13px/1.2 {T.mono};
+            background:{activeTab === g.id ? 'rgba(78,205,214,0.06)' : 'transparent'};
+            border:none;border-left:2px solid {activeTab === g.id ? T.cyan : 'transparent'};
+            color:{activeTab === g.id ? T.ink0 : T.ink1};
+            font:{activeTab === g.id ? '600' : '400'} 13px/1.2 {T.mono};
             cursor:pointer;text-align:left;width:100%;
           "
         >
           <span style="flex:1;">{g.name}</span>
-          <span style="font:10px/1 {T.mono};color:{g.id === active ? T.cyan : T.ink3};font-variant-numeric:tabular-nums;">{counts[g.id] ?? g.n}</span>
-        </button>
+          <span style="font:10px/1 {T.mono};color:{activeTab === g.id ? T.cyan : T.ink3};font-variant-numeric:tabular-nums;">{counts[g.id] ?? g.n}</span>
+        </Tabs.Trigger>
       {/each}
-    </div>
+    </Tabs.List>
     <button
       onclick={() => { editing = true; }}
       onmouseenter={(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }}
@@ -192,35 +162,32 @@
       <Icon name="plus" size={10} color={T.ink3} />
       <span>New Group</span>
     </button>
-  </div>
+  </Tabs.Root>
 {:else}
-  <div use:melt={$root} style="display:flex;overflow-x:auto;flex-shrink:0;border-bottom:1px solid {T.bd0};background:{T.bg1};scrollbar-width:none;">
-    <div use:melt={$list} style="display:flex;">
+  <Tabs.Root bind:value={activeTab} orientation="horizontal" style="display:flex;overflow-x:auto;flex-shrink:0;border-bottom:1px solid {T.bd0};background:{T.bg1};scrollbar-width:none;">
+    <Tabs.List style="display:flex;">
       {#each groups as g}
-        {@const triggerAttrs = $trigger(g.id)}
-        <button
-          {...triggerAttrs}
-          use:melt={triggerAttrs}
+        <Tabs.Trigger value={g.id}
           onclick={() => onSelect(g.id)}
           onpointerdown={() => startPress(g.id)}
           onpointerup={cancelPress}
           onpointercancel={cancelPress}
-          onmouseenter={(e: MouseEvent) => { if (g.id !== active)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
-          onmouseleave={(e: MouseEvent) => { if (g.id !== active)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          onmouseenter={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
+          onmouseleave={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           style="
             flex-shrink:0;padding:13px 14px;min-height:44px;
             background:transparent;border:none;
-            border-bottom:2px solid {g.id === active ? T.cyan : 'transparent'};
-            color:{g.id === active ? T.ink0 : T.ink2};
-            font:{g.id === active ? '600' : '400'} 13px/1.2 {T.mono};
+            border-bottom:2px solid {activeTab === g.id ? T.cyan : 'transparent'};
+            color:{activeTab === g.id ? T.ink0 : T.ink2};
+            font:{activeTab === g.id ? '600' : '400'} 13px/1.2 {T.mono};
             cursor:pointer;display:flex;align-items:center;gap:6px;letter-spacing:0.3px;
           "
         >
           <span>{g.name}</span>
-          <span style="font:10px/1 {T.mono};color:{g.id === active ? T.cyan : T.ink3};font-variant-numeric:tabular-nums;">{counts[g.id] ?? g.n}</span>
-        </button>
+          <span style="font:10px/1 {T.mono};color:{activeTab === g.id ? T.cyan : T.ink3};font-variant-numeric:tabular-nums;">{counts[g.id] ?? g.n}</span>
+        </Tabs.Trigger>
       {/each}
-    </div>
+    </Tabs.List>
     <div style="flex:1;min-width:8px;"></div>
     <button
       onclick={() => { editing = true; }}
@@ -228,5 +195,5 @@
     >
       <Icon name="edit" size={14} />
     </button>
-  </div>
+  </Tabs.Root>
 {/if}
