@@ -158,11 +158,44 @@ When the user shares a URL from any Android app:
 
 ### Frontend layout
 
-The UI is responsive-bifurcated: `+page.svelte` checks `window.innerWidth` and renders either `Desktop.svelte` or `Mobile.svelte` from `src/lib/screens/`. All Tauri commands are called via `@tauri-apps/api/core` `invoke()`.
+The UI is responsive-bifurcated: `+page.svelte` checks `window.innerWidth` and renders either `DesktopShell.svelte` or `MobileShell.svelte` from `src/lib/screens/`. All Tauri commands are called via `@tauri-apps/api/core` `invoke()`.
 
-`+layout.svelte` sets up two persistent listeners: the AI tagging progress listener (from `store.svelte.ts`) and the share intent listener (from `share.svelte.ts`). It also renders `<ShareSheet />` when `shareSheet.candidate !== null`.
+`+layout.svelte` sets up two persistent listeners: the AI tagging progress listener (from `$lib/stores/ai.svelte`) and the share intent listener (from `share.svelte.ts`). It also renders `<ShareSheet />` when `shareSheet.candidate !== null`, injects accent color CSS variables via `<svelte:head>`, applies system/dark/light theme resolution, and sets `data-density` attribute on the root div.
 
-Desktop FTS search: a debounced `$effect` (300ms) calls `searchItems()` when the search box is non-empty and `IS_TAURI` is true. Results override the paginated `filteredItems` derived store. When the box is cleared, pagination resumes from where it left off.
+**Styling:** Tailwind CSS v4 with a `@theme` block in `app.css`. All design tokens use `light-dark(LIGHT, DARK)` for automatic theme switching via `color-scheme`. Sizing/spacing uses inline styles (Tailwind arbitrary values don't generate from `.svelte` templates). Color utilities (`text-cyan`, `bg-bg-1`, `border-bd-0`) are standard Tailwind classes from `@theme` tokens. `tokens.ts` bridges JS→CSS vars for dynamic inline styles.
+
+**Theming:** Settings (`settings.svelte.ts`) persist theme (`system`/`dark`/`light`), accent color (cyan/blue/green/amber/violet), and density (dense/normal/roomy). Accent is injected as `--user-accent` CSS var with `light-dark()` awareness. Density sets `--item-pad-y` CSS variable on `[data-density]` selector.
+
+### Store architecture (hub-and-spoke)
+
+State is decomposed into feature modules under `src/lib/stores/`:
+
+| Module | Responsibility |
+|--------|---------------|
+| `data.svelte.ts` | items[], sources[], groups[], dbStats, initStore (cold-start retry loop), ALL mutation functions |
+| `timeline.svelte.ts` | timelineFilter, pageCounts, fetchNextPage, filter setters |
+| `ai.svelte.ts` | aiStatus, models[], aiStats, taggingProgress, model CRUD |
+| `sync.svelte.ts` | syncState, doSync(), Tauri event listeners, mock sync pool |
+| `search.svelte.ts` | searchItems() via FTS5 |
+| `settings.svelte.ts` | User preferences persisted to localStorage + Tauri backend |
+
+`data.svelte.ts` is the single source of truth. Feature modules import from it, never from each other. Components import directly from the module they need.
+
+### Component structure
+
+```
+src/lib/components/
+├── layout/          — DragHandle, StatusBar (extracted from DesktopShell)
+├── timeline/        — ItemRow, TimelineList, FilterStrip, GroupTabs, FilterPills
+├── reader/          — ReaderView
+├── sources/         — SourceExplorer
+├── settings/        — SettingsPanelContent, ThemeSection, SettingsSection
+├── ai/              — AiPanelContent
+├── shell/           — BottomTools (left rail utilities)
+└── shared/          — Icon, IconBtn, Modal, ContextActions, TagChip, KeyCap, ScoreBar, Sparkline, Thumb, SourceGlyph, StatusDot, SearchView, ShareSheet, SkipLink
+```
+
+Desktop FTS search: a debounced `$effect` (300ms) calls `searchItems()` when the search box is non-empty and `IS_TAURI` is true. Results override the paginated `displayItems` derived store. When the box is cleared, pagination resumes.
 
 `og_image` pipeline: `FeedItemView.og_image` (DB) → `FeedItemDto.og_image` (Tauri DTO) → `BackendItem.ogImage` (store adapter) → `FeedItem.ogImage` (frontend type) → trailing `<img>` in `ItemRow.svelte`. The image is hidden via `onerror` if it fails to load.
 
@@ -234,3 +267,47 @@ Never use `pip install` directly. Always use `uv venv` + `uv pip install`. The s
 ### Package manager: pnpm only
 
 All JS/TS operations use `pnpm`. Never use `npm` or `yarn`.
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **pulse-rs** (2239 symbols, 4429 relationships, 188 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
+- NEVER commit changes without running `detect_changes()` to check affected scope.
+
+## Resources
+
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/pulse-rs/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/pulse-rs/clusters` | All functional areas |
+| `gitnexus://repo/pulse-rs/processes` | All execution flows |
+| `gitnexus://repo/pulse-rs/process/{name}` | Step-by-step execution trace |
+
+## CLI
+
+| Task | Read this skill file |
+|------|---------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+
+<!-- gitnexus:end -->

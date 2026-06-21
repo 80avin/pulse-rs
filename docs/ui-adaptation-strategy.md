@@ -1,5 +1,11 @@
 # Pulse — UI Adaptation Strategy
 
+> **Status (June 2026):** The frontend v2 refactor implemented most goals from this doc but with a different architecture. See `docs/superpowers/specs/2026-06-20-frontend-v2-design.md` for the actual implementation.
+>
+> **Implemented:** theming (system/dark/light + accent), density system (CSS vars), accessibility (focus-visible, aria-labels, skip-link), Tailwind CSS v4, store decomposition (hub-and-spoke pattern instead of feature-event pattern), component extractions.
+>
+> **Diverged:** route-based SPA (single-page with tabs/modals works fine), event-based sync (direct imports via data hub), feature-oriented stores (hub-and-spoke with single data module). The original design's spirit (clean separation, accessibility, theming) was preserved, but the architecture is simpler and more pragmatic.
+
 ## Overview
 
 This document covers how the headless `pulse-core` library maps to the Tauri+Svelte UI layer in Phase 3. The UI is a thin presentation layer over the core engine — it does not implement any business logic independently.
