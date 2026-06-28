@@ -13,6 +13,7 @@ export function longpress(
     startX = clientX;
     startY = clientY;
     fired = false;
+    if (timer) clearTimeout(timer);
     timer = setTimeout(() => { fired = true; options.onLongpress(); }, delay);
   }
 
@@ -46,26 +47,33 @@ export function longpress(
     onMove(e.clientX, e.clientY);
   }
 
-  node.addEventListener('touchstart', touchStart, { passive: true });
-  node.addEventListener('touchmove', touchMove, { passive: true });
-  node.addEventListener('touchend', onEnd);
-  node.addEventListener('touchcancel', onEnd);
-  node.addEventListener('pointerdown', pointerDown);
-  node.addEventListener('pointermove', pointerMove);
-  node.addEventListener('pointerup', onEnd);
-  node.addEventListener('pointercancel', onEnd);
+  const supportsPointerEvents = 'PointerEvent' in window;
+  if (supportsPointerEvents) {
+    node.addEventListener('pointerdown', pointerDown);
+    node.addEventListener('pointermove', pointerMove);
+    node.addEventListener('pointerup', onEnd);
+    node.addEventListener('pointercancel', onEnd);
+  } else {
+    node.addEventListener('touchstart', touchStart, { passive: true });
+    node.addEventListener('touchmove', touchMove, { passive: true });
+    node.addEventListener('touchend', onEnd);
+    node.addEventListener('touchcancel', onEnd);
+  }
 
   return {
     destroy() {
       if (timer) clearTimeout(timer);
-      node.removeEventListener('touchstart', touchStart);
-      node.removeEventListener('touchmove', touchMove);
-      node.removeEventListener('touchend', onEnd);
-      node.removeEventListener('touchcancel', onEnd);
-      node.removeEventListener('pointerdown', pointerDown);
-      node.removeEventListener('pointermove', pointerMove);
-      node.removeEventListener('pointerup', onEnd);
-      node.removeEventListener('pointercancel', onEnd);
-    }
+      if (supportsPointerEvents) {
+        node.removeEventListener("pointerdown", pointerDown);
+        node.removeEventListener("pointermove", pointerMove);
+        node.removeEventListener("pointerup", onEnd);
+        node.removeEventListener("pointercancel", onEnd);
+      } else {
+        node.removeEventListener("touchstart", touchStart);
+        node.removeEventListener("touchmove", touchMove);
+        node.removeEventListener("touchend", onEnd);
+        node.removeEventListener("touchcancel", onEnd);
+      }
+    },
   };
 }
