@@ -356,7 +356,9 @@ pub async fn get_timeline(
         is_saved: None,
         ..filter.clone()
     };
-    let counts = get_timeline_counts(pool, &count_filter).await.unwrap_or_default();
+    let counts = get_timeline_counts(pool, &count_filter)
+        .await
+        .unwrap_or_default();
 
     Ok(TimelinePage {
         items,

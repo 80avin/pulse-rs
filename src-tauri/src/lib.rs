@@ -384,9 +384,7 @@ pub extern "C" fn Java_com_avinthakur080_pulse_1rs_ShareBridge_onShareUrl<'local
     url: jni::objects::JString<'local>,
 ) {
     let url = env
-        .with_env(|env| -> jni::errors::Result<_> {
-            Ok(String::from(url.mutf8_chars(env)?))
-        })
+        .with_env(|env| -> jni::errors::Result<_> { Ok(String::from(url.mutf8_chars(env)?)) })
         .resolve::<jni::errors::ThrowRuntimeExAndDefault>();
     if url.is_empty() {
         return;

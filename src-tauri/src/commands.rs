@@ -963,21 +963,19 @@ pub fn share_log_file(app: tauri::AppHandle, state: State<'_, AppState>) -> Resu
         let dest_str = dest.to_string_lossy().to_string();
 
         if let Some(vm) = crate::ANDROID_VM.get() {
-            let Ok(_) = vm.attach_current_thread(
-                |env: &mut jni::Env| -> jni::errors::Result<()> {
-                    let class = env
-                        .find_class(jni::jni_str!("com/avinthakur080/pulse_rs/ShareBridge"))?;
-                    let jpath = env.new_string(&dest_str)?;
-                    env.call_static_method(
-                        class,
-                        jni::jni_str!("shareFile"),
-                        jni::jni_sig!("(Ljava/lang/String;)V"),
-                        &[jni::objects::JValue::Object(&jpath)],
-                    )?;
-                    tracing::info!(path = %dest_str, "share_log_file: shared via Android intent");
-                    Ok(())
-                },
-            ) else {
+            let Ok(_) = vm.attach_current_thread(|env: &mut jni::Env| -> jni::errors::Result<()> {
+                let class =
+                    env.find_class(jni::jni_str!("com/avinthakur080/pulse_rs/ShareBridge"))?;
+                let jpath = env.new_string(&dest_str)?;
+                env.call_static_method(
+                    class,
+                    jni::jni_str!("shareFile"),
+                    jni::jni_sig!("(Ljava/lang/String;)V"),
+                    &[jni::objects::JValue::Object(&jpath)],
+                )?;
+                tracing::info!(path = %dest_str, "share_log_file: shared via Android intent");
+                Ok(())
+            }) else {
                 return Err("JNI: cannot attach thread".into());
             };
             return Ok(());
