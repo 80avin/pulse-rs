@@ -323,7 +323,6 @@ pub fn run() {
             commands::get_settings,
             commands::save_settings,
             commands::get_db_stats,
-            commands::clear_items,
             commands::search_items,
             // AI management
             commands::get_ai_status,

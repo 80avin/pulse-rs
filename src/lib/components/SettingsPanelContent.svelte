@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { sources, groups, clearItems, loadMockData, coldstartTiming, dbStats, addSource, createGroup } from '$lib/stores/data.svelte';
+  import { sources, groups, coldstartTiming, dbStats, addSource, createGroup } from '$lib/stores/data.svelte';
   import { aiStatus } from '$lib/stores/ai.svelte';
   import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
@@ -28,8 +28,6 @@
   const okCount     = $derived(sources.filter(s => s.status === 'ok').length);
   const errCount    = $derived(sources.filter(s => s.status === 'error').length);
 
-  let clearing = $state(false);
-
   // Diagnostics state
   let logPath = $state('');
   let sharingLogs = $state(false);
@@ -41,13 +39,6 @@
       tauriInvoke<string>('get_log_path').then(p => { logPath = p; }).catch(() => {});
     }
   });
-
-  async function handleClearItems() {
-    if (!confirm('Delete all cached items? Sources will remain. Re-sync to restore.')) return;
-    clearing = true;
-    await clearItems();
-    clearing = false;
-  }
 
   async function handleOpenLogsFolder() {
     await tauriInvoke('open_logs_folder').catch(e => logger.warn('open_logs_folder failed', e));
@@ -84,15 +75,6 @@
       group: s.group,
     }));
     sourceJson = JSON.stringify(data, null, 2);
-  }
-
-  async function handleCopyExport() {
-    if (!sourceJson) exportSources();
-    try {
-      await navigator.clipboard.writeText(sourceJson);
-    } catch (e) {
-      logger.warn('clipboard write failed', e);
-    }
   }
 
   async function handleShareExport() {
@@ -380,25 +362,4 @@
       {/if}
     </div>
   {/if}
-</SettingsSection>
-
-<!-- Actions -->
-<SettingsSection label="actions">
-  <div class="flex flex-col gap-2">
-    <button
-      onclick={() => loadMockData()}
-      class="flex items-center justify-center gap-2 w-full p-3 bg-transparent border border-bd-1 rounded text-amber cursor-pointer text-[12px] leading-none font-mono"
-    >
-      <Icon name="list" size={14} color={T.amber} />
-      load sample data
-    </button>
-    <button
-      onclick={handleClearItems}
-      disabled={clearing}
-      class="flex items-center justify-center gap-2 w-full p-3 bg-transparent border border-bd-1 rounded cursor-pointer text-[12px] leading-none font-mono" style="color:{clearing ? T.ink3 : T.red};cursor:{clearing ? 'default' : 'pointer'};"
-    >
-      <Icon name="trash" size={14} color={clearing ? T.ink3 : T.red} />
-      {clearing ? 'clearing…' : 'clear all cached items'}
-    </button>
-  </div>
 </SettingsSection>

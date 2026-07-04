@@ -94,11 +94,6 @@ pub enum DbCommand {
         reply: oneshot::Sender<DbResult<()>>,
     },
 
-    /// Delete all feed items (item_states and ai_tags cascade automatically)
-    ClearAllItems {
-        reply: oneshot::Sender<DbResult<()>>,
-    },
-
     /// Mark all items in a feed as read
     MarkFeedRead {
         feed_id: FeedId,
@@ -215,11 +210,6 @@ pub async fn db_writer_task(mut rx: mpsc::Receiver<DbCommand>, pool: SqlitePool)
                     .await
                     .map(|_| ())
                     .map_err(StorageError::Sqlite);
-                let _ = reply.send(result);
-            }
-
-            DbCommand::ClearAllItems { reply } => {
-                let result = clear_all_items(&pool).await;
                 let _ = reply.send(result);
             }
 
@@ -729,15 +719,6 @@ async fn delete_feed_group(pool: &SqlitePool, id: &str) -> DbResult<()> {
     Ok(())
 }
 
-async fn clear_all_items(pool: &SqlitePool) -> DbResult<()> {
-    // Trigger handles FTS cleanup via feed_items_fts_delete
-    sqlx::query("DELETE FROM feed_items")
-        .execute(pool)
-        .await
-        .map_err(StorageError::Sqlite)?;
-    Ok(())
-}
-
 async fn mark_feed_read(pool: &SqlitePool, feed_id: &str) -> DbResult<()> {
     let now = chrono::Utc::now().timestamp();
     sqlx::query(
@@ -897,11 +878,6 @@ impl DbHandle {
     pub async fn delete_feed_group(&self, id: String) -> DbResult<()> {
         self.send(|reply| DbCommand::DeleteFeedGroup { id, reply })
             .await
-    }
-
-    /// Delete all feed items (cascades to item_states, ai_tags)
-    pub async fn clear_all_items(&self) -> DbResult<()> {
-        self.send(|reply| DbCommand::ClearAllItems { reply }).await
     }
 
     /// Mark all items in a feed as read

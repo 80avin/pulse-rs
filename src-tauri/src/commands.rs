@@ -395,12 +395,6 @@ pub async fn hide_item(state: State<'_, AppState>, id: String) -> Result<(), Str
     core.hide_item(&id).await.map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub async fn clear_items(state: State<'_, AppState>) -> Result<(), String> {
-    let core = state.core().await?;
-    core.clear_all_items().await.map_err(|e| e.to_string())
-}
-
 // ── Group commands ─────────────────────────────────────────────────────────────
 
 #[tauri::command]

@@ -497,11 +497,6 @@ impl PulseCore {
             .map_err(PulseError::Storage)
     }
 
-    /// Delete all feed items (leaves feeds intact).
-    pub async fn clear_all_items(&self) -> Result<(), PulseError> {
-        self.db.clear_all_items().await.map_err(PulseError::Storage)
-    }
-
     /// Mark all items in a feed as read.
     pub async fn mark_feed_read(&self, feed_id: &FeedId) -> Result<(), PulseError> {
         self.db

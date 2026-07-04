@@ -203,12 +203,6 @@ export async function initStore(): Promise<void> {
 
 if (IS_TAURI) initStore();
 
-export function loadMockData() {
-  items.splice(0, items.length, ...MOCK_ITEMS.map(i => ({ ...i })));
-  sources.splice(0, sources.length, ...MOCK_SOURCES.map(s => ({ ...s })));
-  groups.splice(0, groups.length, ...MOCK_GROUPS.map(g => ({ ...g })));
-}
-
 // --- Public mutations ---
 
 export async function markRead(id: string, read = true) {
@@ -432,16 +426,6 @@ export async function syncSource(sourceId: string): Promise<void> {
   } else {
     const { doSync } = await import('./sync.svelte');
     await doSync();
-  }
-}
-
-export async function clearItems(): Promise<void> {
-  if (IS_TAURI) {
-    await tauriInvoke('clear_items');
-    items.splice(0, items.length);
-    await Promise.all([reloadSources(), reloadGroups(), reloadDbStats()]);
-  } else {
-    items.splice(0, items.length);
   }
 }
 
