@@ -3759,7 +3759,7 @@ dependencies = [
 
 [[package]]
 name = "pulse-cli"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3777,7 +3777,7 @@ dependencies = [
 
 [[package]]
 name = "pulse-core"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3801,7 +3801,7 @@ dependencies = [
 
 [[package]]
 name = "pulse-rs"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "chrono",
