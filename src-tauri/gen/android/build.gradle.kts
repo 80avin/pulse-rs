@@ -16,6 +16,9 @@ allprojects {
     }
 }
 
+// rustls-platform-verifier — Maven repo for the Android component (trust-store access)
+apply(from = "../../android-platform-verifier.gradle")
+
 tasks.register("clean").configure {
     delete("build")
 }

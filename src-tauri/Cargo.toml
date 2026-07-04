@@ -43,5 +43,8 @@ uuid = { workspace = true }
 futures-util = "0.3"
 tauri-plugin-sharesheet = "0.0.1"
 
+# platform TLS verifier — Android init requires a direct dependency
+rustls-platform-verifier = { workspace = true }
+
 [target.'cfg(target_os = "android")'.dependencies]
-jni = "0.21"
+jni = "0.22"

@@ -349,18 +349,27 @@ pub fn run() {
 }
 
 /// JNI function called from ShareBridge.kt during MainActivity.onCreate.
-/// Caches the JavaVM so background commands (e.g. share_log_file) can call
-/// Kotlin methods from any thread.
+/// Receives the Android Application context so the platform TLS verifier
+/// can access the system trust store on Android.
+/// Also caches the JavaVM so background commands can call Kotlin methods.
 #[cfg(target_os = "android")]
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
-pub extern "C" fn Java_com_avinthakur080_pulse_1rs_ShareBridge_init(
-    env: jni::JNIEnv,
-    _class: jni::objects::JClass,
+pub extern "C" fn Java_com_avinthakur080_pulse_1rs_ShareBridge_init<'local>(
+    mut env: jni::EnvUnowned<'local>,
+    _class: jni::objects::JClass<'local>,
+    context: jni::objects::JObject<'local>,
 ) {
-    if let Ok(vm) = env.get_java_vm() {
-        let _ = ANDROID_VM.set(vm);
-    }
+    env.with_env(|env| -> jni::errors::Result<()> {
+        if let Ok(vm) = env.get_java_vm() {
+            let _ = ANDROID_VM.set(vm);
+        }
+        if let Err(e) = rustls_platform_verifier::android::init_with_env(env, context) {
+            tracing::error!("rustls-platform-verifier android init failed: {e}");
+        }
+        Ok(())
+    })
+    .resolve::<jni::errors::LogErrorAndDefault>();
 }
 
 /// JNI function called from ShareBridge.kt when Android receives a share/view intent.
@@ -369,15 +378,16 @@ pub extern "C" fn Java_com_avinthakur080_pulse_1rs_ShareBridge_init(
 #[cfg(target_os = "android")]
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
-pub extern "C" fn Java_com_avinthakur080_pulse_1rs_ShareBridge_onShareUrl(
-    mut env: jni::JNIEnv,
-    _class: jni::objects::JClass,
-    url: jni::objects::JString,
+pub extern "C" fn Java_com_avinthakur080_pulse_1rs_ShareBridge_onShareUrl<'local>(
+    mut env: jni::EnvUnowned<'local>,
+    _class: jni::objects::JClass<'local>,
+    url: jni::objects::JString<'local>,
 ) {
-    let url: String = match env.get_string(&url) {
-        Ok(s) => s.into(),
-        Err(_) => return,
-    };
+    let url = env
+        .with_env(|env| -> jni::errors::Result<_> {
+            Ok(String::from(url.mutf8_chars(env)?))
+        })
+        .resolve::<jni::errors::ThrowRuntimeExAndDefault>();
     if url.is_empty() {
         return;
     }

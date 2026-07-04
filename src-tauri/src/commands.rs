@@ -949,8 +949,6 @@ pub fn share_log_file(app: tauri::AppHandle, state: State<'_, AppState>) -> Resu
         "No log file found yet — try again after the app has been running.".to_string()
     })?;
 
-    let log_path = log_file.to_string_lossy().to_string();
-
     #[cfg(target_os = "android")]
     {
         use tauri::Manager;
@@ -965,24 +963,23 @@ pub fn share_log_file(app: tauri::AppHandle, state: State<'_, AppState>) -> Resu
         let dest_str = dest.to_string_lossy().to_string();
 
         if let Some(vm) = crate::ANDROID_VM.get() {
-            let Ok(mut env) = vm.attach_current_thread() else {
+            let Ok(_) = vm.attach_current_thread(
+                |env: &mut jni::Env| -> jni::errors::Result<()> {
+                    let class = env
+                        .find_class(jni::jni_str!("com/avinthakur080/pulse_rs/ShareBridge"))?;
+                    let jpath = env.new_string(&dest_str)?;
+                    env.call_static_method(
+                        class,
+                        jni::jni_str!("shareFile"),
+                        jni::jni_sig!("(Ljava/lang/String;)V"),
+                        &[jni::objects::JValue::Object(&jpath)],
+                    )?;
+                    tracing::info!(path = %dest_str, "share_log_file: shared via Android intent");
+                    Ok(())
+                },
+            ) else {
                 return Err("JNI: cannot attach thread".into());
             };
-            let Ok(class) = env.find_class("com/avinthakur080/pulse_rs/ShareBridge") else {
-                return Err("JNI: ShareBridge class not found".into());
-            };
-            let Ok(jpath) = env.new_string(&dest_str) else {
-                return Err("JNI: cannot create string".into());
-            };
-            if let Err(e) = env.call_static_method(
-                class,
-                "shareFile",
-                "(Ljava/lang/String;)V",
-                &[jni::objects::JValue::Object(&jpath)],
-            ) {
-                return Err(format!("JNI: shareFile failed: {e}"));
-            }
-            tracing::info!(path = %dest_str, "share_log_file: shared via Android intent");
             return Ok(());
         }
         return Err("JNI: Android VM not available (app not fully initialized)".into());
@@ -991,6 +988,7 @@ pub fn share_log_file(app: tauri::AppHandle, state: State<'_, AppState>) -> Resu
     #[cfg(not(target_os = "android"))]
     {
         use tauri_plugin_opener::OpenerExt;
+        let log_path = log_file.to_string_lossy().to_string();
         app.opener()
             .open_path(&log_path, None::<&str>)
             .map_err(|e| e.to_string())

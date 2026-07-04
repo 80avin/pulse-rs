@@ -7,7 +7,7 @@ import androidx.annotation.Keep
 
 @Keep // Prevents ProGuard from stripping this class and its methods
 object ShareBridge {
-    external fun init()
+    external fun init(context: android.content.Context)
     external fun onShareUrl(url: String)
 
     @JvmStatic var activity: Activity? = null

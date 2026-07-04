@@ -1,0 +1,33 @@
+// rustls-platform-verifier Android component — Maven repository setup.
+// Apply from gen/android/build.gradle.kts (root project only).
+
+import groovy.json.JsonSlurper
+
+def baos = new ByteArrayOutputStream()
+project.exec {
+    workingDir = file("../../../")   // gen/android/ → workspace root
+    commandLine(
+        "cargo", "metadata", "--format-version", "1",
+        "--filter-platform", "aarch64-linux-android",
+        "--manifest-path", "src-tauri/Cargo.toml"
+    )
+    standardOutput = baos
+}
+def json = new JsonSlurper().parseText(baos.toString())
+def pkg = json.packages.find { it.name == "rustls-platform-verifier-android" }
+if (pkg == null) throw new RuntimeException(
+    "rustls-platform-verifier-android not found in cargo metadata. " +
+    "Ensure src-tauri/Cargo.toml declares rustls-platform-verifier as a dependency."
+)
+def mavenDir = file(pkg.manifest_path).parentFile != null
+    ? new File(new File(pkg.manifest_path).parentFile, "maven").absolutePath
+    : null
+
+allprojects {
+    repositories {
+        maven {
+            url uri(mavenDir)
+            metadataSources { mavenPom() }
+        }
+    }
+}

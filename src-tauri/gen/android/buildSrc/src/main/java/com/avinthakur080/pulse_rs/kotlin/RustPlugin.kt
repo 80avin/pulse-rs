@@ -35,11 +35,11 @@ open class RustPlugin : Plugin<Project> {
                         abiFilters += abiList
                     }
                 }
-                defaultArchList.forEachIndexed { index, arch ->
+                archList.forEachIndexed { index, arch ->
                     create(arch) {
                         dimension = "abi"
                         ndk {
-                            abiFilters.add(defaultAbiList[index])
+                            abiFilters.add(abiList[index])
                         }
                     }
                 }

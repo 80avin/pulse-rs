@@ -9,7 +9,7 @@ class MainActivity : TauriActivity() {
         ShareBridge.activity = this
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        ShareBridge.init()
+        ShareBridge.init(this)
         handleShareIntent(intent)
     }
 
