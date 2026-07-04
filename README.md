@@ -63,7 +63,7 @@ Pulse aggregates Hacker News, Reddit, and RSS feeds, then uses a hybrid on-devic
 
 ## Building
 
-**Prerequisites:** Rust 1.95+, Node.js 24+, pnpm, Tauri CLI v2
+**Prerequisites:** Rust 1.95+, Node.js 22+, pnpm, Tauri CLI v2
 
 ```bash
 # Clone
