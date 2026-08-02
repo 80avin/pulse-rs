@@ -56,6 +56,7 @@
   let newGroupName = $state('');
   let addInputEl: HTMLInputElement | null = $state(null);
   let actionSheet = $state<string | null>(null);
+  let suppressClick = false;
   let ctxMenuPos = $state<{ x: number; y: number } | null>(null);
 
   let editingSourceId = $state<string | null>(null);
@@ -221,8 +222,8 @@
         <div
           role="button"
           tabindex="0"
-          use:longpress={{ onLongpress: () => { actionSheet = s.id; ctxMenuPos = null; } }}
-          onclick={() => onSourceSelect?.(s.id)}
+          use:longpress={{ onLongpress: () => { suppressClick = true; actionSheet = s.id; ctxMenuPos = null; } }}
+          onclick={() => { if (suppressClick) { suppressClick = false; return; } onSourceSelect?.(s.id); }}
           oncontextmenu={(e) => handleContextMenu(e, s.id)}
           onkeydown={(e) => { if (e.key === 'Enter') onSourceSelect?.(s.id); }}
           class="grid gap-2.5 p-2.5 px-3 border-b border-bd-0 cursor-pointer items-center select-none grid-cols-[auto_1fr_auto]"

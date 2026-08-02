@@ -192,7 +192,7 @@
           <!-- Muted tags -->
           {#if item.tags.length > 0 && !isDense}
             {#each item.tags.slice(0, 4) as tag}
-              <TagChip {tag} size={9} dim onclick={onTagClick ? () => { onTagClick!(tag); } : undefined} />
+              <TagChip {tag} size={9} dim onclick={onTagClick ? (e) => { e.stopPropagation(); onTagClick!(tag); } : undefined} />
             {/each}
           {/if}
         </div>
@@ -202,7 +202,7 @@
           <div class="flex items-center gap-1.5 flex-wrap" style="margin-top:5px;">
             {#each item.userTags.slice(0, 6) as tag}
               <button
-                onclick={() => onTagClick?.(tag)}
+                onclick={(e) => { e.stopPropagation(); onTagClick?.(tag); }}
                 title={`Filter by "${tag}" (your tag)`}
                 class="inline-flex items-center gap-1 bg-transparent cursor-pointer whitespace-nowrap px-1.5 py-0.5 rounded-sm text-[9px] leading-none font-mono" style="color:{T.amber};border:1px dashed {T.amber}55;"
               ><Icon name="bookmark" size={8} color={T.amber} />{tag}</button>

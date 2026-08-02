@@ -21,7 +21,13 @@
     onNavigate?: (id: string) => void;
   } = $props();
 
-  const item   = $derived(items.find(i => i.id === itemId));
+  // Keep the last-known item even if it's evicted from `items` (e.g. marking it
+  // read while the "unread" filter is active). The cached reference stays live
+  // for state mutations until the next item is opened.
+  const storeItem = $derived(items.find(i => i.id === itemId));
+  let cachedItem = $state<import('$lib/types').FeedItem | null>(null);
+  $effect(() => { if (storeItem) cachedItem = storeItem; });
+  const item = $derived(storeItem ?? cachedItem);
   const source = $derived(item ? sources.find(s => s.id === item.src) : undefined);
   const idx    = $derived(allIds.indexOf(itemId));
   const hasPrev = $derived(idx > 0);

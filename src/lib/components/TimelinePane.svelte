@@ -12,11 +12,10 @@
 
   // One timeline pane for both breakpoints. `mode` switches the toolbar/filter
   // layout; the list, filter state, counts, and tag logic are shared.
-  let { mode, items, onOpen, onTabChange, onSearch, searchQuery = '', openId = '' }: {
+  let { mode, items, onOpen, onSearch, searchQuery = '', openId = '' }: {
     mode: 'wide' | 'narrow';
     items: FeedItem[];
     onOpen: (id: string, allIds: string[]) => void;
-    onTabChange?: (id: string) => void;
     onSearch?: () => void;
     searchQuery?: string;
     openId?: string;

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { T } from '$lib/tokens';
   import { sources, toggleSaved, tauriInvoke, adaptItem } from '$lib/stores/data.svelte';
+  import { settings } from '$lib/settings.svelte';
   import ItemRow from '$lib/components/ItemRow.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import type { FeedItem } from '$lib/types';
@@ -90,7 +91,7 @@
             {item}
             {source}
             isFocused={false}
-            density="normal"
+            density={settings.density}
             onclick={() => onOpen(item.id, saved.map(i => i.id))}
           />
           <button

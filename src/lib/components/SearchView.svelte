@@ -1,6 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import { sources } from '$lib/stores/data.svelte';
+  import { settings } from '$lib/settings.svelte';
   import { searchItems } from '$lib/stores/search.svelte';
   import Icon from './Icon.svelte';
   import ItemRow from './ItemRow.svelte';
@@ -46,7 +47,7 @@
       <div class="text-ink-3 border-b border-bd-0 p-1.5 px-3 tracking-[0.6px] text-[9px] leading-none font-mono">{results.length} result{results.length === 1 ? '' : 's'}</div>
       {#each results as item}
         {@const source = sources.find(s => s.id === item.src)}
-        <ItemRow {item} {source} isFocused={false} density="normal" onclick={() => onItemOpen?.(item.id, results.map(i => i.id))} />
+        <ItemRow {item} {source} isFocused={false} density={settings.density} onclick={() => onItemOpen?.(item.id, results.map(i => i.id))} />
       {/each}
     {/if}
   </div>

@@ -45,6 +45,7 @@
 
   let activeTab = $state<string>("");
   $effect(() => { activeTab = active; });
+  let suppressClick = false;
 </script>
 
 {#if editing}
@@ -159,7 +160,7 @@
     <Tabs.List class="flex">
       {#each groups as g}
         <Tabs.Trigger value={g.id}
-          onclick={() => onSelect(g.id)}
+          onclick={() => { if (suppressClick) { suppressClick = false; return; } onSelect(g.id); }}
           // onpointerdown={() => startPress(g.id)}
           // onpointerup={cancelPress}
           // onpointercancel={cancelPress}
@@ -173,8 +174,8 @@
             letter-spacing:0.3px;
           "
         >
-          <span use:longpress={{ onLongpress: () => {editing=true;}}}>{g.name}</span>
-          <span use:longpress={{ onLongpress: () => {editing=true;}}} class="tabular-nums text-[10px] leading-none font-mono" style="color:{activeTab === g.id ? T.cyan : T.ink3};">{counts[g.id] ?? g.n}</span>
+          <span use:longpress={{ onLongpress: () => { suppressClick = true; editing=true;}}}>{g.name}</span>
+          <span use:longpress={{ onLongpress: () => { suppressClick = true; editing=true;}}} class="tabular-nums text-[10px] leading-none font-mono" style="color:{activeTab === g.id ? T.cyan : T.ink3};">{counts[g.id] ?? g.n}</span>
         </Tabs.Trigger>
       {/each}
     </Tabs.List>

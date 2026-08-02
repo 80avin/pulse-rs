@@ -44,6 +44,9 @@
   function openItem(id: string, ids: string[]) {
     openId = id;
     timelineIds = ids;
+    // Push a history entry so Android's system back closes the reader instead
+    // of exiting the app (popstate restores the previous state).
+    history.pushState({ tab: activeTab, openItemId: id } satisfies NavState, '');
   }
   function openItemAndRead(id: string, ids: string[]) {
     openId = id;
@@ -128,7 +131,6 @@
   let showSources   = $state(false);
   let accValue = $state<string[]>(['sources']);
   let showSourcesAccordion = $derived(accValue.includes('sources'));
-  let popoverOpen   = $state(false);
   let showCheatsheet = $state(false);
   let showOnboarding = $state(false);
   const ONBOARDING_DONE_KEY = 'pulse:onboarding-done';
@@ -203,7 +205,6 @@
       if (e.key === 'r' && !inInput) { showSources = !showSources; return; }
       if (e.key === '/' && !inInput) { e.preventDefault(); searchInputEl?.focus(); return; }
       if (inInput) return;
-      if (popoverOpen) return;
 
       switch (e.key) {
         case 'j': case 'ArrowDown': {
