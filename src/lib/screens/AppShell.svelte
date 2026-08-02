@@ -21,6 +21,7 @@
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import Onboarding from '$lib/components/Onboarding.svelte';
+  import ItemActionsMenu from '$lib/components/ItemActionsMenu.svelte';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import MobileSaved from './MobileSaved.svelte';
   import SearchView from '$lib/components/SearchView.svelte';
@@ -451,4 +452,6 @@
   {#if showOnboarding}
     <Onboarding onDone={finishOnboarding} />
   {/if}
+
+  <ItemActionsMenu />
 </div>

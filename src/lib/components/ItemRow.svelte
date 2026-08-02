@@ -3,7 +3,7 @@
   import type { FeedItem, Source, Density } from '$lib/types';
   import Icon from './Icon.svelte';
   import TagChip from './TagChip.svelte';
-  import ItemActionsMenu from './ItemActionsMenu.svelte';
+  import { openItemMenu } from '$lib/stores/item-menu.svelte';
   import { longpress } from './longpress.svelte';
 
   let { item, source, isFocused = false, density = 'normal', onclick, onTagClick }: {
@@ -15,33 +15,20 @@
     onTagClick?: (tag: string) => void;
   } = $props();
 
-  // Unified item-action menu: one menu per row, rendered as a floating popup on
-  // desktop right-click and a bottom sheet on touch long-press. Previously a
-  // bits-ui ContextMenu AND a mobile sheet both opened on the same gesture.
-  let menuItem = $state<FeedItem | null>(null);
-  let menuMode = $state<'popup' | 'sheet'>('popup');
-  let menuX = $state(0);
-  let menuY = $state(0);
+  // The action menu is ONE shared instance rendered by AppShell (portal-escaped),
+  // so it never anchors to this row, scrolls with the list, or opens twice.
   let suppressClick = $state(false);
-
-  function openMenu(mode: 'popup' | 'sheet', cx = 0, cy = 0) {
-    menuItem = item;
-    menuMode = mode;
-    menuX = cx;
-    menuY = cy;
-  }
-  function closeMenu() { menuItem = null; }
 
   function handleContextMenu(e: MouseEvent) {
     e.preventDefault();
     const pointerType = (e as unknown as { pointerType?: string }).pointerType ?? '';
     const isTouch = pointerType === 'touch' || (pointerType === '' && 'ontouchstart' in window);
     if (isTouch) suppressClick = true; // block the ghost click that follows a long-press
-    openMenu(isTouch ? 'sheet' : 'popup', e.clientX, e.clientY);
+    openItemMenu(item, isTouch ? 'sheet' : 'popup', e.clientX, e.clientY);
   }
   function handleLongPress() {
     suppressClick = true;
-    openMenu('sheet');
+    openItemMenu(item, 'sheet');
   }
   function handleRowClick() {
     if (suppressClick) { suppressClick = false; return; }
@@ -224,6 +211,3 @@
     </div>
 </div>
 
-{#if menuItem}
-  <ItemActionsMenu {item} mode={menuMode} x={menuX} y={menuY} onClose={closeMenu} />
-{/if}
