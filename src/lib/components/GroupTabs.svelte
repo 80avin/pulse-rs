@@ -43,7 +43,7 @@
     if (active === id) onSelect('all');
   }
 
-  let activeTab = $state<string>();
+  let activeTab = $state<string>("");
   $effect(() => { activeTab = active; });
 </script>
 
