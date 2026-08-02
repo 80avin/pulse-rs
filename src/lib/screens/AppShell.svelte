@@ -21,10 +21,8 @@
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
-  import MobileSources from './MobileSources.svelte';
-  import MobileSearch from './MobileSearch.svelte';
   import MobileSaved from './MobileSaved.svelte';
-  import MobileSettings from './MobileSettings.svelte';
+  import SearchView from '$lib/components/SearchView.svelte';
   import { Accordion } from 'bits-ui';
 
   // ── Shared navigation state (one shell, both breakpoints) ───────────────
@@ -381,13 +379,34 @@
       {#if activeTab === 'feed'}
         <TimelinePane mode="narrow" items={items} openId={openId ?? ''} onOpen={openItem} onSearch={goToSearch} />
       {:else if activeTab === 'sources'}
-        <MobileSources tab={activeTab} onTabChange={changeTab} onSourceSelect={openSourceFeed} />
+        <div class="flex flex-col h-full bg-bg-0 text-ink-0">
+          <div class="h-[44px] flex items-center px-[10px] border-b border-b-bd-0 bg-bg-1 shrink-0 gap-2">
+            <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px] flex-1">sources <span class="text-ink-3">· {sources.length}</span></span>
+            <button onclick={doSync} aria-label="Sync feeds" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11">
+              <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1} /></span>
+            </button>
+            <button onclick={() => { document.querySelector('.add-source-target')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11" title="Add source" aria-label="Add source">
+              <Icon name="plus" size={16} color={T.cyan} />
+            </button>
+          </div>
+          <div class="flex-1 overflow-auto">
+            <SourceExplorer onSourceSelect={openSourceFeed} onSync={doSync} />
+          </div>
+        </div>
       {:else if activeTab === 'search'}
-        <MobileSearch tab={activeTab} onTabChange={changeTab} onOpen={openItem} />
+        <SearchView onItemOpen={(id, ids) => openItem(id, ids)} />
       {:else if activeTab === 'saved'}
         <MobileSaved tab={activeTab} onTabChange={changeTab} onOpen={openItem} />
       {:else if activeTab === 'settings'}
-        <MobileSettings tab={activeTab} onTabChange={changeTab} />
+        <div class="flex flex-col h-full bg-bg-0 text-ink-0">
+          <div class="h-[44px] flex items-center px-3.5 border-b border-b-bd-0 bg-bg-1 shrink-0">
+            <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px]">settings</span>
+          </div>
+          <div class="flex-1 overflow-y-auto flex flex-col gap-2.5 p-3 px-2.5">
+            <SettingsPanelContent showShortcuts={false} />
+            <div class="h-3"></div>
+          </div>
+        </div>
       {:else}
         <div class="flex-1 flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">{activeTab}</div>
       {/if}
