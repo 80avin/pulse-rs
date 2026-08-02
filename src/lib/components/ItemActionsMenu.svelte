@@ -80,7 +80,7 @@
     {:else}
       <!-- Floating popup (desktop right-click) -->
       <div class="fixed inset-0 z-[100]" onclick={closeItemMenu} aria-hidden="true"></div>
-      <div class="fixed z-[101] bg-bg-1 border border-bd-1 rounded overflow-hidden w-64 shadow-[0_8px_32px_rgba(0,0,0,0.6)]" style="left:{Math.min(Math.max(4, x), window.innerWidth - 260)}px;top:{Math.min(Math.max(4, y), window.innerHeight - 360)}px;">
+      <div class="fixed z-[101] bg-bg-1 border border-bd-1 rounded overflow-hidden w-64 shadow-[0_8px_32px_rgba(0,0,0,0.6)]" style="left:{Math.max(4, Math.min(x, window.innerWidth - 260))}px;top:{Math.max(4, Math.min(y, window.innerHeight - 360))}px;">
         {@render tagEditor()}
         {#if item.url && !isHnSelf}
           <button class={rowCls} onclick={() => act(() => openExternal(item.url!))}><Icon name="ext" size={11} color={T.ink2} /><span>Open in browser</span></button>

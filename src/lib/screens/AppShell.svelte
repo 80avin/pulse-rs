@@ -266,27 +266,27 @@
       <div class="flex-1 flex overflow-hidden relative" role="presentation" onmousemove={onMouseMove} onmouseup={stopDrag} onmouseleave={stopDrag}>
         {#if leftRailCollapsed}
           <div class="w-8 shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col items-center pt-1 overflow-hidden gap-1.5">
-            <button onclick={toggleLeftRail} aria-label="Expand sidebar" title="Expand sidebar" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+            <button onclick={toggleLeftRail} aria-label="Expand sidebar" title="Expand sidebar" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded">
               <Icon name="chev-r" size={13} color={T.ink2} />
             </button>
             {#each groups as g}
-              <button onclick={() => selectGroup(g.id)} onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} unread`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px]" style="background:{g.id===activeGroup?'rgba(78,205,214,0.12)':'transparent'}">
+              <button onclick={() => selectGroup(g.id)} onmouseenter={(e) => { if (g.id !== activeGroup) (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { if (g.id !== activeGroup) (e.currentTarget as HTMLElement).style.background = 'transparent'; }} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} unread`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px]" style="background:{g.id===activeGroup?'rgba(78,205,214,0.12)':'transparent'}">
                 <span class="font-bold text-[10px] leading-none font-mono text-cyan={g.id===activeGroup} text-ink-2={g.id!==activeGroup}">{g.name.slice(0, 2).toUpperCase()}</span>
                 {#if g.n > 0}<span class="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-cyan"></span>{/if}
               </button>
             {/each}
             <div class="flex-1"></div>
-            <button onclick={() => { showSources = !showSources; }} aria-label="Sources" title="Sources" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+            <button onclick={() => { showSources = !showSources; }} aria-label="Sources" title="Sources" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded">
               <Icon name="rss" size={13} color={showSources ? T.cyan : T.ink2} />
             </button>
-            <button onclick={() => { showSettings = !showSettings; }} aria-label="Settings" title="Settings" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer mb-1.5 rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+            <button onclick={() => { showSettings = !showSettings; }} aria-label="Settings" title="Settings" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer mb-1.5 rounded">
               <Icon name="cog" size={13} color={showSettings ? T.cyan : T.ink2} />
             </button>
           </div>
         {:else}
           <div class="shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col overflow-hidden" style="width:{leftRailWidth}px">
             <div class="flex justify-end pt-0.5 px-1">
-              <button onclick={toggleLeftRail} aria-label="Collapse sidebar" title="Collapse sidebar" class="flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+              <button onclick={toggleLeftRail} aria-label="Collapse sidebar" title="Collapse sidebar" class="flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5">
                 <Icon name="chev-l" size={12} color={T.ink3} />
               </button>
             </div>
@@ -305,7 +305,7 @@
             <Accordion.Root type="multiple" bind:value={accValue} class="border-b border-bd-0">
               <Accordion.Item value="sources">
                 <Accordion.Header>
-                  <Accordion.Trigger onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3" aria-label={`Sources for ${activeGroupLabel}`}>
+                  <Accordion.Trigger class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3" aria-label={`Sources for ${activeGroupLabel}`}>
                     <span class="uppercase flex-1 text-ink-3 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
                     <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
                     <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
@@ -320,11 +320,11 @@
                     </button>
                   {/each}
                   <div class="flex items-center gap-1 mt-0.5">
-                    <button onclick={() => { showSources = !showSources; }} onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer text-left px-1.5 py-1 text-[10px] leading-none font-mono">
+                    <button onclick={() => { showSources = !showSources; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer text-left px-1.5 py-1 text-[10px] leading-none font-mono">
                       <Icon name="plus" size={10} color={T.ink3} />
                       <span>Manage Sources</span>
                     </button>
-                    <button onclick={() => { showOnboarding = true; }} onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer justify-center px-1.5 py-1 text-[10px] leading-none font-mono" title="Discover feeds" aria-label="Discover feeds">
+                    <button onclick={() => { showOnboarding = true; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer justify-center px-1.5 py-1 text-[10px] leading-none font-mono" title="Discover feeds" aria-label="Discover feeds">
                       <Icon name="list" size={10} color={T.ink3} />
                       <span>discover</span>
                     </button>

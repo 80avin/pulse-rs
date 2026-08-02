@@ -18,8 +18,6 @@
   <button
     onclick={onToggleSources}
     class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left p-[5px_12px] text-[10px] leading-none font-mono" style="background:{showSources ? 'rgba(78,205,214,0.06)' : 'transparent'};border-left:2px solid {showSources ? 'var(--color-cyan)' : 'transparent'};color:{showSources ? 'var(--color-cyan)' : 'var(--color-ink-2)'};"
-    onmouseenter={(e) => { if(!showSources)(e.currentTarget as HTMLElement).style.background = 'var(--color-bg-2)'; }}
-    onmouseleave={(e) => { if(!showSources)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
     title="Sources (r)"
     aria-label="Sources (r)"
   >
@@ -29,8 +27,6 @@
   <button
     onclick={onToggleSettings}
     class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left p-[5px_12px] text-[10px] leading-none font-mono" style="background:{showSettings ? 'rgba(78,205,214,0.06)' : 'transparent'};border-left:2px solid {showSettings ? 'var(--color-cyan)' : 'transparent'};color:{showSettings ? 'var(--color-cyan)' : 'var(--color-ink-2)'};"
-    onmouseenter={(e) => { if(!showSettings)(e.currentTarget as HTMLElement).style.background = 'var(--color-bg-2)'; }}
-    onmouseleave={(e) => { if(!showSettings)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
     title="Settings"
     aria-label="Settings"
   >

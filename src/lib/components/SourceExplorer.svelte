@@ -349,7 +349,7 @@
           </Dialog.Content>
         {:else}
           <Dialog.Overlay class="fixed inset-0 z-210 flex flex-col justify-end bg-black/50" />
-          <Dialog.Content preventScroll={false} class="relative bg-bg-1 rounded-t-xl p-4 flex flex-col gap-3" style="padding-bottom:max(16px, env(safe-area-inset-bottom));">
+          <Dialog.Content preventScroll={false} class="fixed bottom-0 left-0 right-0 z-210 bg-bg-1 rounded-t-xl p-4 flex flex-col gap-3" style="padding-bottom:max(16px, env(safe-area-inset-bottom));">
             {@render editForm()}
           </Dialog.Content>
         {/if}

@@ -250,27 +250,31 @@ html, body {
   color-scheme: light dark;
 }
 
-button { cursor: pointer; }
+button:not(:disabled) { cursor: pointer; }
 
 /* ── Interaction feedback (hover / press / touch) ─────────────────────────── */
 /* Minimal, consistent feedback on every interactive element without manual
    per-button JS handlers. Inline `background:` styles on buttons take
-   precedence over these states, so they only tint buttons without their own. */
-button, [role='button'] {
-  -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-  transition: filter 0.1s ease, transform 0.06s ease;
-}
-@media (hover: hover) {
-  button:not(:disabled):hover,
-  [role='button']:hover {
-    filter: brightness(1.07);
+   precedence over these states, so they only tint buttons without their own.
+   Wrapped in @layer components so Tailwind utility transitions (e.g.
+   ToggleSwitch's transition-[background_0.15s]) still win per the cascade. */
+@layer components {
+  button, [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    transition: filter 0.1s ease, transform 0.06s ease;
   }
-}
-button:not(:disabled):active,
-[role='button']:active {
-  filter: brightness(0.92);
-  transform: translateY(0.5px);
+  @media (hover: hover) {
+    button:not(:disabled):hover,
+    [role='button']:hover {
+      filter: brightness(1.07);
+    }
+  }
+  button:not(:disabled):active,
+  [role='button']:active {
+    filter: brightness(0.92);
+    transform: translateY(0.5px);
+  }
 }
 
 *:focus-visible {

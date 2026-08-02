@@ -129,8 +129,6 @@
         <Tabs.Trigger value={g.id}
           onclick={() => onSelect(g.id)}
           oncontextmenu={(e: MouseEvent) => { e.preventDefault(); editing = true; }}
-          onmouseenter={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
-          onmouseleave={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           onfocus={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
           onblur={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
           class="flex items-center gap-2 cursor-pointer text-left w-full border-none px-3 py-1.5" style="
@@ -147,8 +145,6 @@
     </Tabs.List>
     <button
       onclick={() => { editing = true; }}
-      onmouseenter={(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }}
-      onmouseleave={(e: MouseEvent) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
       class="flex items-center gap-1.5 bg-transparent border-none text-ink-3 cursor-pointer text-left w-full mt-0.5 p-[5px_12px] text-[10px] leading-none font-mono"
     >
       <Icon name="plus" size={10} color={T.ink3} />
@@ -164,8 +160,6 @@
           // onpointerdown={() => startPress(g.id)}
           // onpointerup={cancelPress}
           // onpointercancel={cancelPress}
-          onmouseenter={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = T.bg2; }}
-          onmouseleave={(e: MouseEvent) => { if (g.id !== activeTab)(e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           class="shrink-0 bg-transparent border-none cursor-pointer flex items-center gap-1.5" style="
             padding:13px 14px;min-height:44px;
             border-bottom:2px solid {activeTab === g.id ? T.cyan : 'transparent'};

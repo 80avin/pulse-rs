@@ -19,8 +19,6 @@
         aria-pressed={isActive}
         class={'cursor-pointer uppercase bg-transparent p-[4px_10px] rounded-[3px] text-[10px] leading-none font-mono tracking-[0.3px] ' + (isActive ? 'text-cyan' : 'text-ink-2')}
         style="border:1px solid {isActive ? T.cyan : T.bd1};background:{isActive ? 'rgba(78,205,214,0.10)' : 'transparent'};"
-        onmouseenter={(e) => { if(!isActive)(e.currentTarget as HTMLElement).style.borderColor = T.ink3; }}
-        onmouseleave={(e) => { if(!isActive)(e.currentTarget as HTMLElement).style.borderColor = T.bd1; }}
       >{pill}</button>
     {/each}
   </div>
