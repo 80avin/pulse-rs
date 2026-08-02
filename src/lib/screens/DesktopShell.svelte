@@ -5,20 +5,19 @@
   import { searchItems } from '$lib/stores/search.svelte';
   import { timelineFilter, applyFilter, setFeedFilter, setGroupFilter, setTagFilter, pageCounts } from '$lib/stores/timeline.svelte';
   import { settings } from '$lib/settings.svelte';
-  import { openExternal, shareItem } from '$lib/utils';
+  import { openExternal } from '$lib/utils';
   import Icon from '$lib/components/Icon.svelte';
   import KeyCap from '$lib/components/KeyCap.svelte';
   import DragHandle from '$lib/components/DragHandle.svelte';
   import FilterPills from '$lib/components/FilterPills.svelte';
   import BottomTools from '$lib/components/BottomTools.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
-  import SourceGlyph from '$lib/components/SourceGlyph.svelte';
   import StatusDot from '$lib/components/StatusDot.svelte';
   import SettingsPanelContent from '$lib/components/SettingsPanelContent.svelte';
   import SourceExplorer from '$lib/components/SourceExplorer.svelte';
   import TimelinePane from '$lib/components/TimelinePane.svelte';
+  import ReaderPane from '$lib/components/ReaderPane.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
-  import ReaderView from '$lib/components/ReaderView.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import { Accordion } from 'bits-ui';
 
@@ -373,83 +372,7 @@
     <!-- Detail pane -->
     {#if openItem}
       <div class="flex-1 min-w-0 flex flex-col bg-bg-0 overflow-hidden">
-        <div class="border-b border-bd-0 bg-bg-1 flex items-center gap-2 shrink-0 text-ink-2 px-3.5 py-1.5 text-[10px] leading-none font-mono">
-          {#if openSource}
-            <SourceGlyph kind={openSource.kind} />
-            <span class="text-ink-1">{openSource.name}</span>
-            <span class="text-ink-3">·</span>
-          {/if}
-          <span>{openItem.author}</span>
-          <span class="text-ink-3">·</span>
-          <span>{openItem.age}</span>
-          {#if openItem.score > 0}<span class="text-ink-3">·</span><span class="text-amber">▲{openItem.score}</span>{/if}
-          {#if openItem.n > 0}<span class="text-ink-3">·</span><span class="text-ink-2">{openItem.n}c</span>{/if}
-        </div>
-
-        <ReaderView itemId={openItem.id} noteMode="inline" onTagClick={setActiveTag} onPopoverChange={(open) => { popoverOpen = open; }} showMetadata={false} isDesktop={true} />
-
-        <div class="flex border-t border-bd-1 bg-bg-1 shrink-0">
-          <button
-            onclick={() => markRead(openItem!.id, !openItem!.read)}
-            class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer gap-0.75 py-2 tracking-[0.3px] text-[10px] leading-none font-mono"
-            class:text-green={openItem.read}
-            class:text-ink-2={!openItem.read}
-          >
-            <div class="flex items-center gap-1">
-              <Icon name="check" size={14} color={openItem.read ? T.green : T.ink1} />
-              <KeyCap k="m" dim />
-            </div>
-            <span class="uppercase">{openItem.read ? 'unread' : 'read'}</span>
-          </button>
-          <button
-            onclick={() => toggleSaved(openItem!.id)}
-            class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer gap-0.75 py-2 tracking-[0.3px] text-[10px] leading-none font-mono"
-            class:text-amber={openItem.saved}
-            class:text-ink-2={!openItem.saved}
-          >
-            <div class="flex items-center gap-1">
-              <Icon name="bookmark" size={14} color={openItem.saved ? T.amber : T.ink1} />
-              <KeyCap k="s" dim />
-            </div>
-            <span class="uppercase">{openItem.saved ? 'saved' : 'save'}</span>
-          </button>
-          {#if openItem.url}
-            <button
-            onclick={() => openExternal(openItem!.url!)}
-            class="flex-1 flex flex-col items-center bg-transparent border-none text-ink-2 cursor-pointer gap-0.75 py-2 tracking-[0.3px] text-[10px] leading-none font-mono"
-            >
-              <div class="flex items-center gap-1">
-                <Icon name="ext" size={14} color={T.ink1} />
-                <KeyCap k="o" dim />
-              </div>
-              <span class="uppercase">open</span>
-            </button>
-          {/if}
-          <button
-            onclick={() => shareItem(openItem!.title, openItem!.url ?? openItem!.externalUrl)}
-            class="flex-1 flex flex-col items-center bg-transparent border-none text-ink-2 cursor-pointer gap-0.75 py-2 tracking-[0.3px] text-[10px] leading-none font-mono"
-            >
-              <div class="flex items-center gap-1">
-                <Icon name="share" size={14} color={T.ink1} />
-              </div>
-              <span class="uppercase">share</span>
-            </button>
-          <button
-            onclick={() => { const cur = displayItems.findIndex(i => i.id === openItem!.id); const fallback = displayItems[Math.max(0, cur - 1)]; hideItem(openItem!.id); openId = (fallback && fallback.id !== openItem!.id) ? fallback.id : ''; }}
-            class="flex-1 flex flex-col items-center bg-transparent border-none text-red cursor-pointer gap-0.75 py-2 tracking-[0.3px] text-[10px] leading-none font-mono"
-          >
-            <div class="flex items-center gap-1">
-              <Icon name="eye-off" size={14} color={T.red} />
-              <KeyCap k="x" dim />
-            </div>
-            <span class="uppercase">hide</span>
-          </button>
-        </div>
-      </div>
-    {:else}
-      <div class="flex-1 flex items-center justify-center flex-col gap-2 text-ink-3 text-[11px] leading-none font-mono">
-        <span>select an item</span>
-        <span class="text-ink-4 text-[10px] leading-none font-mono">j/k to navigate · / to search</span>
+        <ReaderPane mode="wide" itemId={openItem.id} allIds={displayItems.map(i => i.id)} onBack={() => { openId = ''; }} onNavigate={openItemAndRead} />
       </div>
     {/if}
 

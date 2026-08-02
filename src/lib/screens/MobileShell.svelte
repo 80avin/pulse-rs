@@ -3,11 +3,11 @@
   import { T } from '$lib/tokens';
   import { storeReady, items } from '$lib/stores/data.svelte';
   import { setFeedFilter, setTagFilter } from '$lib/stores/timeline.svelte';
-  import MobileReader from './MobileReader.svelte';
   import MobileSources from './MobileSources.svelte';
   import MobileSearch from './MobileSearch.svelte';
   import MobileSaved from './MobileSaved.svelte';
   import TimelinePane from '$lib/components/TimelinePane.svelte';
+  import ReaderPane from '$lib/components/ReaderPane.svelte';
   import MobileSettings from './MobileSettings.svelte';
 
   let tab = $state('timeline');
@@ -119,7 +119,8 @@
       <!-- Reader overlays tab content via absolute positioning — tab underneath stays alive -->
       {#if openItemId}
         <div class="absolute inset-0 z-10 flex flex-col">
-          <MobileReader
+          <ReaderPane
+            mode="narrow"
             itemId={openItemId}
             allIds={timelineIds}
             onBack={goBack}

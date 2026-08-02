@@ -1,19 +1,24 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
   import { T } from '$lib/tokens';
   import { Dialog } from 'bits-ui';
   import { items, sources, markRead, toggleSaved, saveWithNote, hideItem } from '$lib/stores/data.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, shareItem } from '$lib/utils';
-  import KeyCap from '$lib/components/KeyCap.svelte';
-  import Icon from '$lib/components/Icon.svelte';
-  import ReaderView from '$lib/components/ReaderView.svelte';
+  import { untrack } from 'svelte';
+  import KeyCap from './KeyCap.svelte';
+  import Icon from './Icon.svelte';
+  import SourceGlyph from './SourceGlyph.svelte';
+  import ReaderView from './ReaderView.svelte';
 
-  let { itemId, allIds, onBack, onNavigate }: {
+  // One reader pane for both breakpoints. `mode` switches the chrome (metadata
+  // bar + no-nav on wide; top bar + swipe + back on narrow); ReaderView, the
+  // action bar, and the note flow are shared.
+  let { mode, itemId, allIds, onBack, onNavigate }: {
+    mode: 'wide' | 'narrow';
     itemId: string;
     allIds: string[];
-    onBack: () => void;
-    onNavigate: (id: string) => void;
+    onBack?: () => void;
+    onNavigate?: (id: string) => void;
   } = $props();
 
   const item   = $derived(items.find(i => i.id === itemId));
@@ -22,12 +27,10 @@
   const hasPrev = $derived(idx > 0);
   const hasNext = $derived(idx < allIds.length - 1);
 
-  $effect(() => { if (itemId && settings.markReadOn === 'open') { untrack(() => markRead(itemId)); } });
+  // Auto mark-read on open (narrow; desktop handles it via the shell)
+  $effect(() => { if (mode === 'narrow' && itemId && settings.markReadOn === 'open') { untrack(() => markRead(itemId)); } });
 
-  function goNext() { if (hasNext) onNavigate(allIds[idx + 1]); }
-  function goPrev() { if (hasPrev) onNavigate(allIds[idx - 1]); }
-
-  // Swipe gesture state
+  // Swipe gesture state (narrow)
   let swipeX = $state(0);
   let swipeTransition = $state(false);
   let swipeStartX = 0;
@@ -43,7 +46,6 @@
     swipeTracking = true;
     swipeTransition = false;
   }
-
   function onSwipeMove(e: TouchEvent) {
     if (!swipeTracking || popoverOpen) return;
     const dx = e.touches[0].clientX - swipeStartX;
@@ -51,7 +53,6 @@
     if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 8) return;
     swipeX = dx * 0.5;
   }
-
   function onSwipeEnd(_e: TouchEvent) {
     if (!swipeTracking) return;
     swipeTracking = false;
@@ -68,7 +69,6 @@
       swipeX = 0;
     }
   }
-
   $effect(() => {
     if (navDir !== 0) {
       const timer = setTimeout(() => { navDir = 0; }, 250);
@@ -76,13 +76,13 @@
     }
   });
 
-  // Note sheet state
+  // Note sheet + save toast state
   let noteSheetOpen = $state(false);
   let noteDraft = $state('');
   let saveToast = $state(false);
   let saveToastTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Long-press on save button
+  // Long-press on save button (narrow; harmless on desktop)
   let savePressTimer: ReturnType<typeof setTimeout> | null = null;
   let saveLongPressed = false;
   let suppressNextClick = false;
@@ -106,23 +106,34 @@
     const wasLong = saveLongPressed;
     cancelSavePress();
     if (wasLong) {
-      // Suppress the ghost click that follows — otherwise it fires the button's
-      // onclick and double-toggles the save on top of the note-sheet flow.
       suppressNextClick = true;
       e.preventDefault();
     }
   }
-
   function showSaveToast() {
     saveToast = true;
     if (saveToastTimer) clearTimeout(saveToastTimer);
     saveToastTimer = setTimeout(() => { saveToast = false; }, 3000);
   }
-
+  function handleSaveClick() {
+    if (suppressNextClick) { suppressNextClick = false; return; }
+    toggleSaved(item!.id);
+    if (mode === 'narrow') showSaveToast();
+  }
   function submitNote() {
     if (!item) return;
     saveWithNote(item.id, noteDraft);
     noteSheetOpen = false;
+  }
+
+  function goNext() { if (hasNext) onNavigate?.(allIds[idx + 1]); }
+  function goPrev() { if (hasPrev) onNavigate?.(allIds[idx - 1]); }
+
+  function handleHide() {
+    if (!item) return;
+    hideItem(item.id);
+    if (hasPrev) onNavigate?.(allIds[idx - 1]);
+    else onBack?.();
   }
 
   function handleKey(e: KeyboardEvent) {
@@ -133,61 +144,68 @@
       case 'm': if (item) markRead(item.id, !item.read); break;
       case 's': if (item) toggleSaved(item.id); break;
       case 'o': if (item?.url || item?.domain) openExternal(item.url ?? `https://${item.domain}`); break;
-      case 'Escape': onBack(); break;
+      case 'Escape': onBack?.(); break;
     }
   }
-
 </script>
 
-<svelte:window onkeydown={handleKey} />
+<svelte:window onkeydown={mode === 'narrow' ? handleKey : undefined} />
 
 {#if item}
   <div class="relative flex flex-col h-full bg-bg-0 text-ink-0">
 
-    <!-- Top bar -->
-    <div class="h-11 flex items-center gap-1.5 shrink-0 bg-bg-1 border-b border-bd-0 px-2">
-      <button
-        onclick={onBack}
-        class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-8.5 h-8.5">
-        <Icon name="arrow-l" size={18} color={T.ink1} />
-      </button>
-      <span class="text-ink-2 flex-1 text-[11px] leading-none font-mono">
-        reader · {idx + 1}<span class="text-ink-3">/{allIds.length}</span>
-      </span>
-      <button onclick={goPrev} disabled={!hasPrev} class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-8.5 h-8.5" style="opacity:{hasPrev ? 1 : 0.3};">
-        <Icon name="arrow-up" size={18} color={T.ink1} />
-      </button>
-      <button onclick={goNext} disabled={!hasNext} class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-8.5 h-8.5" style="opacity:{hasNext ? 1 : 0.3};">
-        <Icon name="arrow-dn" size={18} color={T.ink1} />
-      </button>
-    </div>
+    {#if mode === 'wide'}
+      <!-- Metadata bar -->
+      <div class="border-b border-bd-0 bg-bg-1 flex items-center gap-2 shrink-0 text-ink-2 px-3.5 py-1.5 text-[10px] leading-none font-mono">
+        {#if source}
+          <SourceGlyph kind={source.kind} />
+          <span class="text-ink-1">{source.name}</span>
+          <span class="text-ink-3">·</span>
+        {/if}
+        <span>{item.author}</span>
+        <span class="text-ink-3">·</span>
+        <span>{item.age}</span>
+        {#if item.score > 0}<span class="text-ink-3">·</span><span class="text-amber">▲{item.score}</span>{/if}
+        {#if item.n > 0}<span class="text-ink-3">·</span><span class="text-ink-2">{item.n}c</span>{/if}
+      </div>
+    {:else}
+      <!-- Narrow top bar -->
+      <div class="h-11 flex items-center gap-1.5 shrink-0 bg-bg-1 border-b border-bd-0 px-2">
+        <button onclick={() => onBack?.()} aria-label="Back" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11">
+          <Icon name="arrow-l" size={18} color={T.ink1} />
+        </button>
+        <span class="text-ink-2 flex-1 text-[11px] leading-none font-mono">
+          reader · {idx + 1}<span class="text-ink-3">/{allIds.length}</span>
+        </span>
+        <button onclick={goPrev} disabled={!hasPrev} aria-label="Previous item" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11" style="opacity:{hasPrev ? 1 : 0.3};">
+          <Icon name="arrow-up" size={18} color={T.ink1} />
+        </button>
+        <button onclick={goNext} disabled={!hasNext} aria-label="Next item" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11" style="opacity:{hasNext ? 1 : 0.3};">
+          <Icon name="arrow-dn" size={18} color={T.ink1} />
+        </button>
+      </div>
+    {/if}
 
     <!-- Scrollable body -->
     <div
       class="flex-1 overflow-y-auto touch-pan-y"
-      style="
-        transform: translateX({navDir ? 0 : swipeX}px);
-        transition: transform {swipeTransition && !navDir ? '0.2s ease-out' : 'none'};
-        animation: {navDir > 0 ? 'reader-slide-in-next' : navDir < 0 ? 'reader-slide-in-prev' : 'none'} 0.22s ease-out;"
-      ontouchstart={onSwipeStart}
-      ontouchmove={onSwipeMove}
-      ontouchend={onSwipeEnd}
+      style="transform: translateX({navDir ? 0 : swipeX}px);transition: transform {swipeTransition && !navDir ? '0.2s ease-out' : 'none'};animation: {navDir > 0 ? 'reader-slide-in-next' : navDir < 0 ? 'reader-slide-in-prev' : 'none'} 0.22s ease-out;"
+      ontouchstart={mode === 'narrow' ? onSwipeStart : undefined}
+      ontouchmove={mode === 'narrow' ? onSwipeMove : undefined}
+      ontouchend={mode === 'narrow' ? onSwipeEnd : undefined}
       role="feed"
     >
-      <ReaderView itemId={itemId} noteMode="sheet" onPopoverChange={(open) => { popoverOpen = open; }} />
+      <ReaderView itemId={itemId} noteMode={mode === 'wide' ? 'inline' : 'sheet'} onPopoverChange={(open) => { popoverOpen = open; }} showMetadata={mode === 'wide' ? false : true} isDesktop={mode === 'wide'} />
     </div>
 
-    <!-- Save toast -->
-    {#if saveToast}
-      <div class="flex items-center justify-between bg-bg-1 text-ink-1 shrink-0 p-2 px-3 border-t border-t-bd-0 text-[11px] leading-none font-mono">
-        <span>Saved <span class="text-amber">{source?.name ?? item.src}</span> post</span>
-        <button
-          onclick={() => { saveToast = false; noteDraft = item?.note ?? ''; noteSheetOpen = true; }}
-          class="bg-transparent border-none cursor-pointer text-cyan py-0.5 px-1.5 text-[11px] leading-none font-mono"
-        >
-          add note
-        </button>
-      </div>
+    {#if mode === 'narrow'}
+      <!-- Save toast -->
+      {#if saveToast}
+        <div class="flex items-center justify-between bg-bg-1 text-ink-1 shrink-0 p-2 px-3 border-t border-t-bd-0 text-[11px] leading-none font-mono">
+          <span>Saved <span class="text-amber">{source?.name ?? item.src}</span> post</span>
+          <button onclick={() => { saveToast = false; noteDraft = item?.note ?? ''; noteSheetOpen = true; }} class="bg-transparent border-none cursor-pointer text-cyan py-0.5 px-1.5 text-[11px] leading-none font-mono">add note</button>
+        </div>
+      {/if}
     {/if}
 
     <!-- Action bar -->
@@ -203,11 +221,7 @@
         <span class="uppercase">{item.read ? 'unread' : 'read'}</span>
       </button>
       <button
-        onclick={() => {
-          if (suppressNextClick) { suppressNextClick = false; return; }
-          toggleSaved(item.id);
-          showSaveToast();
-        }}
+        onclick={handleSaveClick}
         ontouchstart={startSavePress}
         ontouchend={endSavePress}
         ontouchcancel={cancelSavePress}
@@ -241,49 +255,37 @@
         <span class="uppercase">share</span>
       </button>
       <button
-        onclick={() => { hideItem(item.id); onBack(); }}
+        onclick={handleHide}
         class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer text-red gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono"
       >
         <div class="flex items-center gap-1">
           <Icon name="eye-off" size={16} color={T.red} />
-          <KeyCap k="h" dim />
+          <KeyCap k={mode === 'wide' ? 'x' : 'h'} dim />
         </div>
         <span class="uppercase">hide</span>
       </button>
     </div>
 
-    <!-- Note input sheet -->
+    {#if mode === 'narrow'}
+      <!-- Note input sheet -->
       <Dialog.Root open={noteSheetOpen} onOpenChange={(open) => { if (!open) noteSheetOpen = false; }}>
         <Dialog.Portal>
           <Dialog.Overlay class="absolute inset-0 bg-black/55 z-20" />
-          <Dialog.Content
-            preventScroll={false}
-            class="absolute bg-bg-2 text-ink-0 bottom-0 left-0 right-0 w-full p-[14px_14px_24px] z-20 border-t border-t-bd-1 text-[12px] leading-[1.4] font-sans"
-          >
+          <Dialog.Content preventScroll={false} class="absolute bg-bg-2 text-ink-0 bottom-0 left-0 right-0 w-full p-[14px_14px_24px] z-20 border-t border-t-bd-1 text-[12px] leading-[1.4] font-sans">
             <div class="flex items-center justify-between mb-2.5">
               <span class="uppercase tracking-[0.5px] text-[10px] leading-none font-mono text-ink-3">note</span>
-              <Dialog.Close class="bg-transparent border-none text-ink-2 cursor-pointer flex">
-                <Icon name="x" size={14} />
-              </Dialog.Close>
+              <Dialog.Close class="bg-transparent border-none text-ink-2 cursor-pointer flex"><Icon name="x" size={14} /></Dialog.Close>
             </div>
-            <textarea
-              bind:value={noteDraft}
-              placeholder="Add a note about this post…"
-              class="w-full box-border min-h-20 rounded p-2.5 resize-y bg-bg-0 border border-bd-1 text-[12px] leading-normal font-sans text-ink-0"
-            ></textarea>
+            <textarea bind:value={noteDraft} placeholder="Add a note about this post…" class="w-full box-border min-h-20 rounded p-2.5 resize-y bg-bg-0 border border-bd-1 text-[12px] leading-normal font-sans text-ink-0"></textarea>
             <div class="flex gap-2 mt-3">
               <Dialog.Close class="flex-1 bg-transparent text-ink-1 border border-bd-2 cursor-pointer py-2.5 rounded tracking-[0.3px] text-[11px] leading-none font-mono">cancel</Dialog.Close>
-              <button
-                onclick={submitNote}
-                class="flex-1 bg-amber text-bg-0 border-none cursor-pointer py-2.5 rounded tracking-[0.3px] text-[11px] leading-none font-mono"
-              >save with note</button>
+              <button onclick={submitNote} class="flex-1 bg-amber text-bg-0 border-none cursor-pointer py-2.5 rounded tracking-[0.3px] text-[11px] leading-none font-mono">save with note</button>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+    {/if}
   </div>
 {:else}
-  <div class="h-full flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">
-    item not found
-  </div>
+  <div class="h-full flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">item not found</div>
 {/if}
