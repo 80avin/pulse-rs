@@ -7,7 +7,7 @@
 
 A local-first feed reader with on-device AI filtering. Built for people who know what they want to read and are tired of algorithmic noise.
 
-Pulse aggregates Hacker News, Reddit, and RSS feeds, then uses a hybrid on-device AI pipeline to tag and filter posts — no cloud, no telemetry, no subscription.
+Pulse aggregates Hacker News, Reddit, and RSS feeds, then tags and filters posts with a deterministic on-device rule engine — no cloud, no telemetry, no subscription.
 
 ---
 
@@ -31,13 +31,12 @@ Pulse aggregates Hacker News, Reddit, and RSS feeds, then uses a hybrid on-devic
 - Full-text search across the entire database (SQLite FTS5)
 - og_image thumbnails, crosspost detection, score/comment metadata
 
-**AI filtering** _(experimental)_
+**Tagging** _(on-device, deterministic)_
 
-- On-device only — nothing leaves your device
-- Hybrid pipeline: deterministic rules → FastText (9.6 MB, <1 ms/item) → MiniLM semantic classifier → CLIP vision tagger for image posts
+- On-device only — nothing leaves your device; no models, no downloads
+- Rule engine: structural rules (`show-hn`, `ask-hn`, `job-posting`, `paywall`, `video`, `low-effort`) + keyword/regex semantic rules (`technical`, `research`, `ai-ml`, `security`, `news`, `clickbait`, …)
 - Tags are _filters_, not categories — designed to let you exclude noise, not just label subjects
-- 20 tags across three tiers: structural (`show-hn`, `job-posting`, `paywall`, `video`, `low-effort`), semantic (`technical`, `research`, `ai-ml`, `security`, `news`, `clickbait`, …), and community (`civic`, `local-rec`, `culture`, `marketplace`)
-- Models hot-reloadable without restart; FastText bundled, larger models downloaded on demand
+- 20 tags: structural, semantic, and community (`civic`, `local-rec`, `culture`, `marketplace`)
 
 **Android**
 
@@ -96,7 +95,7 @@ cargo build -p pulse-cli
 
 ## AI tagging
 
-> **Experimental.** The tagger is functional but accuracy varies by feed type and content. Tags may fire incorrectly, miss posts, or shift behaviour after model updates. If results look wrong, raise the confidence threshold in Settings or disable AI tagging entirely — the app works fine without it.
+Tags are produced by a deterministic rule engine — no models, no downloads, no confidence thresholds. Tune the rules in `pulse-core/src/ai/rules.rs`; run `pulse ai rules list` to inspect them and `pulse ai run` to re-tag.
 
 The goal of the tagging system is **spam filtering**, not subject classification. Tags exist to answer the question: _"Is this the kind of post I want to see?"_ — not _"What is this post about?"_
 
@@ -112,7 +111,7 @@ A post can be correctly identified as being about technology and still be low-ef
 
 Lazy or vague posts get no tags. **The absence of a tag is itself a filter signal.** If you filter your feed to only show `technical` or `research` posts, everything without those tags is implicitly excluded.
 
-Full tag reference and pipeline details: [CLAUDE.md](CLAUDE.md#ai-tagging-pipeline)
+Full tag reference and pipeline details: [CLAUDE.md](CLAUDE.md#tagging-pipeline)
 
 ---
 
@@ -121,7 +120,7 @@ Full tag reference and pipeline details: [CLAUDE.md](CLAUDE.md#ai-tagging-pipeli
 ```
 pulse-core/   — all business logic; no platform I/O assumptions
 pulse-cli/    — thin CLI for scripting and backend testing
-src-tauri/    — Tauri shell: IPC commands, model bundling, Android bridge
+src-tauri/    — Tauri shell: IPC commands, Android bridge
 src/          — SvelteKit 5 UI
 ```
 

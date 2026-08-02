@@ -81,21 +81,19 @@ src/          — SvelteKit UI (Svelte 5, TypeScript)
 
 - **`DbHandle`** — single-writer actor + read pool (SQLite WAL mode). All writes go through typed `DbCommand` messages to `db_writer_task`; reads use `with_reader(closure)`.
 - **`SyncScheduler`** — manages per-feed background tasks with exponential backoff (60s → 4h), ETag/Last-Modified caching, and health tracking (failure_streak, avg_latency_ms).
-- **`TaggerHandle`** — bounded async queue (size 200) feeding `tagger_task`. Items enter the queue immediately after upsert; the task dispatches to the active model combination.
+- **`TaggerHandle`** — bounded async queue (size 200) feeding `tagger_task`. Items enter the queue immediately after upsert; the task tags them with the active `Tagger` implementation.
 - **`TimelineService`** — cursor-based pagination over `FeedItemView` (joined: item + feed + group + state + tags). Cursor is an opaque `(published_at, item_id)` tuple. `get_items_page` is the only item query command; there is no `get_items`.
 - **`SearchService`** — FTS5 full-text search backed by `fts_items` virtual table. Searches the entire database, not just the loaded page.
-- **`RuleEngine`** — structural tag rules (regex + keyword) run synchronously before any ML model.
+- **`RuleEngine`** — deterministic structural tag rules (regex + keyword). This is the only tagger.
 
-### AI tagging pipeline
+### Tagging pipeline
 
-Tags flow through four layers, executed in order:
+Tags are produced on-device by the **rule engine only** (no ML models — the FastText/MiniLM/CLIP stack was removed in v0.6). The pipeline is a small `Tagger` trait (`item → Vec<TagResult>`) implemented by `RulesTagger`, run inside a bounded async queue:
 
-1. **`RuleEngine`** — deterministic structural rules → tags like `show-hn`, `job-posting`, `paywall`, `video`, `low-effort`
-2. **`FastTextTagger`** — 9.6 MB supervised .ftz classifier, <1 ms/item; bundled in the binary and extracted on first run
-3. **`MiniMlTagger`** — MiniLM-L6 ONNX + 201 KB MLP head; semantic classification for nuanced categories
-4. **`VisionTagger`** — CLIP/MobileCLIP for image-only posts (no text body)
+1. **`RuleEngine`** — deterministic structural rules → tags like `show-hn`, `ask-hn`, `job-posting`, `paywall`, `video`, `low-effort`, plus keyword/regex semantic rules (`technical`, `tutorial`, `research`, `news`, `security`, …).
+2. **`RulesTagger`** — wraps the rule engine + the runtime `low-effort` score check behind the `Tagger` trait, so a future BYO hosted-model adapter can be added without touching the queue or IPC layer.
 
-Active combination is set by `TextBackend` enum in `PulseConfig`. Default is `HybridFastTextMiniMl`. Models can be hot-reloaded (`reload_*_tagger()`) without restarting the app. FastText + MiniLM MLP head are bundled as `include_bytes!` in `src-tauri/src/lib.rs`; vision and full MiniLM ONNX are downloaded on demand.
+No models, no downloads, no feature flags (`ai-*` removed). The tag distribution for the UI comes from `get_tag_stats` (a `COUNT(*) ... GROUP BY tag` over `ai_tags`).
 
 **Tag vocabulary (20 tags):**
 
@@ -107,20 +105,22 @@ Active combination is set by `TextBackend` enum in `PulseConfig`. Default is `Hy
 | `paywall` | rules | Paywall indicators in title |
 | `video` | rules | Video content |
 | `low-effort` | rules | Minimal title, very low score |
-| `technical` | ml | Engineering, systems, code |
-| `tutorial` | ml | How-to, guide, walkthrough |
-| `research` | ml | Papers, studies, academic content |
-| `news` | ml | Factual event reports, announcements |
-| `security` | ml | Vulnerabilities, exploits, privacy incidents |
-| `ai-ml` | ml | Machine learning, AI systems |
-| `privacy` | ml | Surveillance, data rights, tracking |
-| `policy` | ml | Regulation, law, governance |
-| `science` | ml | Scientific findings outside CS |
-| `clickbait` | ml | Sensational, misleading framing |
-| `civic` | rules+ml | Infrastructure failures, governance complaints |
-| `local-rec` | rules+ml | Specific local service recommendations |
-| `culture` | rules+ml | Regional heritage, folk traditions, arts |
-| `marketplace` | rules+ml | Buy/sell/rent/hire listings |
+| `technical` | rules | Engineering, systems, code |
+| `tutorial` | rules | How-to, guide, walkthrough |
+| `research` | rules | Papers, studies, academic content |
+| `news` | rules | Factual event reports, announcements |
+| `security` | rules | Vulnerabilities, exploits, privacy incidents |
+| `ai-ml` | rules | Machine learning, AI systems |
+| `privacy` | rules | Surveillance, data rights, tracking |
+| `policy` | rules | Regulation, law, governance |
+| `science` | rules | Scientific findings outside CS |
+| `clickbait` | rules | Sensational, misleading framing |
+| `civic` | rules | Infrastructure failures, governance complaints |
+| `local-rec` | rules | Specific local service recommendations |
+| `culture` | rules | Regional heritage, folk traditions, arts |
+| `marketplace` | rules | Buy/sell/rent/hire listings |
+
+> All tags now come from the deterministic rule engine. The former ML tags (`ml` source column) are produced by keyword/regex rules in `default_rules()`. 
 
 ### Tag design philosophy
 
@@ -139,10 +139,9 @@ When adding or tuning tags: test both true positives (posts that should fire) an
 
 ### Tauri IPC layer
 
-`src-tauri/src/commands.rs` — all `#[tauri::command]` functions. They receive `State<AppState>` (which holds `Arc<PulseCore>`) and return serializable DTOs defined in `src-tauri/src/models.rs`. Event payloads (`DownloadProgressEvent`, `TaggingProgressEvent`, `IncomingShareEvent`) are emitted via `app.emit()`.
+`src-tauri/src/commands.rs` — all `#[tauri::command]` functions. They receive `State<AppState>` (which holds `Arc<PulseCore>`) and return serializable DTOs defined in `src-tauri/src/models.rs`. Event payloads (`TaggingProgressEvent`, `IncomingShareEvent`) are emitted via `app.emit()`.
 
 `AppState` lives in `src-tauri/src/lib.rs` alongside:
-- `extract_bundled_models()` — copies embedded FastText + MiniLM MLP head to `data_dir` on first launch, re-extracts FastText when `BUNDLED_FASTTEXT_VERSION` changes.
 - `APP_HANDLE: OnceLock<AppHandle>` + `PENDING_SHARE: OnceLock<Mutex<Option<String>>>` — the JNI bridge writes to these; the setup closure drains `PENDING_SHARE` and emits `share://incoming-url` after an 800ms delay to let the WebView register its listener.
 
 ### Android share intent
@@ -229,7 +228,7 @@ Resolved by `platform_data_dir()` in `config.rs`:
 
 ### Cross-platform consistency
 
-Every feature or fix must work on **both desktop and Android** unless a platform difference is explicitly requested. This includes: data directory resolution, model loading (bundled vs. download), sync scheduling, and all Tauri commands. `PulseConfig::is_android` gates platform-specific behavior — check it before adding any platform fork.
+Every feature or fix must work on **both desktop and Android** unless a platform difference is explicitly requested. This includes: data directory resolution, sync scheduling, and all Tauri commands. `PulseConfig::is_android` gates platform-specific behavior — check it before adding any platform fork.
 
 ### Don't substitute a different feature
 
@@ -258,7 +257,7 @@ Never write to SQLite directly from a reader context or from outside `db_writer_
 
 ### AI model feature flags
 
-pulse-core compiles with optional AI features: `ai-rules`, `ai-onnx`, `ai-vision`, `ai-fasttext`, `ai-miniml`. The Tauri shell enables all of them; the CLI enables only what's needed. Don't hard-require a feature in shared code paths — always gate with `#[cfg(feature = "...")]` or runtime `Option<...>`.
+pulse-core no longer compiles with AI model features (`ai-*` removed with the ML stack in v0.6). Don't re-add model dependencies without a design doc.
 
 ### Python scripts use uv
 
