@@ -11,7 +11,7 @@
     body: string; bodyHtml: string | null; externalUrl: string | null; author: string | null;
     publishedAt: string; read: boolean; saved: boolean; hidden: boolean;
     score: number | null; n: number; tags: string[]; signal: number;
-    ogImage: string | null; note: string | null;
+    ogImage: string | null; note: string | null; userTags: string[];
   }
 
   interface BackendPage {

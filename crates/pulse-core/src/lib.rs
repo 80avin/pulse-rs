@@ -600,6 +600,22 @@ impl PulseCore {
             .map_err(PulseError::Storage)
     }
 
+    pub async fn get_user_tags(&self, item_id: &ItemId) -> Result<Vec<String>, PulseError> {
+        let iid = item_id.clone();
+        self.db
+            .with_reader(|pool| async move { storage::queries::get_user_tags(&pool, &iid).await })
+            .await
+            .map_err(PulseError::Storage)
+    }
+
+    /// Replace the user-defined tags for an item (full-set semantics).
+    pub async fn set_user_tags(&self, item_id: &ItemId, tags: Vec<String>) -> Result<(), PulseError> {
+        self.db
+            .replace_user_tags(item_id.clone(), tags)
+            .await
+            .map_err(PulseError::Storage)
+    }
+
     // ─── Stats ────────────────────────────────────────────────────────────────
 
     pub async fn get_db_stats(&self) -> Result<DbStats, PulseError> {

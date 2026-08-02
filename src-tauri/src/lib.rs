@@ -248,6 +248,8 @@ pub fn run() {
             commands::toggle_saved,
             commands::set_item_note,
             commands::hide_item,
+            commands::get_user_tags,
+            commands::set_user_tags,
             commands::get_groups,
             commands::add_group,
             commands::rename_group,

@@ -38,6 +38,7 @@ pub struct FeedItemDto {
     pub score: Option<i64>,
     pub n: i64,
     pub tags: Vec<String>,
+    pub user_tags: Vec<String>,
     pub og_image: Option<String>,
     pub signal: f64,
     pub note: Option<String>,

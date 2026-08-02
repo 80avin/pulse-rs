@@ -224,6 +224,8 @@ pub struct FeedItemView {
 
     // AI tags (tag names) and aggregate signal score
     pub ai_tags: Vec<String>,
+    // User-defined tags (from the user_tags table)
+    pub user_tags: Vec<String>,
     pub signal: f64,
 }
 

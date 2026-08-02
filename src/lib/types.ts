@@ -35,6 +35,7 @@ export interface FeedItem {
   score: number;
   n: number;
   tags: string[];
+  userTags: string[];
   aiScore: number;
   read: boolean;
   saved: boolean;

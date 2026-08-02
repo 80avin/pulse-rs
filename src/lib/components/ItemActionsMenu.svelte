@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
+  import { markRead, toggleSaved, hideItem, setItemTags, normalizeTag } from '$lib/stores/data.svelte';
   import { openExternal, shareItem } from '$lib/utils';
   import Icon from './Icon.svelte';
   import type { FeedItem } from '$lib/types';
@@ -19,6 +19,32 @@
 
   function act(fn: () => void) { fn(); onClose(); }
 
+  let tagDraft = $state('');
+  function addTag() {
+    const t = normalizeTag(tagDraft);
+    if (t) setItemTags(item.id, [...item.userTags, t]);
+    tagDraft = '';
+  }
+  function removeTag(tag: string) { setItemTags(item.id, item.userTags.filter(t => t !== tag)); }
+
+  const tagEditor = `
+    <div class="px-3 py-2 border-b border-bd-0">
+      <div class="flex items-center gap-1 mb-1.5">
+        <span class="text-ink-3 uppercase tracking-[0.5px] text-[9px] leading-none font-mono">your tags</span>
+        <span class="text-ink-4 text-[9px] leading-none font-mono">(click to remove)</span>
+      </div>
+      {#if item.userTags.length > 0}
+        <div class="flex flex-wrap gap-1 mb-1.5">
+          {#each item.userTags as tag}
+            <button class="inline-flex items-center gap-1 bg-transparent cursor-pointer px-1.5 py-0.5 rounded-sm text-[9px] leading-none font-mono" style="color:{T.amber};border:1px dashed {T.amber}55;" onclick={() => removeTag(tag)}>{tag} ×</button>
+          {/each}
+        </div>
+      {/if}
+      <form onsubmit={(e) => { e.preventDefault(); addTag(); }}>
+        <input bind:value={tagDraft} placeholder="add tag…" aria-label="Add a tag" class="w-full bg-bg-0 border border-bd-1 rounded px-2 py-1 text-[11px] leading-none font-mono text-ink-0" />
+      </form>
+    </div>`;
+
   const rowCls = 'flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[11px_14px] text-[11px] leading-none font-mono';
 </script>
 
@@ -30,6 +56,7 @@
     <div class="flex items-center gap-2.5 px-3 py-2 border-b border-bd-0 mb-1">
       <span class="text-ink-0 flex-1 truncate text-[12px] leading-[1.3] font-mono">{item.title}</span>
     </div>
+    {@html tagEditor}
     {#if item.url && !isHnSelf}
       <button class={rowCls} onclick={() => act(() => openExternal(item.url!))}><Icon name="ext" size={11} color={T.ink2} /><span>Open in browser</span></button>
     {/if}
@@ -47,7 +74,8 @@
   </div>
 {:else}
   <!-- Floating popup (desktop right-click) -->
-  <div class="fixed z-[100] bg-bg-1 border border-bd-1 rounded overflow-hidden w-52 shadow-[0_8px_32px_rgba(0,0,0,0.6)]" style="left:{Math.min(x, window.innerWidth - 220)}px;top:{Math.min(y, window.innerHeight - 320)}px;">
+  <div class="fixed z-[100] bg-bg-1 border border-bd-1 rounded overflow-hidden w-64 shadow-[0_8px_32px_rgba(0,0,0,0.6)]" style="left:{Math.min(x, window.innerWidth - 260)}px;top:{Math.min(y, window.innerHeight - 360)}px;">
+    {@html tagEditor}
     {#if item.url && !isHnSelf}
       <button class={rowCls} onclick={() => act(() => openExternal(item.url!))}><Icon name="ext" size={11} color={T.ink2} /><span>Open in browser</span></button>
     {/if}

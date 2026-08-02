@@ -118,6 +118,7 @@ fn adapt_item(view: &pulse_core::types::FeedItemView) -> FeedItemDto {
         score: view.score,
         n: view.comment_count.unwrap_or(0),
         tags: view.ai_tags.clone(),
+        user_tags: view.user_tags.clone(),
         og_image: view.og_image.clone(),
         signal: view.signal,
         note: view.note.clone(),
@@ -360,6 +361,22 @@ pub async fn set_item_note(
     core.set_item_note(&id, note)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_user_tags(state: State<'_, AppState>, id: String) -> Result<Vec<String>, String> {
+    let core = state.core().await?;
+    core.get_user_tags(&id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_user_tags(
+    state: State<'_, AppState>,
+    id: String,
+    tags: Vec<String>,
+) -> Result<(), String> {
+    let core = state.core().await?;
+    core.set_user_tags(&id, tags).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

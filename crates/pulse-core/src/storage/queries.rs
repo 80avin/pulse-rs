@@ -129,6 +129,7 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
     use sqlx::Row;
     let feed_type_str: String = row.try_get("feed_type").map_err(StorageError::Sqlite)?;
     let ai_tags_json: String = row.try_get("ai_tags").map_err(StorageError::Sqlite)?;
+    let user_tags_json: String = row.try_get("user_tags").map_err(StorageError::Sqlite)?;
     let is_read_i: i64 = row.try_get("is_read").map_err(StorageError::Sqlite)?;
     let is_saved_i: i64 = row.try_get("is_saved").map_err(StorageError::Sqlite)?;
     let is_hidden_i: i64 = row.try_get("is_hidden").map_err(StorageError::Sqlite)?;
@@ -136,6 +137,7 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
 
     let feed_type = FeedType::from_str(&feed_type_str).unwrap_or(FeedType::Rss);
     let ai_tags: Vec<String> = serde_json::from_str(&ai_tags_json).unwrap_or_default();
+    let user_tags: Vec<String> = serde_json::from_str(&user_tags_json).unwrap_or_default();
 
     Ok(FeedItemView {
         id: row.try_get("id").map_err(StorageError::Sqlite)?,
@@ -163,6 +165,7 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
         is_hidden: is_hidden_i != 0,
         note: row.try_get("note").ok(),
         ai_tags,
+        user_tags,
         signal,
     })
 }
@@ -294,12 +297,14 @@ pub async fn get_timeline(
             f.group_id, fg.name AS group_name,
             ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
             COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
+            COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags,
             COALESCE(MAX(at.confidence), 0.0) AS signal
          FROM feed_items fi
          JOIN feeds f ON fi.feed_id = f.id
          LEFT JOIN feed_groups fg ON f.group_id = fg.id
          JOIN item_states ist ON ist.item_id = fi.id
          LEFT JOIN ai_tags at ON at.item_id = fi.id
+         LEFT JOIN user_tags ut ON ut.item_id = fi.id
          WHERE {where_clause}
          GROUP BY fi.id
          ORDER BY fi.published_at DESC, fi.id DESC
@@ -422,12 +427,14 @@ pub async fn get_item_view(pool: &SqlitePool, item_id: &ItemId) -> Result<FeedIt
             f.group_id, fg.name AS group_name,
             ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
             COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
+            COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags,
             COALESCE(MAX(at.confidence), 0.0) AS signal
          FROM feed_items fi
          JOIN feeds f ON fi.feed_id = f.id
          LEFT JOIN feed_groups fg ON f.group_id = fg.id
          JOIN item_states ist ON ist.item_id = fi.id
          LEFT JOIN ai_tags at ON at.item_id = fi.id
+         LEFT JOIN user_tags ut ON ut.item_id = fi.id
          WHERE fi.id = ?
          GROUP BY fi.id";
 
@@ -483,6 +490,7 @@ pub async fn search_items(
                 f.group_id, fg.name AS group_name,
                 ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
                 COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
+            COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags,
                 COALESCE(MAX(at.confidence), 0.0) AS signal
          FROM feed_items_fts
          JOIN feed_items fi ON fi.rowid = feed_items_fts.rowid
@@ -490,6 +498,7 @@ pub async fn search_items(
          LEFT JOIN feed_groups fg ON f.group_id = fg.id
          JOIN item_states ist ON ist.item_id = fi.id
          LEFT JOIN ai_tags at ON at.item_id = fi.id
+         LEFT JOIN user_tags ut ON ut.item_id = fi.id
          WHERE feed_items_fts MATCH ?
            AND ist.is_hidden = 0
          GROUP BY fi.id
@@ -741,4 +750,19 @@ pub async fn get_tag_stats(pool: &SqlitePool) -> Result<TagStats, StorageError> 
         tag_counts.push((row.try_get::<String, _>("tag")?, row.try_get::<i64, _>("n")?));
     }
     Ok(TagStats { tagged_count, tag_counts })
+}
+
+/// Fetch user-defined tags for a single item.
+pub async fn get_user_tags(pool: &SqlitePool, item_id: &ItemId) -> Result<Vec<String>, StorageError> {
+    let rows = sqlx::query("SELECT tag FROM user_tags WHERE item_id = ? ORDER BY created_at, tag")
+        .bind(item_id)
+        .fetch_all(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
+    let mut tags = Vec::with_capacity(rows.len());
+    for row in rows {
+        use sqlx::Row;
+        tags.push(row.try_get("tag").map_err(StorageError::Sqlite)?);
+    }
+    Ok(tags)
 }

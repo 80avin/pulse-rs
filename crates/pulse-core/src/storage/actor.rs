@@ -52,6 +52,13 @@ pub enum DbCommand {
         reply: oneshot::Sender<DbResult<()>>,
     },
 
+    /// Replace the user-defined tags for an item (full-set semantics).
+    ReplaceUserTags {
+        item_id: ItemId,
+        tags: Vec<String>,
+        reply: oneshot::Sender<DbResult<()>>,
+    },
+
     /// Update the source_config JSON for a feed (e.g., last_seen_id for HN)
     UpdateFeedSourceConfig {
         feed_id: FeedId,
@@ -165,6 +172,11 @@ pub async fn db_writer_task(mut rx: mpsc::Receiver<DbCommand>, pool: SqlitePool)
                 reply,
             } => {
                 let result = insert_ai_tags(&pool, &item_id, &tags).await;
+                let _ = reply.send(result);
+            }
+
+            DbCommand::ReplaceUserTags { item_id, tags, reply } => {
+                let result = replace_user_tags(&pool, &item_id, &tags).await;
                 let _ = reply.send(result);
             }
 
@@ -625,6 +637,33 @@ async fn insert_ai_tags(pool: &SqlitePool, item_id: &ItemId, tags: &[TagResult])
     Ok(())
 }
 
+/// Replace the user-defined tags for an item (full-set semantics — the UI edits
+/// the whole set, so delete + reinsert keeps the table consistent).
+async fn replace_user_tags(pool: &SqlitePool, item_id: &ItemId, tags: &[String]) -> DbResult<()> {
+    let now = chrono::Utc::now().timestamp();
+    let mut tx = pool.begin().await.map_err(StorageError::Sqlite)?;
+    sqlx::query("DELETE FROM user_tags WHERE item_id = ?")
+        .bind(item_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(StorageError::Sqlite)?;
+    for tag in tags {
+        let tag = tag.trim().to_lowercase();
+        if tag.is_empty() || tag.len() > 40 {
+            continue;
+        }
+        sqlx::query("INSERT INTO user_tags (item_id, tag, created_at) VALUES (?, ?, ?)")
+            .bind(item_id)
+            .bind(&tag)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(StorageError::Sqlite)?;
+    }
+    tx.commit().await.map_err(StorageError::Sqlite)?;
+    Ok(())
+}
+
 async fn update_feed_source_config(
     pool: &SqlitePool,
     feed_id: &FeedId,
@@ -845,6 +884,16 @@ impl DbHandle {
     /// Store AI tags for an item
     pub async fn insert_ai_tags(&self, item_id: ItemId, tags: Vec<TagResult>) -> DbResult<()> {
         self.send(|reply| DbCommand::InsertAiTags {
+            item_id,
+            tags,
+            reply,
+        })
+        .await
+    }
+
+    /// Replace the user-defined tags for an item (full-set semantics).
+    pub async fn replace_user_tags(&self, item_id: ItemId, tags: Vec<String>) -> DbResult<()> {
+        self.send(|reply| DbCommand::ReplaceUserTags {
             item_id,
             tags,
             reply,
@@ -1215,5 +1264,40 @@ mod vacuum_tests {
         .await
         .unwrap();
         assert_eq!(found.as_deref(), Some("i1"));
+    }
+}
+
+#[cfg(test)]
+mod user_tags_tests {
+    use super::*;
+    use crate::config::PulseConfig;
+    use crate::storage::connection::open_writer_pool;
+    use crate::storage::migrations::run_migrations;
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    #[tokio::test]
+    async fn replace_user_tags_persists_and_normalizes() {
+        let dir = std::env::temp_dir().join(format!("pulse-core-ut-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let config = PulseConfig::default().with_data_dir(dir);
+        let pool = open_writer_pool(&config.db_path, &config).await.unwrap();
+        run_migrations(&pool).await.unwrap();
+
+        let now = Utc::now().timestamp();
+        sqlx::query("INSERT INTO feeds (id, url, feed_type, title, created_at, updated_at) VALUES ('f1','https://x/rss','rss','t',?,?)")
+            .bind(now).bind(now).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO feed_items (id, feed_id, source_guid, title, published_at, fetched_at) VALUES ('i1','f1','g1','hello world',?,?)")
+            .bind(now).bind(now).execute(&pool).await.unwrap();
+
+        // Replace = set + normalize (trim, lowercase, cap).
+        replace_user_tags(&pool, &"i1".into(), &["Rust ".into(), "  Systems".into(), "".into(), "a".repeat(45).into()]).await.unwrap();
+        let tags = crate::storage::queries::get_user_tags(&pool, &"i1".into()).await.unwrap();
+        assert_eq!(tags, vec!["rust".to_string(), "systems".to_string()]);
+
+        // Replace again = full-set semantics (previous tags gone).
+        replace_user_tags(&pool, &"i1".into(), &["later".into()]).await.unwrap();
+        let tags = crate::storage::queries::get_user_tags(&pool, &"i1".into()).await.unwrap();
+        assert_eq!(tags, vec!["later".to_string()]);
     }
 }

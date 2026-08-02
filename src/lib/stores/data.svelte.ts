@@ -20,7 +20,7 @@ interface BackendItem {
   body: string; bodyHtml: string | null; externalUrl: string | null; author: string | null;
   publishedAt: string; read: boolean; saved: boolean; hidden: boolean;
   score: number | null; n: number; tags: string[]; signal: number;
-  ogImage: string | null; note: string | null;
+  ogImage: string | null; note: string | null; userTags: string[];
 }
 
 interface BackendSource {
@@ -55,7 +55,7 @@ export function adaptItem(b: BackendItem): FeedItem {
     bodyHtml: b.bodyHtml ?? undefined,
     externalUrl: b.externalUrl ?? undefined,
     author: b.author ?? '', age: ageLabel(b.publishedAt),
-    score: b.score ?? 0, n: b.n, tags: b.tags, aiScore: b.signal,
+    score: b.score ?? 0, n: b.n, tags: b.tags, userTags: b.userTags ?? [], aiScore: b.signal,
     read: b.read, saved: b.saved,
     domain: domainOf(b.url),
     ogImage: b.ogImage ?? null, note: b.note ?? undefined,
@@ -291,6 +291,28 @@ export async function setNote(id: string, note: string | null) {
       await tauriInvoke('set_item_note', { id, note: note === '' ? null : note });
     } catch {
       if (item) item.note = wasNote;
+    }
+  }
+}
+
+// Normalize a raw tag input: lowercase, collapse spaces, cap length.
+export function normalizeTag(tag: string): string | null {
+  const t = tag.trim().toLowerCase().replace(/\s+/g, '-');
+  if (!t || t.length > 40) return null;
+  return t;
+}
+
+/** Replace the user-defined tags for an item (full-set semantics). */
+export async function setItemTags(id: string, tags: string[]) {
+  const cleaned = [...new Set(tags.map(normalizeTag).filter((t): t is string => t !== null))];
+  const item = items.find(i => i.id === id);
+  const wasTags = item?.userTags;
+  if (item) item.userTags = cleaned;
+  if (IS_TAURI) {
+    try {
+      await tauriInvoke('set_user_tags', { id, tags: cleaned });
+    } catch {
+      if (item) item.userTags = wasTags ?? [];
     }
   }
 }

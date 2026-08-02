@@ -196,6 +196,19 @@
             {/each}
           {/if}
         </div>
+
+        <!-- User tags (distinct: dashed amber, click to filter) -->
+        {#if item.userTags.length > 0}
+          <div class="flex items-center gap-1.5 flex-wrap" style="margin-top:5px;">
+            {#each item.userTags.slice(0, 6) as tag}
+              <button
+                onclick={() => onTagClick?.(tag)}
+                title={`Filter by "${tag}" (your tag)`}
+                class="inline-flex items-center gap-1 bg-transparent cursor-pointer whitespace-nowrap px-1.5 py-0.5 rounded-sm text-[9px] leading-none font-mono" style="color:{T.amber};border:1px dashed {T.amber}55;"
+              ><Icon name="bookmark" size={8} color={T.amber} />{tag}</button>
+            {/each}
+          </div>
+        {/if}
       </div>
 
       <!-- og_image trailing edge -->
