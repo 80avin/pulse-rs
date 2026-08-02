@@ -54,14 +54,14 @@
     violet: { light: '#5b21b6', dark: '#b48ce6', lightDim: '#4c1d95', darkDim: '#7b4fbf' },
   };
 
-  const accentVars = $derived(() => {
+  const accentVars = $derived.by(() => {
     const a = ACCENTS[accentColor] ?? ACCENTS.cyan;
     return `:root{--user-accent:light-dark(${a.light},${a.dark});--user-accent-dim:light-dark(${a.lightDim},${a.darkDim})}`;
   });
 </script>
 
 <svelte:head>
-  {@html `<style>${accentVars()}</style>`}
+  {@html `<style>${accentVars}</style>`}
 </svelte:head>
 
 <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-3 focus:py-2 focus:bg-bg-0 focus:text-ink-0 focus:border focus:border-cyan focus:rounded">

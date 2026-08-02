@@ -66,3 +66,21 @@ describe('save/note semantics (non-Tauri optimistic path)', () => {
     expect(item.note).toBeUndefined();
   });
 });
+
+import { normalizeTag } from './data.svelte';
+
+describe('normalizeTag (user-tag normalization contract)', () => {
+  it('trims and lowercases', () => {
+    expect(normalizeTag('  Rust ')).toBe('rust');
+    expect(normalizeTag('Systems')).toBe('systems');
+  });
+
+  it('rejects empty and over-long tags', () => {
+    expect(normalizeTag('   ')).toBeNull();
+    expect(normalizeTag('a'.repeat(41))).toBeNull();
+  });
+
+  it('preserves internal spaces (matches backend)', () => {
+    expect(normalizeTag('Web Dev')).toBe('web dev');
+  });
+});

@@ -25,11 +25,12 @@
   import MobileSaved from './MobileSaved.svelte';
   import SearchView from '$lib/components/SearchView.svelte';
   import { Accordion } from 'bits-ui';
+  import { TABS, isTabId, type TabId } from '$lib/nav';
 
   // ── Shared navigation state (one shell, both breakpoints) ───────────────
   let openId = $state('');
   let timelineIds = $state<string[]>([]);
-  let activeTab = $state('feed');
+  let activeTab = $state<TabId>('feed');
 
   const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -58,9 +59,10 @@
   // Narrow navigation (history-backed so Android back unwinds in-app)
   type NavState = { tab: string; openItemId: string | null };
   function changeTab(newTab: string) {
+    if (!isTabId(newTab)) { activeTab = 'feed'; newTab = 'feed'; }
     if (newTab === activeTab && !openId) return;
     history.pushState({ tab: newTab, openItemId: null } satisfies NavState, '');
-    activeTab = newTab;
+    activeTab = newTab as TabId;
     openId = '';
   }
   function goBack() { openId = ''; history.back(); }
@@ -72,7 +74,7 @@
     history.replaceState({ tab: 'feed', openItemId: null } satisfies NavState, '');
     function handlePop(e: PopStateEvent) {
       const s = e.state as NavState | null;
-      activeTab = s?.tab ?? 'feed';
+      activeTab = (s?.tab && isTabId(s.tab)) ? s.tab : 'feed';
       openId = s?.openItemId ?? '';
     }
     window.addEventListener('popstate', handlePop);
@@ -267,7 +269,7 @@
               <Icon name="chev-r" size={13} color={T.ink2} />
             </button>
             {#each groups as g}
-              <button onclick={() => selectGroup(g.id)} onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} items`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px]" style="background:{g.id===activeGroup?'rgba(78,205,214,0.12)':'transparent'}">
+              <button onclick={() => selectGroup(g.id)} onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} unread`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px]" style="background:{g.id===activeGroup?'rgba(78,205,214,0.12)':'transparent'}">
                 <span class="font-bold text-[10px] leading-none font-mono text-cyan={g.id===activeGroup} text-ink-2={g.id!==activeGroup}">{g.name.slice(0, 2).toUpperCase()}</span>
                 {#if g.n > 0}<span class="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-cyan"></span>{/if}
               </button>
@@ -310,7 +312,7 @@
                 </Accordion.Header>
                 <Accordion.Content class="p-[0_8px_6px]">
                   {#each groupSources as s}
-                    <button onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }} oncontextmenu={(e) => { e.preventDefault(); showSources = !showSources; }} onmouseenter={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = 'transparent'; }} onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }} onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }} class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1" style="background:{activeSource===s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border-left:2px solid {activeSource===s.id ? T.cyan : 'transparent'}" aria-current={activeSource===s.id ? 'true' : undefined}>
+                    <button onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }} oncontextmenu={(e) => { e.preventDefault(); }} onmouseenter={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = 'transparent'; }} onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }} onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }} class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1" style="background:{activeSource===s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border-left:2px solid {activeSource===s.id ? T.cyan : 'transparent'}" aria-current={activeSource===s.id ? 'true' : undefined}>
                       <StatusDot status={s.status} size={5} />
                       <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-[11px] leading-[1.2] font-mono" style="color:{activeSource===s.id ? T.ink0 : T.ink1};">{s.name}</span>
                       {#if s.unread > 0}<span class="text-cyan text-[10px] leading-none font-mono">{s.unread}</span>{/if}

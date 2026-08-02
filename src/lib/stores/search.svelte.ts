@@ -1,13 +1,7 @@
 import { IS_TAURI, tauriInvoke, items, adaptItem } from './data.svelte';
+import type { BackendItem } from '../types';
 import type { FeedItem } from '../types';
 
-interface BackendItem {
-  id: string; sourceId: string; sourceName: string; title: string; url: string;
-  body: string; bodyHtml: string | null; externalUrl: string | null; author: string | null;
-  publishedAt: string; read: boolean; saved: boolean; hidden: boolean;
-  score: number | null; n: number; tags: string[]; signal: number;
-  ogImage: string | null; note: string | null; userTags: string[];
-}
 
 export async function searchItems(query: string, limit = 100): Promise<FeedItem[]> {
   if (!IS_TAURI) {

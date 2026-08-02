@@ -52,5 +52,16 @@ export interface FeedItem {
   note?: string;
 }
 
+// The wire shape of a feed item from the Tauri backend (camelCase).
+// Single source of truth — components no longer re-declare it (that caused
+// silent drift when a DTO field was added).
+export interface BackendItem {
+  id: string; sourceId: string; sourceName: string; title: string; url: string;
+  body: string; bodyHtml: string | null; externalUrl: string | null; author: string | null;
+  publishedAt: string; read: boolean; saved: boolean; hidden: boolean;
+  score: number | null; n: number; tags: string[]; signal: number;
+  ogImage: string | null; note: string | null; userTags: string[];
+}
+
 export type Density = 'dense' | 'normal' | 'roomy';
 

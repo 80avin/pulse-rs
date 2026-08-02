@@ -5,16 +5,9 @@
   import { settings } from '$lib/settings.svelte';
   import ItemRow from '$lib/components/ItemRow.svelte';
   import Icon from '$lib/components/Icon.svelte';
-  import type { FeedItem } from '$lib/types';
+  import type { FeedItem, BackendItem } from '$lib/types';
 
-  interface BackendItem {
-    id: string; sourceId: string; sourceName: string; title: string; url: string;
-    body: string; bodyHtml: string | null; externalUrl: string | null; author: string | null;
-    publishedAt: string; read: boolean; saved: boolean; hidden: boolean;
-    score: number | null; n: number; tags: string[]; signal: number;
-    ogImage: string | null; note: string | null; userTags: string[];
-  }
-
+  
   interface BackendPage {
     items: BackendItem[];
     nextCursor: { publishedAt: number; itemId: string } | null;

@@ -1,5 +1,5 @@
 import { ITEMS as MOCK_ITEMS, SOURCES as MOCK_SOURCES, GROUPS as MOCK_GROUPS } from '../mock-data';
-import type { FeedItem, Source, Group } from '../types';
+import type { FeedItem, Source, Group, BackendItem } from '../types';
 import { logger } from '../logger';
 import { settings } from '../settings.svelte';
 
@@ -15,13 +15,6 @@ export async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>
 }
 
 // --- Backend types (camelCase from Rust serde) ---
-interface BackendItem {
-  id: string; sourceId: string; sourceName: string; title: string; url: string;
-  body: string; bodyHtml: string | null; externalUrl: string | null; author: string | null;
-  publishedAt: string; read: boolean; saved: boolean; hidden: boolean;
-  score: number | null; n: number; tags: string[]; signal: number;
-  ogImage: string | null; note: string | null; userTags: string[];
-}
 
 interface BackendSource {
   id: string; name: string; url: string; kind: 'hn' | 'reddit' | 'rss';
@@ -110,9 +103,8 @@ export async function reloadItems(): Promise<void> {
   });
   if (myEpoch !== currentEpoch()) return;
   items.splice(0, items.length, ...page.items.map(adaptItem));
-  const { loadingMore, hasPrecedingItems } = await import('./timeline.svelte');
+  const { loadingMore } = await import('./timeline.svelte');
   loadingMore.cursor = page.nextCursor ?? null;
-  hasPrecedingItems.value = false;
   if (page.counts) {
     pageCounts.total = page.counts.total;
     pageCounts.unread = page.counts.unread;

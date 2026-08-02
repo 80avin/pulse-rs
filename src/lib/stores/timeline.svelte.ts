@@ -1,14 +1,8 @@
 import { IS_TAURI, tauriInvoke, items, storeReady, adaptItem, reloadDbStats, reloadSources, reloadGroups } from './data.svelte';
+import type { BackendItem } from '../types';
 import { settings } from '../settings.svelte';
 import { logger } from '../logger';
 
-interface BackendItem {
-  id: string; sourceId: string; sourceName: string; title: string; url: string;
-  body: string; bodyHtml: string | null; externalUrl: string | null; author: string | null;
-  publishedAt: string; read: boolean; saved: boolean; hidden: boolean;
-  score: number | null; n: number; tags: string[]; signal: number;
-  ogImage: string | null; note: string | null; userTags: string[];
-}
 
 interface BackendPage {
   items: BackendItem[];
@@ -22,7 +16,6 @@ export const timelineFilter = $state<{
 }>({ groupId: null, feedId: null, tag: null, isRead: null, isSaved: null });
 
 export const loadingMore = $state({ active: false, cursor: null as { publishedAt: number; itemId: string } | null });
-export const hasPrecedingItems = $state({ value: false });
 export const pageCounts = $state({ total: 0, unread: 0, saved: 0, signal: 0 });
 
 const MAX_CACHED_ITEMS = 500;
@@ -60,7 +53,6 @@ async function resetAndFetch(): Promise<void> {
   if (myEpoch !== epoch) return; // a newer filter change superseded this response
   items.splice(0, items.length, ...page.items.map(adaptItem));
   loadingMore.cursor = page.nextCursor ?? null;
-  hasPrecedingItems.value = false;
   if (page.counts) {
     pageCounts.total = page.counts.total;
     pageCounts.unread = page.counts.unread;
@@ -79,7 +71,6 @@ export async function fetchNextPage(): Promise<void> {
     items.push(...page.items.map(adaptItem));
     if (items.length > MAX_CACHED_ITEMS) {
       items.splice(0, EVICT_COUNT);
-      hasPrecedingItems.value = true;
     }
     loadingMore.cursor = page.nextCursor ?? null;
     if (page.counts) {
