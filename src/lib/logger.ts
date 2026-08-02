@@ -1,4 +1,4 @@
-const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
+const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 type Level = 'Error' | 'Warn' | 'Info' | 'Debug';
 

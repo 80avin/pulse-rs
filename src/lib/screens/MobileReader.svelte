@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { T } from '$lib/tokens';
   import { Dialog } from 'bits-ui';
-  import { items, sources, markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
+  import { items, sources, markRead, toggleSaved, saveWithNote, hideItem } from '$lib/stores/data.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, shareItem } from '$lib/utils';
   import KeyCap from '$lib/components/KeyCap.svelte';
@@ -85,12 +85,15 @@
   // Long-press on save button
   let savePressTimer: ReturnType<typeof setTimeout> | null = null;
   let saveLongPressed = false;
+  let suppressNextClick = false;
 
   function startSavePress() {
+    suppressNextClick = false;
     saveLongPressed = false;
     savePressTimer = setTimeout(() => {
       saveLongPressed = true;
       savePressTimer = null;
+      suppressNextClick = true;
       noteDraft = item?.note ?? '';
       noteSheetOpen = true;
     }, 450);
@@ -103,10 +106,10 @@
     const wasLong = saveLongPressed;
     cancelSavePress();
     if (wasLong) {
+      // Suppress the ghost click that follows — otherwise it fires the button's
+      // onclick and double-toggles the save on top of the note-sheet flow.
+      suppressNextClick = true;
       e.preventDefault();
-    } else {
-      toggleSaved(item!.id);
-      showSaveToast();
     }
   }
 
@@ -116,9 +119,9 @@
     saveToastTimer = setTimeout(() => { saveToast = false; }, 3000);
   }
 
-  function saveWithNote() {
+  function submitNote() {
     if (!item) return;
-    toggleSaved(item.id, noteDraft.trim() || undefined);
+    saveWithNote(item.id, noteDraft);
     noteSheetOpen = false;
   }
 
@@ -200,7 +203,11 @@
         <span class="uppercase">{item.read ? 'unread' : 'read'}</span>
       </button>
       <button
-        onclick={() => { toggleSaved(item.id); showSaveToast(); }}
+        onclick={() => {
+          if (suppressNextClick) { suppressNextClick = false; return; }
+          toggleSaved(item.id);
+          showSaveToast();
+        }}
         ontouchstart={startSavePress}
         ontouchend={endSavePress}
         ontouchcancel={cancelSavePress}
@@ -267,7 +274,7 @@
             <div class="flex gap-2 mt-3">
               <Dialog.Close class="flex-1 bg-transparent text-ink-1 border border-bd-2 cursor-pointer py-2.5 rounded tracking-[0.3px] text-[11px] leading-none font-mono">cancel</Dialog.Close>
               <button
-                onclick={saveWithNote}
+                onclick={submitNote}
                 class="flex-1 bg-amber text-bg-0 border-none cursor-pointer py-2.5 rounded tracking-[0.3px] text-[11px] leading-none font-mono"
               >save with note</button>
             </div>

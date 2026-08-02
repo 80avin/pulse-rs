@@ -1,7 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import { sources, groups, coldstartTiming, dbStats, addSource, createGroup } from '$lib/stores/data.svelte';
-  import { aiStatus } from '$lib/stores/ai.svelte';
   import { settings } from '$lib/settings.svelte';
   import { logger } from '$lib/logger';
   import Icon from '$lib/components/Icon.svelte';
@@ -15,7 +14,7 @@
 
   let { showShortcuts = false }: { showShortcuts?: boolean } = $props();
 
-  const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
+  const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
   // IS_DESKTOP: true when running in Tauri on a non-mobile platform.
   // navigator.maxTouchPoints > 1 is a reasonable heuristic used elsewhere in the app.
   const IS_DESKTOP = IS_TAURI && (typeof navigator === 'undefined' || navigator.maxTouchPoints <= 1);
@@ -165,27 +164,9 @@
   </div>
 </SettingsSection>
 
-<!-- AI -->
-<SettingsSection label="ai tagging">
-  <div class="flex items-center gap-2 mb-2.5">
-    <div class="text-ink-3 uppercase text-[10px] leading-none font-mono tracking-[0.6px]">ai tagging</div>
-    <div class="text-amber uppercase opacity-80 text-[10px] leading-none font-mono tracking-[0.5px] p-[2px_5px] border border-amber rounded-sm">experimental</div>
-  </div>
-  <div class="mb-2.5 text-ink-3 text-[10px] leading-normal font-mono">Tags may be inaccurate. Raise the confidence threshold or disable tagging if results look wrong.</div>
-  <div class="flex flex-col gap-2.5">
-    <div class="flex items-center gap-2">
-      <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">AI tagging</span>
-      <ToggleSwitch on={settings.aiTagging} change={() => { settings.aiTagging = !settings.aiTagging; }} />
-    </div>
-    <div class="flex items-center gap-2">
-      <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">Model</span>
-      <span class="text-[11px] leading-none font-mono" style="color:{aiStatus.taggingMode !== 'none' ? T.cyan : T.amber};">{aiStatus.taggingMode === 'none' ? 'not loaded' : aiStatus.taggingMode}</span>
-    </div>
-    <div>
-      <div class="text-ink-1 mb-1.5 text-[11px] leading-none font-mono">Confidence threshold: <span class="text-cyan">{settings.confidenceThreshold.toFixed(2)}</span></div>
-      <input type="range" min="0.1" max="0.9" step="0.05" bind:value={settings.confidenceThreshold} class="w-full" style="accent-color:{T.cyan};" />
-    </div>
-  </div>
+<!-- Tagging -->
+<SettingsSection label="tagging">
+  <div class="text-ink-3 text-[10px] leading-normal font-mono">Items are tagged on-device by a deterministic rule engine (structural rules + low-effort heuristics). No models, no downloads, no cloud.</div>
 </SettingsSection>
 
 <!-- Notifications -->

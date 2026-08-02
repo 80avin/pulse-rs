@@ -8,7 +8,7 @@
     sort: string;
     onSort: (s: string) => void;
     onMarkAllRead: () => void;
-    counts?: { all: number; unread: number; saved: number; signal: number };
+    counts?: { all: number; unread: number; saved: number };
     activeTag?: string | null;
     onClearTagFilter?: () => void;
     topTags?: string[];
@@ -19,7 +19,6 @@
     { id: 'all',    label: 'all',    n: counts?.all    ?? 0                         },
     { id: 'unread', label: 'unread', n: counts?.unread ?? 0                         },
     { id: 'saved',  label: 'saved',  n: counts?.saved  ?? 0, color: T.amber          },
-    { id: 'signal', label: 'signal', n: counts?.signal ?? 0, color: T.cyan           },
   ]);
 
   const showTagRow = $derived(!!activeTag || topTags.length > 0);

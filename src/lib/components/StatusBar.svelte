@@ -1,7 +1,6 @@
 <script lang="ts">
   let {
     density,
-    aiTagging,
     activeGroupLabel,
     activeSource,
     activeSourceName,
@@ -15,7 +14,6 @@
     onToggleCheatsheet,
   }: {
     density: string;
-    aiTagging: boolean;
     activeGroupLabel: string;
     activeSource: string | null;
     activeSourceName: string | undefined;
@@ -48,8 +46,6 @@
     <span class="text-ink-1"> {syncState.lastSyncAt}</span>
     {#if syncState.lastNewCount > 0}<span class="text-cyan"> +{syncState.lastNewCount}</span>{/if}
   </span>
-  <span class="text-ink-4">·</span>
-  <span><span class="text-ink-3">ai</span> <span style="color:{aiTagging ? 'var(--color-amber)' : 'var(--color-ink-3)'};">{aiTagging ? 'on' : 'off'}</span></span>
   <span class="text-ink-4">·</span>
   <button onclick={onToggleCheatsheet} class="bg-transparent border-none cursor-pointer text-ink-3 p-0 text-[10px] leading-none font-mono" title="keyboard shortcuts (?)" aria-label="Keyboard shortcuts (?)">?</button>
 </div>

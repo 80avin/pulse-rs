@@ -1,7 +1,7 @@
 import { groups, addSource as storeAddSource, syncSource as storeSyncSource, createGroup } from '$lib/stores/data.svelte';
 import { logger } from '$lib/logger';
 
-const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
+const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');
@@ -57,7 +57,18 @@ export async function confirmShare(): Promise<void> {
   }
 }
 
+let lastHandledUrl: string | null = null;
+let lastHandledAt = 0;
+
 async function handleIncomingUrl(url: string): Promise<void> {
+  // Dedup: on cold start the JNI both buffers the URL and emits the event, so
+  // the live listener and the get_pending_share drain can deliver the SAME URL
+  // back-to-back. A second identical share within a few seconds is almost
+  // certainly that race, not a real double-share — skip it.
+  if (lastHandledUrl === url && Date.now() - lastHandledAt < 5000) return;
+  lastHandledUrl = url;
+  lastHandledAt = Date.now();
+
   shareSheet.loading = true;
   shareSheet.error = null;
   shareSheet.candidate = {
@@ -88,14 +99,17 @@ async function handleIncomingUrl(url: string): Promise<void> {
 
 export async function setupShareListener(): Promise<() => void> {
   if (!IS_TAURI) return () => {};
+  // Register the live listener BEFORE draining the cold-start buffer, so no
+  // share can slip between the drain and listener registration.
+  const { listen } = await import('@tauri-apps/api/event');
+  const unlisten = await listen<{ url: string }>('share://incoming-url', (ev) => {
+    handleIncomingUrl(ev.payload.url);
+  });
   try {
     const pending = await tauriInvoke<string | null>('get_pending_share');
     if (pending) await handleIncomingUrl(pending);
   } catch {
     /* ignore — app may not be fully initialized */
   }
-  const { listen } = await import('@tauri-apps/api/event');
-  return listen<{ url: string }>('share://incoming-url', (ev) => {
-    handleIncomingUrl(ev.payload.url);
-  });
+  return unlisten;
 }

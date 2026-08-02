@@ -1,7 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import { groups, dbStats } from '$lib/stores/data.svelte';
-  import { taggingProgress } from '$lib/stores/ai.svelte';
   import Icon from './Icon.svelte';
   import { Toolbar } from 'bits-ui';
 
@@ -13,11 +12,11 @@
   const totalUnread = $derived(groups.find(g => g.id === 'all')?.n ?? dbStats.unreadItems);
 
   const tabs = [
-    { id: 'timeline', label: 'feed',     icon: 'list'   },
-    { id: 'sources',  label: 'sources',  icon: 'rss'    },
-    { id: 'search',   label: 'search',   icon: 'search' },
-    { id: 'ai',       label: 'ai',       icon: 'cpu'    },
-    { id: 'settings', label: 'settings', icon: 'cog'    },
+    { id: 'timeline', label: 'feed',     icon: 'list'     },
+    { id: 'sources',  label: 'sources',  icon: 'rss'      },
+    { id: 'search',   label: 'search',   icon: 'search'   },
+    { id: 'saved',    label: 'saved',    icon: 'bookmark' },
+    { id: 'settings', label: 'settings', icon: 'cog'      },
   ] as const;
 </script>
 
@@ -35,12 +34,9 @@
     >
       <div class="relative">
         <Icon name={tab.icon} size={18}
-          color={tab.id === 'ai' && taggingProgress.active ? T.amber : (a ? T.cyan : T.ink2)} />
+          color={tab.id === 'saved' ? T.amber : (a ? T.cyan : T.ink2)} />
         {#if tab.id === 'timeline' && totalUnread > 0}
           <span class="absolute top-[-5px] right-[-8px] px-1 py-[1px] rounded-[6px] min-w-[14px] text-center bg-cyan text-bg-0 font-semibold text-[8px] leading-none font-mono">{totalUnread > 99 ? '99+' : totalUnread}</span>
-        {/if}
-        {#if tab.id === 'ai' && taggingProgress.active}
-          <span class="tagging-dot absolute top-[-4px] right-[-6px] w-[7px] h-[7px] rounded-full bg-amber"></span>
         {/if}
       </div>
       <span>{tab.label}</span>

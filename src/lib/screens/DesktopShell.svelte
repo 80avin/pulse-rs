@@ -2,9 +2,9 @@
   import { T, TAG_COLORS } from '$lib/tokens';
   import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, dbStats } from '$lib/stores/data.svelte';
   import { doSync as storeSync, syncState } from '$lib/stores/sync.svelte';
-  import { taggingProgress, aiStats } from '$lib/stores/ai.svelte';
+  import { tagStats } from '$lib/stores/ai.svelte';
   import { searchItems } from '$lib/stores/search.svelte';
-  import { timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts } from '$lib/stores/timeline.svelte';
+  import { timelineFilter, applyFilter, setFeedFilter, setGroupFilter, setTagFilter, pageCounts } from '$lib/stores/timeline.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, shareItem } from '$lib/utils';
   import Icon from '$lib/components/Icon.svelte';
@@ -15,7 +15,6 @@
   import StatusBar from '$lib/components/StatusBar.svelte';
   import SourceGlyph from '$lib/components/SourceGlyph.svelte';
   import StatusDot from '$lib/components/StatusDot.svelte';
-  import AiPanelContent from '$lib/components/AiPanelContent.svelte';
   import SettingsPanelContent from '$lib/components/SettingsPanelContent.svelte';
   import SourceExplorer from '$lib/components/SourceExplorer.svelte';
   import TimelineList from '$lib/components/TimelineList.svelte';
@@ -68,9 +67,7 @@
   function stopDrag() { dragging = null; }
 
   let openId       = $state('');
-  let signalActive  = $state(false);
-  const desktopFilter = $derived<'all'|'unread'|'saved'|'signal'>(
-    signalActive ? 'signal' :
+  const desktopFilter = $derived<'all'|'unread'|'saved'>(
     timelineFilter.isRead === false ? 'unread' :
     timelineFilter.isSaved === true ? 'saved' : 'all'
   );
@@ -80,14 +77,13 @@
   let ftsResults   = $state<import('$lib/types').FeedItem[] | null>(null);
   let searchInputEl: HTMLInputElement | null = $state(null);
   let showSettings  = $state(false);
-  let showAI        = $state(false);
   let showSources   = $state(false);
   let accValue = $state<string[]>(['sources']);
   let showSourcesAccordion = $derived(accValue.includes('sources'));
   let popoverOpen   = $state(false);
   let showCheatsheet = $state(false);
 
-  const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
+  const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
   // FTS backend search — debounced 300ms, only in Tauri context.
   $effect(() => {
@@ -115,8 +111,6 @@
         i.title.toLowerCase().includes(q) || (i.snippet?.toLowerCase().includes(q) ?? false)
       );
     }
-    // Signal filtering remains client-side (TODO: move to backend)
-    if (signalActive) list = list.filter(i => i.aiScore >= settings.confidenceThreshold);
     return list;
   });
 
@@ -128,23 +122,20 @@
 
   // Top 5 tags from global AI stats.
   const topTags = $derived(
-    aiStats.tagCounts.slice(0, 5).map(([tag]) => tag)
+    tagStats.tagCounts.slice(0, 5).map(([tag]) => tag)
   );
 
   function selectGroup(id: string) { searchQuery = ''; setGroupFilter(id === 'all' ? null : id); }
   function setActiveTag(tag: string) {
     const next = activeTag === tag ? null : tag;
     setTagFilter(next);
-    showAI = false;
   }
 
   function handleFilterChange(filter: string) {
-    signalActive = false;
     switch (filter) {
-      case 'all':    setReadFilter(null); setSavedFilter(null); break;
-      case 'unread': setReadFilter(false); setSavedFilter(null); break;
-      case 'saved':  setReadFilter(null); setSavedFilter(true); break;
-      case 'signal': setReadFilter(null); setSavedFilter(null); signalActive = true; break;
+      case 'all':    applyFilter({ isRead: null, isSaved: null }); break;
+      case 'unread': applyFilter({ isRead: false, isSaved: null }); break;
+      case 'saved':  applyFilter({ isRead: null, isSaved: true }); break;
     }
   }
 
@@ -171,11 +162,6 @@
       }
       if (e.key === '?' && !inInput) {
         showCheatsheet = !showCheatsheet;
-        return;
-      }
-      if (e.key === 'a' && !inInput) {
-        showAI = !showAI;
-        if (showAI) showSettings = false;
         return;
       }
       if (e.key === 'r' && !inInput) {
@@ -288,9 +274,6 @@
           </button>
         {/each}
         <div class="flex-1"></div>
-        <button onclick={() => { showAI = !showAI; }} aria-label="AI Signal" title="AI Signal" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-          <Icon name="cpu" size={13} color={showAI ? T.cyan : T.ink2} />
-        </button>
         <button onclick={() => { showSources = !showSources; }} aria-label="Sources" title="Sources" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
           <Icon name="rss" size={13} color={showSources ? T.cyan : T.ink2} />
         </button>
@@ -381,12 +364,11 @@
 
       <!-- Bottom utilities -->
       <BottomTools
-        {showAI} {showSources} {showSettings}
+        {showSources} {showSettings}
         syncing={syncState.syncing}
-        {syncState} {taggingProgress}
-        onToggleAI={() => { showAI = !showAI; if (showAI) showSettings = false; }}
+        {syncState}
         onToggleSources={() => { showSources = !showSources; }}
-        onToggleSettings={() => { showSettings = !showSettings; if (showSettings) showAI = false; }}
+        onToggleSettings={() => { showSettings = !showSettings; }}
       />
     </div>
     {/if}
@@ -521,29 +503,6 @@
       </div>
     {/if}
 
-    <!-- AI signal modal -->
-    <Modal open={showAI} title="AI Signal" onClose={() => { showAI = false; }} width="480px">
-      {#if openItem && openItem.tags.length > 0}
-        <div class="bg-bg-1 border border-bd-0 rounded p-2.5 mb-3.5">
-          <div class="text-ink-3 uppercase mb-2 tracking-[0.6px] text-[10px] leading-none font-mono">current item</div>
-          <div class="flex items-center gap-2 mb-2">
-            <span class="text-ink-2 text-[10px] leading-none font-mono">signal</span>
-            <div class="flex-1 bg-bg-3 overflow-hidden rounded-sm h-[3px]">
-              <div class="h-full bg-cyan rounded-sm" style="width:{openItem.aiScore * 100}%"></div>
-            </div>
-            <span class="text-amber tabular-nums text-[10px] leading-none font-mono">{openItem.aiScore.toFixed(2)}</span>
-          </div>
-          <div class="flex flex-wrap gap-1.25">
-            {#each openItem.tags as tag}
-              {@const tc = TAG_COLORS[tag] ?? { fg: T.ink2, bg: 'transparent', bd: T.bd1 }}
-              <span class="rounded px-1.75 py-0.75 text-[10px] leading-none font-mono" style="color:{tc.fg};background:{tc.bg};border:1px solid {tc.bd}">{tag}</span>
-            {/each}
-          </div>
-        </div>
-      {/if}
-      <AiPanelContent compact onTagFilter={setActiveTag} onItemClick={(id) => { openItemAndRead(id); }} onSourceFilter={(id) => { const next = activeSource === id ? null : id; setFeedFilter(next); showAI = false; }} />
-    </Modal>
-
     <!-- Settings modal -->
     <Modal open={showSettings} title="Settings" onClose={() => { showSettings = false; }} width="420px">
       <SettingsPanelContent showShortcuts />
@@ -565,7 +524,6 @@
           { k: 's',       desc: 'save / unsave'     },
           { k: 'o',       desc: 'open in browser'   },
           { k: 'x',       desc: 'hide item'         },
-          { k: 'a',       desc: 'AI signal'         },
           { k: 'r',       desc: 'sources'           },
           { k: 'Esc',     desc: 'clear / close'     },
         ] as sc}
@@ -582,7 +540,7 @@
   <!-- Status bar -->
   <StatusBar
     density={settings.density}
-    aiTagging={settings.aiTagging}
+    
     {activeGroupLabel} {activeSource}
     activeSourceName={activeSource ? sources.find(s => s.id === activeSource)?.name : undefined}
     itemCount={displayItems.length}

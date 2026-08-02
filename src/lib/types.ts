@@ -53,25 +53,3 @@ export interface FeedItem {
 
 export type Density = 'dense' | 'normal' | 'roomy';
 
-export interface AiStatus {
-  modelLoaded: boolean;
-  visionLoaded: boolean;
-  fasttextLoaded: boolean;
-  minimlLoaded: boolean;
-  modelName: string | null;
-  visionModelName: string | null;
-  fasttextModelName: string | null;
-  minimlModelName: string | null;
-  taggingMode: string;
-}
-
-export interface ModelInfo {
-  id: string;
-  name: string;
-  description: string;
-  sizeMb: number;
-  downloaded: boolean;
-  active: boolean;
-  kind: 'nli' | 'vision' | 'fasttext' | 'miniml';
-}
-

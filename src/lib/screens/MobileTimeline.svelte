@@ -4,12 +4,10 @@
   import type { FeedItem } from '$lib/types';
   import { groups, sources, items, markAllRead, markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
   import { doSync as storeSync, syncState } from '$lib/stores/sync.svelte';
-  import { timelineFilter, setFeedFilter, setGroupFilter, setTagFilter, setReadFilter, setSavedFilter, pageCounts } from '$lib/stores/timeline.svelte';
-  import { aiStats } from '$lib/stores/ai.svelte';
+  import { timelineFilter, applyFilter, setFeedFilter, setTagFilter, pageCounts } from '$lib/stores/timeline.svelte';
+  import { tagStats } from '$lib/stores/ai.svelte';
   import { openExternal, shareItem } from '$lib/utils';
-  import { settings } from '$lib/settings.svelte';
-  import GroupTabs from '$lib/components/GroupTabs.svelte';
-  import FilterStrip from '$lib/components/FilterStrip.svelte';
+  import GroupTabs from '$lib/components/GroupTabs.svelte';  import FilterStrip from '$lib/components/FilterStrip.svelte';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import TimelineList from '$lib/components/TimelineList.svelte';
@@ -24,20 +22,16 @@
   let sort = $state('time');
   let showFilter = $state(true);
   let actionSheetItem = $state<FeedItem | null>(null);
-  let signalActive = $state(false);
 
   // Group, feed, tag, read, and saved filters are applied server-side in `items`.
-  // Signal filtering is client-side for now (TODO: move to server-side).
   const displayItems = $derived.by(() => {
     let list = items as typeof items;
-    if (signalActive) list = list.filter(i => i.aiScore >= settings.confidenceThreshold);
     if (sort === 'score') list = [...list].sort((a, b) => b.aiScore - a.aiScore);
     return list;
   });
 
   // Which tab is highlighted in FilterStrip — derived from server-side filter state.
   const filter = $derived(
-    signalActive ? 'signal' :
     timelineFilter.isRead === false ? 'unread' :
     timelineFilter.isSaved === true ? 'saved' :
     'all'
@@ -53,7 +47,7 @@
 
   // Top 5 tags from global AI stats (accurate, not from paginated items).
   const topTags = $derived(
-    aiStats.tagCounts.slice(0, 5).map(([tag]) => tag)
+    tagStats.tagCounts.slice(0, 5).map(([tag]) => tag)
   );
 
   function handleTagClick(tag: string) {
@@ -108,8 +102,6 @@
       {/if}
     </div>
     <div class="flex items-center gap-2">
-      <span><span class="text-ink-3">ai</span> <span style="color:{settings.aiTagging ? T.amber : T.ink3};">{settings.aiTagging ? 'on' : 'off'}</span></span>
-      <span class="text-ink-3">·</span>
       <span class="text-ink-1">{pageCounts.unread}</span>
       <span class="text-ink-3">unread</span>
     </div>
@@ -130,7 +122,7 @@
     </div>
   {:else}
     <!-- Group tabs -->
-    <GroupTabs {groups} active={activeGroup} onSelect={(id) => { setReadFilter(null); setSavedFilter(null); signalActive = false; setGroupFilter(id === 'all' ? null : id); }} />
+    <GroupTabs {groups} active={activeGroup} onSelect={(id) => { applyFilter({ isRead: null, isSaved: null, groupId: id === 'all' ? null : id }); }} />
   {/if}
 
   <!-- Tag filter banner -->
@@ -160,11 +152,10 @@
   <!-- Filter strip (toggleable) -->
   {#if showFilter}
     <FilterStrip
-      {filter} onFilter={(f) => {
-        if (f === 'unread') { setReadFilter(false); setSavedFilter(null); signalActive = false; }
-        else if (f === 'saved') { setReadFilter(null); setSavedFilter(true); signalActive = false; }
-        else if (f === 'signal') { setReadFilter(null); setSavedFilter(null); signalActive = true; }
-        else { setReadFilter(null); setSavedFilter(null); signalActive = false; }
+      {filter}       onFilter={(f) => {
+        if (f === 'unread') { applyFilter({ isRead: false, isSaved: null }); }
+        else if (f === 'saved') { applyFilter({ isRead: null, isSaved: true }); }
+        else { applyFilter({ isRead: null, isSaved: null }); }
       }}
       {sort} onSort={(s) => { sort = s; }}
       {counts}

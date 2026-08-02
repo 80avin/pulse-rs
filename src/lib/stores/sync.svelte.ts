@@ -1,5 +1,5 @@
 import { IS_TAURI, tauriInvoke, items, sources, storeReady, reloadItems, reloadSources, reloadGroups, reloadDbStats } from './data.svelte';
-import { reloadAiStats } from './ai.svelte';
+import { reloadTagStats } from './ai.svelte';
 import { logger } from '../logger';
 
 // --- Mock sync pool (browser dev only) ---
@@ -21,7 +21,7 @@ export async function doSync(): Promise<void> {
   try {
     if (IS_TAURI) {
       const result = await tauriInvoke<{ newCount: number; error: string | null }>('sync_all');
-      await Promise.all([reloadItems(), reloadSources(), reloadGroups(), reloadDbStats(), reloadAiStats()]);
+      await Promise.all([reloadItems(), reloadSources(), reloadGroups(), reloadDbStats(), reloadTagStats()]);
       const t = new Date();
       syncState.lastSyncAt = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
       syncState.lastNewCount = result.newCount;

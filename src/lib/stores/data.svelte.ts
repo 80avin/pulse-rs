@@ -7,7 +7,7 @@ import { settings } from '../settings.svelte';
 // Never splice/push/reassign arrays directly from components.
 // Use the exported mutation functions (markRead, toggleSaved, etc.).
 
-export const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
+export const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');
@@ -95,17 +95,20 @@ export const dbStats = $state({
 
 // --- Reload helpers (used by data mutations and sync module) ---
 export async function reloadItems(): Promise<void> {
-  const { timelineFilter, pageCounts } = await import('./timeline.svelte');
+  const { timelineFilter, pageCounts, currentEpoch } = await import('./timeline.svelte');
+  // Join the timeline epoch protocol: if the filter changed while this refresh
+  // was in flight, discard the stale page instead of clobbering the newer list.
+  const myEpoch = currentEpoch();
   const page = await tauriInvoke<{ items: BackendItem[]; nextCursor: { publishedAt: number; itemId: string } | null; counts: { total: number; unread: number; saved: number; signal: number } }>('get_items_page', {
     groupId: timelineFilter.groupId ?? null,
     feedId: timelineFilter.feedId ?? null,
     tag: timelineFilter.tag ?? null,
     isRead: timelineFilter.isRead,
     isSaved: timelineFilter.isSaved,
-    signalThreshold: settings.confidenceThreshold,
     limit: 100,
     cursor: null,
   });
+  if (myEpoch !== currentEpoch()) return;
   items.splice(0, items.length, ...page.items.map(adaptItem));
   const { loadingMore, hasPrecedingItems } = await import('./timeline.svelte');
   loadingMore.cursor = page.nextCursor ?? null;
@@ -186,10 +189,9 @@ export async function initStore(): Promise<void> {
         itemCount: page.items.length, sourceCount: bs.length, groupCount: bg.length,
       };
       logger.info('coldstart: initStore complete', coldstartTiming.data);
-      // Fire-and-forget AI + stats init (no circular import: dynamic)
+      // Fire-and-forget tag stats init (no circular import: dynamic)
       import('./ai.svelte').then(m => {
-        m.reloadAiInfo().catch(e => logger.warn('ai info failed', e));
-        m.reloadAiStats().catch(e => logger.warn('ai stats failed', e));
+        m.reloadTagStats().catch(e => logger.warn('tag stats failed', e));
       });
       reloadDbStats().catch(e => logger.warn('db stats failed', e));
       return;
@@ -245,34 +247,70 @@ export async function markRead(id: string, read = true) {
       }
       return;
     }
-    if (tlEvict(id, timelineFilter)) items.splice(items.findIndex(i => i.id === id), 1);
+    evictIfFiltered(id, timelineFilter);
     await Promise.all([reloadDbStats(), reloadSources(), reloadGroups()]);
   }
 }
 
-export async function toggleSaved(id: string, note?: string) {
+function evictIfFiltered(id: string, timelineFilter: { isRead: boolean | null; isSaved: boolean | null }) {
+  const idx = items.findIndex(i => i.id === id);
+  if (idx === -1) return;
+  if (tlEvict(id, timelineFilter)) items.splice(idx, 1);
+}
+
+export async function toggleSaved(id: string) {
   const { timelineFilter } = await import('./timeline.svelte');
   const item = items.find(i => i.id === id);
   if (!item) {
     if (IS_TAURI) {
-      await tauriInvoke('toggle_saved', { id, saved: true, note: note ?? undefined });
+      await tauriInvoke('toggle_saved', { id, saved: true });
       await reloadDbStats();
     }
     return;
   }
   const wasSaved = item.saved;
-  const wasNote = item.note;
   item.saved = !item.saved;
-  if (note !== undefined) item.note = note;
   if (IS_TAURI) {
     try {
-      await tauriInvoke('toggle_saved', { id, saved: item.saved, note: note ?? item.note });
+      await tauriInvoke('toggle_saved', { id, saved: item.saved });
     } catch {
       item.saved = wasSaved;
-      item.note = wasNote;
       return;
     }
-    if (tlEvict(id, timelineFilter)) items.splice(items.findIndex(i => i.id === id), 1);
+    evictIfFiltered(id, timelineFilter);
+    await Promise.all([reloadDbStats(), reloadSources()]);
+  }
+}
+
+export async function setNote(id: string, note: string | null) {
+  const item = items.find(i => i.id === id);
+  const wasNote = item?.note;
+  if (item) item.note = note === null ? undefined : note;
+  if (IS_TAURI) {
+    try {
+      await tauriInvoke('set_item_note', { id, note: note === '' ? null : note });
+    } catch {
+      if (item) item.note = wasNote;
+    }
+  }
+}
+
+export async function saveWithNote(id: string, note: string) {
+  const trimmed = note.trim();
+  const finalNote = trimmed === '' ? null : trimmed;
+  const item = items.find(i => i.id === id);
+  const wasSaved = item?.saved;
+  const wasNote = item?.note;
+  if (item && !item.saved) item.saved = true;
+  if (item) item.note = finalNote === null ? undefined : finalNote;
+  if (IS_TAURI) {
+    try {
+      if (!wasSaved) await tauriInvoke('toggle_saved', { id, saved: true });
+      await tauriInvoke('set_item_note', { id, note: finalNote });
+    } catch {
+      if (item) { item.saved = !!wasSaved; item.note = wasNote; }
+      return;
+    }
     await Promise.all([reloadDbStats(), reloadSources()]);
   }
 }
@@ -391,7 +429,7 @@ export async function addSource(name: string, url: string, kind: 'hn' | 'reddit'
 export async function updateSource(id: string, name: string, url: string, kind: 'hn' | 'reddit' | 'rss', group: string, hue?: number): Promise<void> {
   if (IS_TAURI) {
     await tauriInvoke('update_source', { id, name, url, kind, group, hue: hue ?? null });
-    await Promise.all([reloadSources(), reloadGroups()]);
+    await Promise.all([reloadItems(), reloadSources(), reloadGroups()]);
   } else {
     const s = sources.find(s => s.id === id);
     if (s) { s.name = name; s.url = url; s.kind = kind; s.host = domainOf(url); s.group = group; if (hue !== undefined) s.hue = hue; }

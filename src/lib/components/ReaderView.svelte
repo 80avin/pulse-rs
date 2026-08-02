@@ -1,8 +1,7 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
   import { Dialog } from 'bits-ui';
-  import { items, sources, toggleSaved } from '$lib/stores/data.svelte';
-  import { aiStatus } from '$lib/stores/ai.svelte';
+  import { items, sources, saveWithNote, toggleSaved } from '$lib/stores/data.svelte';
   import { openExternal, sanitizeHtml, TAG_EVIDENCE } from '$lib/utils';
   import TagChip from './TagChip.svelte';
   import ScoreBar from './ScoreBar.svelte';
@@ -43,7 +42,7 @@
 
   function saveNote() {
     if (!item) return;
-    toggleSaved(item.id, noteDraft.trim() || undefined);
+    saveWithNote(item.id, noteDraft);
     noteEditing = false;
   }
 
@@ -169,7 +168,7 @@
             <div class="flex items-center justify-between mb-2.5">
               <div class="flex items-center gap-2">
                 <TagChip tag={popoverTag} size={11} />
-                <span class="text-[10px] leading-none font-mono text-ink-3">tagged by {aiStatus.modelName ?? aiStatus.taggingMode} · {Math.round((item.aiScore ?? 0.8) * 100)}% conf</span>
+                <span class="text-[10px] leading-none font-mono text-ink-3">rule engine · {Math.round((item.aiScore ?? 0.8) * 100)}% conf</span>
               </div>
               <Dialog.Close class="bg-transparent border-none text-ink-2 cursor-pointer flex"><Icon name="x" size={14} /></Dialog.Close>
             </div>

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import '../app.css';
-  import { setupTaggingListener } from '$lib/stores/ai.svelte';
   import { initStore } from '$lib/stores/data.svelte';
   import { logger } from '$lib/logger';
   import { setupShareListener, shareSheet } from '$lib/share.svelte';
@@ -12,12 +11,6 @@
 
   onMount(() => {
     Promise.all([initStore(), initSettings()]).catch(e => logger.error('app init failed', e));
-  });
-
-  $effect(() => {
-    let unlisten: (() => void) | undefined;
-    setupTaggingListener().then(u => { unlisten = u; });
-    return () => { unlisten?.(); };
   });
 
   $effect(() => {

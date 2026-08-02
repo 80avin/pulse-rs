@@ -3,7 +3,7 @@ import { logger } from './logger';
 export type MarkReadMode = 'open' | 'never';
 export type SyncInterval = 5 | 15 | 30 | 60;
 
-const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
+const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');
@@ -28,8 +28,6 @@ export const settings = $state({
   syncIntervalMin:     (saved.syncIntervalMin     ?? 15)       as SyncInterval,
   wifiOnly:            (saved.wifiOnly            ?? false)    as boolean,
   backgroundSync:      (saved.backgroundSync      ?? true)     as boolean,
-  aiTagging:           (saved.aiTagging           ?? true)     as boolean,
-  confidenceThreshold: (saved.confidenceThreshold ?? 0.5)     as number,
   notifyHighSignal:    (saved.notifyHighSignal     ?? false)   as boolean,
   notifySaved:         (saved.notifySaved          ?? false)   as boolean,
   verboseLogging:      (saved.verboseLogging       ?? false)   as boolean,
@@ -63,8 +61,6 @@ export async function initSettings(): Promise<void> {
       if (s.syncIntervalMin !== undefined && s.syncIntervalMin !== null) settings.syncIntervalMin = s.syncIntervalMin as SyncInterval;
       if (s.wifiOnly !== undefined && s.wifiOnly !== null)        settings.wifiOnly            = s.wifiOnly;
       if (s.backgroundSync !== undefined && s.backgroundSync !== null) settings.backgroundSync = s.backgroundSync;
-      if (s.aiTagging !== undefined && s.aiTagging !== null)      settings.aiTagging           = s.aiTagging;
-      if (s.confidenceThreshold !== undefined && s.confidenceThreshold !== null) settings.confidenceThreshold = s.confidenceThreshold;
       if (s.notifyHighSignal !== undefined && s.notifyHighSignal !== null) settings.notifyHighSignal = s.notifyHighSignal;
       if (s.notifySaved !== undefined && s.notifySaved !== null)  settings.notifySaved         = s.notifySaved;
       if (s.verboseLogging !== undefined && s.verboseLogging !== null) settings.verboseLogging = s.verboseLogging;
@@ -86,8 +82,6 @@ $effect.root(() => {
       syncIntervalMin:     settings.syncIntervalMin,
       wifiOnly:            settings.wifiOnly,
       backgroundSync:      settings.backgroundSync,
-      aiTagging:           settings.aiTagging,
-      confidenceThreshold: settings.confidenceThreshold,
       notifyHighSignal:    settings.notifyHighSignal,
       notifySaved:         settings.notifySaved,
       verboseLogging:      settings.verboseLogging,

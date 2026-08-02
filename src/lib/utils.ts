@@ -1,8 +1,14 @@
+import DOMPurify from 'dompurify';
+
+// Feed-supplied HTML (RSS content:encoded, HN/Reddit bodies) is attacker
+// controlled. DOMPurify strips <script>/<style>/on* handlers, javascript: URLs,
+// and other XSS vectors via an allowlist parser — a regex can't do this safely.
 export function sanitizeHtml(html: string): string {
-  return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-             .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-             .replace(/\s+on\w+="[^"]*"/gi, '')
-             .replace(/\s+on\w+='[^']*'/gi, '');
+  return DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    // No embedded content or form controls from feed bodies.
+    FORBID_TAGS: ['iframe', 'object', 'embed', 'form', 'input', 'button', 'select', 'textarea', 'video', 'audio', 'source', 'track'],
+  });
 }
 
 export async function openExternal(url: string) {
@@ -19,7 +25,7 @@ export async function shareItem(title: string, url?: string, body?: string): Pro
   const hasContent = !!url || !!text;
 
   // 1. Tauri plugin (Android/iOS native share sheet)
-  if (typeof window !== 'undefined' && '__TAURI__' in window) {
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       await invoke('plugin:sharesheet|share_text', { text, options: { mime: 'text/plain' } });

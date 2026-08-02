@@ -7,8 +7,8 @@
   import MobileReader from './MobileReader.svelte';
   import MobileSources from './MobileSources.svelte';
   import MobileSearch from './MobileSearch.svelte';
+  import MobileSaved from './MobileSaved.svelte';
   import MobileSettings from './MobileSettings.svelte';
-  import MobileAI from './MobileAI.svelte';
 
   let tab = $state('timeline');
   let openItemId = $state<string | null>(null);
@@ -104,8 +104,8 @@
           onTabChange={changeTab}
           onOpen={openItem}
         />
-      {:else if tab === 'ai'}
-        <MobileAI {tab} onTabChange={changeTab} onTagFilter={handleTagFilter} onItemOpen={openItem} onSourceFilter={openSourceFeed} />
+      {:else if tab === 'saved'}
+        <MobileSaved {tab} onTabChange={changeTab} onOpen={openItem} />
       {:else if tab === 'settings'}
         <MobileSettings {tab} onTabChange={changeTab} />
       {:else}

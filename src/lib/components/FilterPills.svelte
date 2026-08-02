@@ -6,7 +6,7 @@
     onChange: (filter: string) => void;
   } = $props();
 
-  const PILLS = ['all', 'unread', 'saved', 'signal'] as const;
+  const PILLS = ['all', 'unread', 'saved'] as const;
 </script>
 
 <div class="border-b border-bd-0 p-1.5 px-2 pb-1">
