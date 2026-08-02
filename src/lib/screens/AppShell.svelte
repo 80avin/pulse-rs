@@ -131,11 +131,19 @@
   let popoverOpen   = $state(false);
   let showCheatsheet = $state(false);
   let showOnboarding = $state(false);
+  const ONBOARDING_DONE_KEY = 'pulse:onboarding-done';
 
-  // First-run onboarding: auto-show once cold-start finishes with no sources.
+  // First-run onboarding: auto-show once cold-start finishes with no sources,
+  // and only if it hasn't been dismissed before.
   $effect(() => {
-    if (!storeReady.loading && sources.length === 0) showOnboarding = true;
+    if (!storeReady.loading && sources.length === 0 && !localStorage.getItem(ONBOARDING_DONE_KEY)) {
+      showOnboarding = true;
+    }
   });
+  function finishOnboarding() {
+    localStorage.setItem(ONBOARDING_DONE_KEY, '1');
+    showOnboarding = false;
+  }
 
   // FTS backend search — debounced 300ms, only in Tauri context.
   $effect(() => {
@@ -181,6 +189,7 @@
   $effect(() => {
     function onKey(e: KeyboardEvent) {
       if (!isWide) return;
+      if (showOnboarding) { if (e.key === 'Escape') showOnboarding = false; return; }
       const target = e.target as HTMLElement;
       const inInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 
@@ -437,6 +446,6 @@
   {/if}
 
   {#if showOnboarding}
-    <Onboarding onDone={() => { showOnboarding = false; }} />
+    <Onboarding onDone={finishOnboarding} />
   {/if}
 </div>

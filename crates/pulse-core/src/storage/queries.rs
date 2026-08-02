@@ -192,7 +192,8 @@ pub async fn get_timeline_counts(
     }
     if filter.tag.is_some() {
         conditions.push(
-            "EXISTS (SELECT 1 FROM ai_tags _tf WHERE _tf.item_id = fi.id AND _tf.tag = ?)"
+            "(EXISTS (SELECT 1 FROM ai_tags _tf WHERE _tf.item_id = fi.id AND _tf.tag = ?)
+                OR EXISTS (SELECT 1 FROM user_tags _ut WHERE _ut.item_id = fi.id AND _ut.tag = ?))"
                 .to_string(),
         );
     }
@@ -233,6 +234,7 @@ pub async fn get_timeline_counts(
         query = query.bind(s as i64);
     }
     if let Some(ref t) = filter.tag {
+        query = query.bind(t.as_str());
         query = query.bind(t.as_str());
     }
 
@@ -280,7 +282,8 @@ pub async fn get_timeline(
     }
     if filter.tag.is_some() {
         conditions.push(
-            "EXISTS (SELECT 1 FROM ai_tags _tf WHERE _tf.item_id = fi.id AND _tf.tag = ?)"
+            "(EXISTS (SELECT 1 FROM ai_tags _tf WHERE _tf.item_id = fi.id AND _tf.tag = ?)
+                OR EXISTS (SELECT 1 FROM user_tags _ut WHERE _ut.item_id = fi.id AND _ut.tag = ?))"
                 .to_string(),
         );
     }
@@ -330,6 +333,7 @@ pub async fn get_timeline(
         query = query.bind(s as i64);
     }
     if let Some(ref t) = filter.tag {
+        query = query.bind(t.as_str());
         query = query.bind(t.as_str());
     }
     query = query.bind(fetch_limit);

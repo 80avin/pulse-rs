@@ -342,11 +342,22 @@ impl PulseCore {
         selections: &[crate::onboarding::OnboardSelection],
     ) -> Result<usize, PulseError> {
         use std::collections::HashMap;
-        let existing = self.get_feed_groups().await?;
+        let existing_groups = self.get_feed_groups().await?;
         let mut group_ids: HashMap<String, String> =
-            existing.into_iter().map(|g| (g.name.clone(), g.id)).collect();
+            existing_groups.into_iter().map(|g| (g.name.clone(), g.id)).collect();
+        // Skip feeds the user already subscribes to (feeds.url is UNIQUE); re-adding
+        // would abort the whole batch on a constraint error.
+        let subscribed: std::collections::HashSet<String> = self
+            .get_feeds()
+            .await?
+            .into_iter()
+            .map(|f| f.url)
+            .collect();
         let mut added = 0usize;
         for sel in selections {
+            if subscribed.contains(&sel.url) {
+                continue;
+            }
             let group_id = if let Some(id) = group_ids.get(&sel.category) {
                 id.clone()
             } else {

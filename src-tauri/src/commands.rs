@@ -388,18 +388,26 @@ pub async fn hide_item(state: State<'_, AppState>, id: String) -> Result<(), Str
 
 #[tauri::command]
 pub async fn get_popular_feeds() -> Result<Vec<PopularCategoryDto>, String> {
-    use std::collections::HashMap;
+    // Preserve first-seen category order (catalog order) — a HashMap would be
+    // nondeterministic across launches.
     let mut cats: Vec<PopularCategoryDto> = Vec::new();
-    let mut by_cat: HashMap<&'static str, Vec<PopularFeedDto>> = HashMap::new();
     for f in pulse_core::onboarding::POPULAR_FEEDS {
-        by_cat.entry(f.category).or_default().push(PopularFeedDto {
-            name: f.name.to_string(),
-            url: f.url.to_string(),
-            kind: f.kind.as_str().to_string(),
-        });
-    }
-    for (cat, mut feeds) in by_cat {
-        cats.push(PopularCategoryDto { category: cat.to_string(), feeds: std::mem::take(&mut feeds) });
+        if let Some(cat) = cats.iter_mut().find(|c| c.category == f.category) {
+            cat.feeds.push(PopularFeedDto {
+                name: f.name.to_string(),
+                url: f.url.to_string(),
+                kind: f.kind.as_str().to_string(),
+            });
+        } else {
+            cats.push(PopularCategoryDto {
+                category: f.category.to_string(),
+                feeds: vec![PopularFeedDto {
+                    name: f.name.to_string(),
+                    url: f.url.to_string(),
+                    kind: f.kind.as_str().to_string(),
+                }],
+            });
+        }
     }
     Ok(cats)
 }

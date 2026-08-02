@@ -295,9 +295,10 @@ export async function setNote(id: string, note: string | null) {
   }
 }
 
-// Normalize a raw tag input: lowercase, collapse spaces, cap length.
+// Normalize a raw tag input: trim + lowercase (matches the backend's
+// replace_user_tags normalization; internal spaces are preserved).
 export function normalizeTag(tag: string): string | null {
-  const t = tag.trim().toLowerCase().replace(/\s+/g, '-');
+  const t = tag.trim().toLowerCase();
   if (!t || t.length > 40) return null;
   return t;
 }
