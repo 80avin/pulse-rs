@@ -15,7 +15,6 @@
     openId = '',
     onItemClick,
     onTagClick,
-    onLongPress,
   }: {
     items: FeedItem[];
     searchQuery?: string;
@@ -23,7 +22,6 @@
     openId?: string;
     onItemClick: (id: string, allIds: string[]) => void;
     onTagClick?: (tag: string) => void;
-    onLongPress?: (item: FeedItem) => void;
   } = $props();
 
   const density = $derived(settings.density);
@@ -92,7 +90,6 @@
               {density}
               onclick={() => onItemClick(item.id, allIds)}
               {onTagClick}
-              onLongPress={onLongPress ? () => onLongPress(item) : undefined}
             />
           </div>
         {/if}

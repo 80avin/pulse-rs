@@ -3,24 +3,50 @@
   import type { FeedItem, Source, Density } from '$lib/types';
   import Icon from './Icon.svelte';
   import TagChip from './TagChip.svelte';
+  import ItemActionsMenu from './ItemActionsMenu.svelte';
   import { longpress } from './longpress.svelte';
-  import { ContextMenu } from 'bits-ui';
-  import { openExternal, shareItem } from '$lib/utils';
-  import { markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
 
-  let { item, source, isFocused = false, density = 'normal', onclick, onTagClick, onLongPress }: {
+  let { item, source, isFocused = false, density = 'normal', onclick, onTagClick }: {
     item: FeedItem;
     source: Source | undefined;
     isFocused?: boolean;
     density?: Density;
     onclick: () => void;
     onTagClick?: (tag: string) => void;
-    onLongPress?: () => void;
   } = $props();
 
-  function copyUrl(u: string) { navigator.clipboard.writeText(u).catch(() => {}); }
-  function copyTitle(t: string) { navigator.clipboard.writeText(t).catch(() => {}); }
-  const isHnSelf = $derived(item.url?.includes('news.ycombinator.com/item') ?? false);
+  // Unified item-action menu: one menu per row, rendered as a floating popup on
+  // desktop right-click and a bottom sheet on touch long-press. Previously a
+  // bits-ui ContextMenu AND a mobile sheet both opened on the same gesture.
+  let menuItem = $state<FeedItem | null>(null);
+  let menuMode = $state<'popup' | 'sheet'>('popup');
+  let menuX = $state(0);
+  let menuY = $state(0);
+  let suppressClick = $state(false);
+
+  function openMenu(mode: 'popup' | 'sheet', cx = 0, cy = 0) {
+    menuItem = item;
+    menuMode = mode;
+    menuX = cx;
+    menuY = cy;
+  }
+  function closeMenu() { menuItem = null; }
+
+  function handleContextMenu(e: MouseEvent) {
+    e.preventDefault();
+    const pointerType = (e as unknown as { pointerType?: string }).pointerType ?? '';
+    const isTouch = pointerType === 'touch' || (pointerType === '' && 'ontouchstart' in window);
+    if (isTouch) suppressClick = true; // block the ghost click that follows a long-press
+    openMenu(isTouch ? 'sheet' : 'popup', e.clientX, e.clientY);
+  }
+  function handleLongPress() {
+    suppressClick = true;
+    openMenu('sheet');
+  }
+  function handleRowClick() {
+    if (suppressClick) { suppressClick = false; return; }
+    onclick();
+  }
 
   const dim         = $derived(item.read);
   const isDense     = $derived(density === 'dense');
@@ -70,15 +96,16 @@
   const thumbSize = $derived(isDense ? 36 : 64);
 </script>
 
-<ContextMenu.Root>
-  <ContextMenu.Trigger
-    tabindex={0}
-    {onclick}
-    onkeydown={(e) => { if (e.key === 'Enter') onclick(); }}
-    // use:longpress={{ onLongpress: () => onLongPress?.() }}
-    class="relative flex p-0 border-0 border-b border-bd-0 cursor-pointer select-none w-full text-left min-h-14"
-    style="background:{isFocused ? 'rgba(78,205,214,0.05)' : 'transparent'};-webkit-touch-callout:none;"
-  >
+<div
+  tabindex={0}
+  role="button"
+  onclick={handleRowClick}
+  onkeydown={(e) => { if (e.key === 'Enter') handleRowClick(); }}
+  oncontextmenu={handleContextMenu}
+  use:longpress={{ onLongpress: handleLongPress }}
+  class="relative flex p-0 border-0 border-b border-bd-0 cursor-pointer select-none w-full text-left min-h-14"
+  style="background:{isFocused ? 'rgba(78,205,214,0.05)' : 'transparent'};-webkit-touch-callout:none;"
+>
     <!-- Platform-colored left spine -->
     <span class="shrink-0" style="width:3px;background:{sk.spine};"></span>
 
@@ -86,7 +113,7 @@
     <span class="absolute" style="left:0;top:0;bottom:0;width:3px;background:{isFocused ? T.cyan : (item.read ? 'transparent' : T.cyanDim)};z-index:1;"></span>
 
     <!-- Body -->
-    <div class="flex-1 min-w-0 flex gap-3" style="padding:var(--item-pad-y,13px) 14px var(--item-pad-y,13px) 12px;" use:longpress={{ onLongpress: () => onLongPress?.() }} >
+    <div class="flex-1 min-w-0 flex gap-3" style="padding:var(--item-pad-y,13px) 14px var(--item-pad-y,13px) 12px;">
 
       <!-- Source pill -->
       <div class="flex items-center justify-center shrink-0 mt-0.5 text-white" style="
@@ -182,45 +209,8 @@
         />
       {/if}
     </div>
-  </ContextMenu.Trigger>
+</div>
 
-  <ContextMenu.Portal>
-    <ContextMenu.Content class="bg-bg-1 border border-bd-1 rounded overflow-hidden w-50 shadow-[0_8px_32px_rgba(0,0,0,0.6)] z-20">
-      {#if item.url && !isHnSelf}
-        <ContextMenu.Item onclick={() => openExternal(item.url!)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono text-ink-0">
-          <Icon name="ext" size={11} color={T.ink2} />
-          <span>Open in browser</span>
-        </ContextMenu.Item>
-      {/if}
-      {#if item.url}
-        <ContextMenu.Item onclick={() => copyUrl(item.url!)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono text-ink-0">
-          <Icon name="link" size={11} color={T.ink2} />
-          <span>Copy URL</span>
-        </ContextMenu.Item>
-      {/if}
-      <ContextMenu.Item onclick={() => copyTitle(item.title)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-1 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono text-ink-0">
-        <Icon name="edit" size={11} color={T.ink2} />
-        <span>Copy title</span>
-      </ContextMenu.Item>
-      {#if item.title && (item.url || item.externalUrl)}
-        <ContextMenu.Item onclick={() => shareItem(item.title, item.url ?? item.externalUrl)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-1 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono text-ink-0">
-          <Icon name="share" size={11} color={T.ink2} />
-          <span>Share</span>
-        </ContextMenu.Item>
-      {/if}
-      <div class="bg-bd-0 h-px my-1"></div>
-      <ContextMenu.Item onclick={() => markRead(item.id, !item.read)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono" style="color:{item.read ? T.ink1 : T.cyan};">
-        <Icon name="check" size={11} color={item.read ? T.ink2 : T.cyan} />
-        <span>{item.read ? 'Mark as unread' : 'Mark as read'}</span>
-      </ContextMenu.Item>
-      <ContextMenu.Item onclick={() => toggleSaved(item.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-1 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono" style="color:{item.saved ? T.amber : T.ink1};">
-        <Icon name="bookmark" size={11} color={item.saved ? T.amber : T.ink2} />
-        <span>{item.saved ? 'Unsave' : 'Save'}</span>
-      </ContextMenu.Item>
-      <ContextMenu.Item onclick={() => hideItem(item.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-1 cursor-pointer text-left p-[9px_12px] text-[11px] leading-none font-mono text-red">
-        <Icon name="eye-off" size={11} color={T.red} />
-        <span>Hide</span>
-      </ContextMenu.Item>
-    </ContextMenu.Content>
-  </ContextMenu.Portal>
-</ContextMenu.Root>
+{#if menuItem}
+  <ItemActionsMenu {item} mode={menuMode} x={menuX} y={menuY} onClose={closeMenu} />
+{/if}

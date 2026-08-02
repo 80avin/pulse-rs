@@ -1,7 +1,7 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
   import { Dialog } from 'bits-ui';
-  import { items, sources, saveWithNote, toggleSaved } from '$lib/stores/data.svelte';
+  import { items, sources, saveWithNote, toggleSaved, domainOf } from '$lib/stores/data.svelte';
   import { openExternal, sanitizeHtml, TAG_EVIDENCE } from '$lib/utils';
   import TagChip from './TagChip.svelte';
   import ScoreBar from './ScoreBar.svelte';
@@ -25,6 +25,8 @@
 
   const item = $derived(items.find(i => i.id === itemId));
   const source = $derived(item ? sources.find(s => s.id === item.src) : undefined);
+  // domainOf guards malformed URLs (a bad feed URL used to crash the render).
+  const primaryDomain = $derived(item?.url ? domainOf(item.url) : '');
 
   let popoverTag = $state<string | null>(null);
   let noteEditing = $state(false);
@@ -75,7 +77,6 @@
       <h1 class="text-ink-0 m-0 max-w-180 tracking-[-0.3px] text-[22px] leading-tight font-sans" style="font-weight:600;">{item.title}</h1>
 
       {#if item.url}
-        {@const primaryDomain = new URL(item.url).hostname.replace(/^www\./, '')}
         <button onclick={() => openExternal(item.url!)} class="inline-flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 mt-2 text-[11px] leading-none font-mono text-ink-2">
           <Icon name="ext" size={11} color={T.ink3} />
           <span class="underline underline-offset-2" style="text-decoration-color:{T.bd2};">{primaryDomain}</span>

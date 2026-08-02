@@ -224,16 +224,8 @@
 {:else}
 <div class="flex flex-col w-full h-full bg-bg-0 text-ink-0 overflow-hidden">
 
-  <!-- Window chrome -->
+  <!-- App toolbar (window controls are handled by the native OS title bar) -->
   <div class="h-8 flex items-center pl-3 pr-2 bg-bg-0 border-b border-bd-0 shrink-0 gap-2.5">
-    <div class="flex items-center gap-1.75">
-      <span class="block w-2.75 h-2.75 rounded-full bg-[#e26b6b]"></span>
-      <span class="block w-2.75 h-2.75 rounded-full bg-[#e6b450]"></span>
-      <span class="block w-2.75 h-2.75 rounded-full bg-[#6bd896]"></span>
-    </div>
-    <div class="w-[18px]"></div>
-    <span class="text-ink-0 tracking-[1px] font-semibold text-[11px] leading-none font-mono">PULSE<span class="text-cyan">.</span></span>
-    <span class="text-ink-3 text-[11px] leading-none font-mono">—</span>
     <span class="text-ink-2 text-[11px] leading-none font-mono">{activeGroupLabel} · {displayItems.length} items</span>
     <span class="flex-1"></span>
     <button onclick={() => searchInputEl?.focus()} aria-label="Search" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" title="Search (/)">

@@ -1,12 +1,9 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { Dialog } from 'bits-ui';
-  import type { FeedItem } from '$lib/types';
-  import { groups, sources, items, markAllRead, markRead, toggleSaved, hideItem } from '$lib/stores/data.svelte';
+  import { groups, sources, items, markAllRead } from '$lib/stores/data.svelte';
   import { doSync as storeSync, syncState } from '$lib/stores/sync.svelte';
   import { timelineFilter, applyFilter, setFeedFilter, setTagFilter, pageCounts } from '$lib/stores/timeline.svelte';
   import { tagStats } from '$lib/stores/ai.svelte';
-  import { openExternal, shareItem } from '$lib/utils';
   import GroupTabs from '$lib/components/GroupTabs.svelte';  import FilterStrip from '$lib/components/FilterStrip.svelte';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import Icon from '$lib/components/Icon.svelte';
@@ -21,7 +18,6 @@
   let activeGroup = $derived(timelineFilter.groupId ?? 'all');
   let sort = $state('time');
   let showFilter = $state(true);
-  let actionSheetItem = $state<FeedItem | null>(null);
 
   // Group, feed, tag, read, and saved filters are applied server-side in `items`.
   const displayItems = $derived.by(() => {
@@ -146,7 +142,6 @@
     emptyMessage={timelineFilter.feedId || timelineFilter.tag ? 'no matching items' : filter !== 'all' ? `no ${filter} items in this view` : 'no items'}
     onItemClick={(id, allIds) => onOpen(id, allIds)}
     onTagClick={handleTagClick}
-    onLongPress={(item) => { window.getSelection()?.removeAllRanges(); actionSheetItem = item; }}
   />
 
   <!-- Filter strip (toggleable) -->
@@ -170,94 +165,3 @@
   <!-- Bottom nav -->
   <PulseBottomNav active={tab} onChange={onTabChange} />
 </div>
-
-<!-- Long-press action sheet -->
-  <Dialog.Root open={actionSheetItem !== null} onOpenChange={(open) => { if (!open) actionSheetItem = null; }}>
-    <Dialog.Portal>
-      <Dialog.Overlay class="fixed inset-0 bg-black/55 z-[100]" />
-      <Dialog.Content
-        preventScroll={false}
-        class="fixed bg-bg-2 text-ink-0 select-none overflow-y-auto bottom-0 left-0 right-0 w-full p-[14px_14px_24px] border-t border-t-bd-1 text-[12px] leading-[1.4] font-sans max-h-[70vh] z-[100]" style="-webkit-touch-callout:none;"
-      >
-        {#if actionSheetItem}
-          {@const ci = actionSheetItem}
-          {@const isHnSelf = ci.url?.includes('news.ycombinator.com/item') ?? false}
-        <div class="flex items-center justify-between mb-3">
-          <span class="uppercase text-[10px] leading-none font-mono text-ink-3 tracking-[0.5px]">actions</span>
-          <Dialog.Close class="bg-transparent border-none text-ink-2 cursor-pointer flex">
-            <Icon name="x" size={14} />
-          </Dialog.Close>
-        </div>
-
-        {#if ci.url && !isHnSelf}
-          <button
-            onclick={() => { openExternal(ci.url!); actionSheetItem = null; }}
-            class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-ink-0 border-b border-b-bd-0"
-          >
-            <Icon name="ext" size={13} color={T.ink2} />
-            <span>Open in browser</span>
-          </button>
-        {/if}
-        {#if ci.url}
-          <button
-            onclick={() => { navigator.clipboard.writeText(ci.url!); actionSheetItem = null; }}
-            class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-ink-0 border-b border-b-bd-0"
-          >
-            <Icon name="link" size={13} color={T.ink2} />
-            <span>Copy URL</span>
-          </button>
-        {/if}
-        <button
-          onclick={() => { navigator.clipboard.writeText(ci.title); actionSheetItem = null; }}
-          class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-ink-0 border-b border-b-bd-1"
-        >
-          <Icon name="edit" size={13} color={T.ink2} />
-          <span>Copy title</span>
-        </button>
-        {#if ci.title && (ci.url || ci.externalUrl)}
-          <button
-            onclick={() => { shareItem(ci.title, ci.url ?? ci.externalUrl); actionSheetItem = null; }}
-            class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-ink-0 border-b border-b-bd-1"
-          >
-            <Icon name="share" size={13} color={T.ink2} />
-            <span>Share</span>
-          </button>
-        {/if}
-
-        <div class="bg-bd-0 h-px my-1"></div>
-
-        <button
-          onclick={() => { markRead(ci.id, !ci.read); actionSheetItem = null; }}
-          class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans border-b border-b-bd-0" style="color:{ci.read ? T.ink1 : T.cyan};"
-        >
-          <Icon name="check" size={13} color={ci.read ? T.ink2 : T.cyan} />
-          <span>{ci.read ? 'Mark as unread' : 'Mark as read'}</span>
-        </button>
-        <button
-          onclick={() => { toggleSaved(ci.id); actionSheetItem = null; }}
-          class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans border-b border-b-bd-0" style="color:{ci.saved ? T.amber : T.ink1};"
-        >
-          <Icon name="bookmark" size={13} color={ci.saved ? T.amber : T.ink2} />
-          <span>{ci.saved ? 'Unsave' : 'Save'}</span>
-        </button>
-        <button
-          onclick={() => { hideItem(ci.id); actionSheetItem = null; }}
-          class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-red border-b border-b-bd-1"
-        >
-          <Icon name="eye-off" size={13} color={T.red} />
-          <span>Hide</span>
-        </button>
-
-        <div class="bg-bd-0 h-px my-1"></div>
-
-        <button
-          onclick={() => { onOpen(ci.id, displayItems.map(i => i.id)); actionSheetItem = null; }}
-          class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left py-[11px] text-[12px] leading-none font-sans text-ink-1"
-        >
-          <Icon name="cpu" size={13} color={T.ink2} />
-          <span>Tag info</span>
-        </button>
-        {/if}
-      </Dialog.Content>
-    </Dialog.Portal>
-  </Dialog.Root>
