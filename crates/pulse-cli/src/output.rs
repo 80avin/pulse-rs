@@ -80,6 +80,17 @@ pub fn format_bytes(bytes: i64) -> String {
     }
 }
 
+/// Truncate a string to at most `max` characters, never splitting a UTF-8
+/// code point. Titles come from the network — multi-byte characters are routine
+/// and byte-slicing panics on them.
+pub fn truncate_chars(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        s.chars().take(max).collect()
+    }
+}
+
 /// Prompt the user for a yes/no confirmation. Returns true if user confirmed.
 pub fn confirm(prompt: &str) -> bool {
     use std::io::Write;

@@ -37,10 +37,6 @@ struct Cli {
     #[arg(long, global = true)]
     json: bool,
 
-    /// Suppress informational output
-    #[arg(long, short, global = true)]
-    quiet: bool,
-
     #[command(subcommand)]
     command: Commands,
 }

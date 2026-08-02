@@ -1,5 +1,5 @@
 use crate::error::StorageError;
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 
 /// Apply all pending migrations to the database.
 /// Uses a simple manual migration table.
@@ -22,82 +22,146 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), StorageError> {
             .await
             .map_err(StorageError::Sqlite)?;
 
-    tracing::info!(
-        applied = ?applied,
-        "Starting database migrations"
-    );
+    tracing::info!(applied = ?applied, "Starting database migrations");
 
     if !applied.contains(&1) {
-        tracing::info!("Applying migration M0001_initial");
-        apply_sql(
+        apply(
             pool,
+            1,
+            "M0001_initial",
             include_str!("../../migrations/M0001_initial.sql"),
-            "M0001",
         )
         .await?;
-        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (1, unixepoch())")
-            .execute(pool)
-            .await
-            .map_err(StorageError::Sqlite)?;
-        tracing::info!("Applied migration M0001_initial");
     }
 
     if !applied.contains(&2) {
-        tracing::info!("Applying migration M0002_fts_update_trigger");
-        apply_sql(
+        apply(
             pool,
+            2,
+            "M0002_fts_update_trigger",
             include_str!("../../migrations/M0002_fts_update_trigger.sql"),
-            "M0002",
         )
         .await?;
-        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (2, unixepoch())")
-            .execute(pool)
-            .await
-            .map_err(StorageError::Sqlite)?;
-        tracing::info!("Applied migration M0002_fts_update_trigger");
     }
 
     if !applied.contains(&3) {
-        tracing::info!("Applying migration M0003_add_note");
-        apply_sql(
-            pool,
-            include_str!("../../migrations/M0003_add_note.sql"),
-            "M0003",
-        )
-        .await?;
-        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (3, unixepoch())")
-            .execute(pool)
-            .await
-            .map_err(StorageError::Sqlite)?;
-        tracing::info!("Applied migration M0003_add_note");
+        // M0003 is a bare ALTER TABLE ... ADD COLUMN. If a legacy DB already has
+        // the column (crash between the old ALTER commit and the version insert),
+        // running it again would brick startup with "duplicate column name".
+        if !column_exists(pool, "item_states", "note").await? {
+            apply(pool, 3, "M0003_add_note", include_str!("../../migrations/M0003_add_note.sql"))
+                .await?;
+        } else {
+            record_version(pool, 3).await?;
+        }
     }
 
     if !applied.contains(&4) {
-        tracing::info!("Applying migration M0004_add_feed_hue");
-        apply_sql(
+        if !column_exists(pool, "feeds", "hue").await? {
+            apply(pool, 4, "M0004_add_feed_hue", include_str!("../../migrations/M0004_add_feed_hue.sql"))
+                .await?;
+        } else {
+            record_version(pool, 4).await?;
+        }
+    }
+
+    if !applied.contains(&5) {
+        apply(
             pool,
-            include_str!("../../migrations/M0004_add_feed_hue.sql"),
-            "M0004",
+            5,
+            "M0005_fts_content_fix",
+            include_str!("../../migrations/M0005_fts_content_fix.sql"),
         )
         .await?;
-        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (4, unixepoch())")
-            .execute(pool)
-            .await
-            .map_err(StorageError::Sqlite)?;
-        tracing::info!("Applied migration M0004_add_feed_hue");
     }
 
     tracing::info!("Database migrations complete");
     Ok(())
 }
 
-async fn apply_sql(pool: &SqlitePool, sql: &str, name: &str) -> Result<(), StorageError> {
-    tracing::debug!(migration = name, "Executing migration SQL");
-    let mut conn = pool.acquire().await.map_err(StorageError::Sqlite)?;
-    sqlx::raw_sql(sql).execute(&mut *conn).await.map_err(|e| {
+/// Run a migration and record its version in a single transaction, so a crash
+/// between the SQL and the version insert cannot leave the DB half-migrated.
+async fn apply(
+    pool: &SqlitePool,
+    version: i64,
+    name: &str,
+    sql: &str,
+) -> Result<(), StorageError> {
+    tracing::info!(migration = name, "Applying migration");
+    let mut tx = pool.begin().await.map_err(StorageError::Sqlite)?;
+    sqlx::raw_sql(sql).execute(&mut *tx).await.map_err(|e| {
         tracing::error!(migration = name, error = %e, "Migration failed");
         StorageError::Migration(format!("{name} failed: {e}"))
     })?;
-    tracing::debug!(migration = name, "Migration SQL executed successfully");
+    sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (?, unixepoch())")
+        .bind(version)
+        .execute(&mut *tx)
+        .await
+        .map_err(StorageError::Sqlite)?;
+    tx.commit().await.map_err(StorageError::Sqlite)?;
+    tracing::info!(migration = name, "Applied migration");
     Ok(())
+}
+
+async fn record_version(pool: &SqlitePool, version: i64) -> Result<(), StorageError> {
+    sqlx::query(
+        "INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, unixepoch())",
+    )
+    .bind(version)
+    .execute(pool)
+    .await
+    .map_err(StorageError::Sqlite)?;
+    Ok(())
+}
+
+async fn column_exists(pool: &SqlitePool, table: &str, column: &str) -> Result<bool, StorageError> {
+    // table/column are compile-time constants in this crate; not user input.
+    let rows = sqlx::query(&format!("PRAGMA table_info({table})"))
+        .fetch_all(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
+    Ok(rows
+        .iter()
+        .any(|r| r.get::<String, _>("name").eq_ignore_ascii_case(column)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::PulseConfig;
+    use crate::storage::connection::open_writer_pool;
+    use uuid::Uuid;
+
+    async fn test_pool() -> SqlitePool {
+        let dir = std::env::temp_dir().join(format!("pulse-core-mig-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let config = PulseConfig::default().with_data_dir(dir);
+        open_writer_pool(&config.db_path, &config).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn migrations_are_idempotent() {
+        let pool = test_pool().await;
+        run_migrations(&pool).await.unwrap();
+        run_migrations(&pool).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn missing_version_row_with_existing_column_does_not_brick() {
+        let pool = test_pool().await;
+        run_migrations(&pool).await.unwrap();
+        // Simulate a legacy partial state: the note column exists but the
+        // M0003 version row is missing. Startup must not fail.
+        sqlx::query("DELETE FROM schema_migrations WHERE version = 3")
+            .execute(&pool)
+            .await
+            .unwrap();
+        run_migrations(&pool).await.unwrap();
+        let note: Option<String> =
+            sqlx::query_scalar("SELECT name FROM pragma_table_info('item_states') WHERE name = 'note'")
+                .fetch_optional(&pool)
+                .await
+                .unwrap();
+        assert_eq!(note.as_deref(), Some("note"));
+    }
 }

@@ -98,11 +98,9 @@ pub async fn fetch_enrichment(client: &Client, url: &str) -> Result<EnrichmentRe
         });
     }
 
-    // Read at most 200 KB — enough for <head> on any page
-    let bytes = response.bytes().await.map_err(|e| FeedError::Network {
-        url: url.to_string(),
-        source: e,
-    })?;
+    // Download at most 2 MB (we only parse the first 200 KB, enough for <head>);
+    // reading the whole body unbounded is a memory-exhaustion vector.
+    let bytes = crate::feeds::read_body_capped(response, 2 * 1024 * 1024).await?;
     let html = String::from_utf8_lossy(&bytes[..bytes.len().min(204_800)]);
 
     Ok(parse_meta(&html))

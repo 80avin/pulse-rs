@@ -133,7 +133,7 @@ CREATE TABLE filter_rules (
 );
 
 CREATE VIRTUAL TABLE feed_items_fts USING fts5(
-    item_id    UNINDEXED,
+    id         UNINDEXED,
     title,
     body_text,
     author,
@@ -143,7 +143,7 @@ CREATE VIRTUAL TABLE feed_items_fts USING fts5(
 );
 
 CREATE TRIGGER feed_items_fts_delete AFTER DELETE ON feed_items BEGIN
-    INSERT INTO feed_items_fts(feed_items_fts, rowid, item_id, title, body_text, author)
+    INSERT INTO feed_items_fts(feed_items_fts, rowid, id, title, body_text, author)
     VALUES ('delete', old.rowid, old.id, old.title, old.body_text, old.author);
 END;
 

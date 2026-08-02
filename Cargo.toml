@@ -54,18 +54,8 @@ tracing-appender = "0.2"
 # CLI argument parsing
 clap = { version = "4", features = ["derive", "env"] }
 
-# ONNX Runtime — used by ai-vision and ai-miniml features in pulse-core
-# rc.12 upgrades Android binary from ORT 1.23.2 → 1.26.0 (fixes libstdc++ ABI mismatch)
-ort = { version = "2.0.0-rc.12", features = ["download-binaries"] }
-
-# HuggingFace tokenizers — for BERT/MiniLM tokenization
-tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"] }
-
 # Regex for rule engine
 regex = "1"
 
 # HTML stripping
 scraper = "0.21"
-
-# Image decode + resize for CLIP vision pipeline
-image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }

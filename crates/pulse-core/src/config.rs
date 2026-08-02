@@ -1,23 +1,11 @@
 use std::path::PathBuf;
 
-/// Which text classification backend is active
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum TextBackend {
-    /// FastText supervised classifier (2-10MB, <1ms/item)
-    FastText,
-    /// MiniLM ONNX embedding + MLP classifier head (24MB)
-    MiniMl,
-    /// FastText primary; MiniLM for semantic categories (default)
-    #[default]
-    HybridFastTextMiniMl,
-}
-
 /// Application configuration
 #[derive(Debug, Clone)]
 pub struct PulseConfig {
     /// Path to the SQLite database file
     pub db_path: PathBuf,
-    /// Path to the data directory (models, exports, etc.)
+    /// Path to the data directory (exports, etc.)
     pub data_dir: PathBuf,
     /// Maximum number of sync tasks that can run concurrently
     pub max_concurrent_syncs: usize,
@@ -29,11 +17,6 @@ pub struct PulseConfig {
     pub reddit_client_id: Option<String>,
     /// Reddit OAuth2 script-app client secret
     pub reddit_client_secret: Option<String>,
-    /// Which text classification backend to use for tagging
-    pub text_backend: TextBackend,
-    /// Whether AI tagging is enabled (mirrors the user's UI setting). When false,
-    /// models are not loaded at startup and the tagger task skips ML inference.
-    pub ai_enabled: bool,
 }
 
 impl PulseConfig {
@@ -50,8 +33,6 @@ impl PulseConfig {
             is_android: cfg!(target_os = "android"),
             reddit_client_id: None,
             reddit_client_secret: None,
-            text_backend: TextBackend::HybridFastTextMiniMl,
-            ai_enabled: true,
         }
     }
 
@@ -68,27 +49,11 @@ impl PulseConfig {
         self
     }
 
-    /// Override the ai_enabled flag (mirrors the user's AI tagging setting).
-    pub fn with_ai_enabled(mut self, enabled: bool) -> Self {
-        self.ai_enabled = enabled;
-        self
-    }
-
     /// Set Reddit OAuth2 credentials (client-credentials / script-app flow).
     pub fn with_reddit_auth(mut self, client_id: String, client_secret: String) -> Self {
         self.reddit_client_id = Some(client_id);
         self.reddit_client_secret = Some(client_secret);
         self
-    }
-
-    /// Path to the models directory
-    pub fn models_dir(&self) -> PathBuf {
-        self.data_dir.join("models")
-    }
-
-    /// Path to the training data directory (labels, exports)
-    pub fn training_dir(&self) -> PathBuf {
-        self.data_dir.join("training")
     }
 }
 

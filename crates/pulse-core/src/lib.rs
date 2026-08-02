@@ -6,7 +6,6 @@ pub mod search;
 pub mod storage;
 pub mod sync;
 pub mod timeline;
-pub mod training;
 pub mod types;
 
 use std::sync::Arc;
@@ -14,10 +13,7 @@ use tokio::sync::mpsc;
 
 use crate::ai::tagger::TagRequest;
 use crate::ai::tagger::process_tag_request;
-use crate::ai::{
-    FastTextTagger, MiniMlTagger, ModelHandle, RuleEngine, TAGGER_QUEUE_SIZE, TaggerHandle,
-    VisionTagger, default_rules, tagger_task,
-};
+use crate::ai::{RuleEngine, RulesTagger, TAGGER_QUEUE_SIZE, TaggerHandle, default_rules, tagger_task};
 use crate::config::PulseConfig;
 use crate::error::PulseError;
 use crate::feeds::{RedditAuth, fetch_enrichment, is_image_url, should_enrich};
@@ -30,7 +26,7 @@ use crate::sync::SyncScheduler;
 use crate::timeline::TimelineService;
 use crate::types::{
     AiTag, DbStats, EnrichItemResult, EnrichStats, EnrichStatus, Feed, FeedGroup, FeedId,
-    FeedItemView, FeedType, ItemId, ItemStatePatch, TimelineCursor, TimelineFilter, TimelinePage,
+    FeedItemView, ItemId, ItemStatePatch, TimelineCursor, TimelineFilter, TimelinePage,
 };
 
 /// Top-level application core. Holds all subsystem handles.
@@ -42,12 +38,6 @@ pub struct PulseCore {
     pub search: SearchService,
     pub config: Arc<PulseConfig>,
     pub rule_engine: Arc<RuleEngine>,
-    /// CLIP vision encoder — idle-unloadable; loaded on first image post, dropped when idle.
-    pub vision_tagger: ModelHandle<VisionTagger>,
-    /// FastText supervised classifier — primary text tagger (<10MB, <1ms/item).
-    pub fasttext_tagger: ModelHandle<FastTextTagger>,
-    /// MiniLM + MLP semantic classifier — secondary for research/discussion/clickbait.
-    pub miniml_tagger: ModelHandle<MiniMlTagger>,
 }
 
 impl PulseCore {
@@ -93,133 +83,16 @@ impl PulseCore {
         let db = DbHandle::new(writer_tx, reader_pool);
         tracing::info!(elapsed_ms = t0.elapsed().as_millis(), "coldstart: DB ready");
 
-        // Build loader closures — each captures the data_dir and loads from the active-model
-        // pointer file. Returning None means "no active model configured"; errors are logged.
-        let make_vision_loader = {
-            let data_dir = config.data_dir.clone();
-            Arc::new(move || -> Option<Arc<VisionTagger>> {
-                let name = std::fs::read_to_string(data_dir.join("active_vision_model")).ok()?;
-                let dir = data_dir.join("models").join(name.trim());
-                let t = std::time::Instant::now();
-                match VisionTagger::load(&dir) {
-                    Ok(tagger) => {
-                        tracing::info!(
-                            elapsed_ms = t.elapsed().as_millis(),
-                            "Vision tagger loaded"
-                        );
-                        Some(Arc::new(tagger))
-                    }
-                    Err(crate::error::TaggingError::ModelNotLoaded) => None,
-                    Err(e) => {
-                        tracing::warn!(error=%e, "Vision load failed");
-                        None
-                    }
-                }
-            }) as Arc<dyn Fn() -> Option<Arc<VisionTagger>> + Send + Sync>
-        };
-
-        let make_fasttext_loader = {
-            let data_dir = config.data_dir.clone();
-            Arc::new(move || -> Option<Arc<FastTextTagger>> {
-                let name = std::fs::read_to_string(data_dir.join("active_fasttext_model")).ok()?;
-                let dir = data_dir.join("models").join(name.trim());
-                let t = std::time::Instant::now();
-                match FastTextTagger::load(&dir) {
-                    Ok(tagger) => {
-                        tracing::info!(
-                            elapsed_ms = t.elapsed().as_millis(),
-                            "FastText tagger loaded"
-                        );
-                        Some(Arc::new(tagger))
-                    }
-                    Err(crate::error::TaggingError::ModelNotLoaded) => None,
-                    Err(e) => {
-                        tracing::warn!(error=%e, "FastText load failed");
-                        None
-                    }
-                }
-            }) as Arc<dyn Fn() -> Option<Arc<FastTextTagger>> + Send + Sync>
-        };
-
-        let make_miniml_loader = {
-            let data_dir = config.data_dir.clone();
-            Arc::new(move || -> Option<Arc<MiniMlTagger>> {
-                let name = std::fs::read_to_string(data_dir.join("active_miniml_model")).ok()?;
-                let dir = data_dir.join("models").join(name.trim());
-                let t = std::time::Instant::now();
-                match MiniMlTagger::load(&dir) {
-                    Ok(tagger) => {
-                        tracing::info!(
-                            elapsed_ms = t.elapsed().as_millis(),
-                            "MiniLM tagger loaded"
-                        );
-                        Some(Arc::new(tagger))
-                    }
-                    Err(crate::error::TaggingError::ModelNotLoaded) => None,
-                    Err(e) => {
-                        tracing::warn!(error=%e, "MiniLM load failed");
-                        None
-                    }
-                }
-            }) as Arc<dyn Fn() -> Option<Arc<MiniMlTagger>> + Send + Sync>
-        };
-
-        // Create ModelHandles. snapshot() sets pending_reload=true before spawning so concurrent
-        // calls from tagger_task cannot trigger a second load while init is still in flight.
-        let vision_tagger = ModelHandle::new(make_vision_loader);
-        let fasttext_tagger = ModelHandle::new(make_fasttext_loader);
-        let miniml_tagger = ModelHandle::new(make_miniml_loader);
-
-        // Kick off background loads only when AI tagging is enabled.
-        // When disabled, models stay unloaded until the user re-enables AI and triggers a retag;
-        // snapshot() in run_tagger_direct / tagger_task will load them on demand at that point.
-        if config.ai_enabled {
-            fasttext_tagger.snapshot();
-            miniml_tagger.snapshot();
-            vision_tagger.snapshot();
-        } else {
-            tracing::info!("AI tagging disabled — skipping model preload");
-        }
-
-        // Spawn idle-unload janitor — checks every 60 s and evicts models unused past their threshold.
-        {
-            let ft = fasttext_tagger.clone();
-            let ml = miniml_tagger.clone();
-            let vis = vision_tagger.clone();
-            tokio::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
-                interval.tick().await; // first tick fires immediately; skip it
-                loop {
-                    interval.tick().await;
-                    ft.idle_drop(std::time::Duration::from_secs(30 * 60));
-                    ml.idle_drop(std::time::Duration::from_secs(10 * 60));
-                    vis.idle_drop(std::time::Duration::from_secs(5 * 60));
-                }
-            });
-        }
-
-        // Spawn the AI tagger task
+        // Build the rules-only tagger and spawn the async tagging queue.
         let (tagger_tx, tagger_rx) = mpsc::channel(TAGGER_QUEUE_SIZE);
         let tagger_handle = TaggerHandle::new(tagger_tx);
 
         let rule_engine = Arc::new(RuleEngine::new(default_rules()));
+        let tagger: Arc<dyn crate::ai::Tagger> = Arc::new(RulesTagger::new(rule_engine.clone()));
         let db_for_tagger = db.clone();
-        let rule_engine_for_task = rule_engine.clone();
-        let fasttext_for_task = fasttext_tagger.clone();
-        let miniml_for_task = miniml_tagger.clone();
-        let vision_for_task = vision_tagger.clone();
-        let text_backend_for_task = config.text_backend.clone();
+        let tagger_for_task = tagger.clone();
         tokio::spawn(async move {
-            tagger_task(
-                tagger_rx,
-                db_for_tagger,
-                text_backend_for_task,
-                rule_engine_for_task,
-                fasttext_for_task,
-                miniml_for_task,
-                vision_for_task,
-            )
-            .await;
+            tagger_task(tagger_rx, db_for_tagger, tagger_for_task).await;
         });
 
         // Build Reddit auth from config if credentials are provided
@@ -262,9 +135,6 @@ impl PulseCore {
             search,
             config,
             rule_engine,
-            vision_tagger,
-            fasttext_tagger,
-            miniml_tagger,
         })
     }
 
@@ -421,16 +291,6 @@ impl PulseCore {
             {
                 tracing::warn!(item_id = %result.item_id, error = %e, "Failed to write enrichment result");
             }
-
-            // Re-queue for tagging if og_image was acquired — the vision tagger
-            // needs the image URL which wasn't available at initial sync time.
-            if let Some(ref img) = result.og_image
-                && !img.is_empty()
-            {
-                self.tagger
-                    .tag_item(result.item_id.clone(), FeedType::Rss)
-                    .await;
-            }
         }
 
         Ok(stats)
@@ -538,6 +398,19 @@ impl PulseCore {
             .map_err(PulseError::Storage)
     }
 
+    /// Fetch a single item as a fully-joined view (feed + group + state + tags),
+    /// with no recency cap.
+    pub async fn get_item_view(
+        &self,
+        item_id: &ItemId,
+    ) -> Result<crate::types::FeedItemView, PulseError> {
+        let iid = item_id.clone();
+        self.db
+            .with_reader(|pool| async move { storage::queries::get_item_view(&pool, &iid).await })
+            .await
+            .map_err(PulseError::Storage)
+    }
+
     /// Clear the ETag, Last-Modified, and source_config cache keys for a feed,
     /// forcing the next sync to perform a full re-fetch regardless of prior state.
     pub async fn clear_feed_cache(&self, feed_id: &FeedId) -> Result<(), PulseError> {
@@ -596,16 +469,27 @@ impl PulseCore {
         .await
     }
 
-    pub async fn toggle_saved(
+    pub async fn toggle_saved(&self, item_id: &ItemId, saved: bool) -> Result<(), PulseError> {
+        self.update_item_state(
+            item_id,
+            ItemStatePatch {
+                is_saved: Some(saved),
+                ..Default::default()
+            },
+        )
+        .await
+    }
+
+    /// Set (or clear) the user note on an item. `note = None` clears it;
+    /// the saved state is never touched.
+    pub async fn set_item_note(
         &self,
         item_id: &ItemId,
-        saved: bool,
         note: Option<String>,
     ) -> Result<(), PulseError> {
         self.update_item_state(
             item_id,
             ItemStatePatch {
-                is_saved: Some(saved),
                 note: Some(note),
                 ..Default::default()
             },
@@ -680,9 +564,7 @@ impl PulseCore {
         let mut items_processed = 0usize;
         let mut tags_created = 0usize;
 
-        let fasttext = self.fasttext_tagger.snapshot();
-        let miniml = self.miniml_tagger.snapshot();
-        let vision = self.vision_tagger.snapshot();
+        let tagger: Arc<dyn crate::ai::Tagger> = Arc::new(RulesTagger::new(self.rule_engine.clone()));
 
         for (item, feed_type) in work {
             if force {
@@ -693,17 +575,7 @@ impl PulseCore {
                 item_id: item.id.clone(),
                 feed_type,
             };
-            match process_tag_request(
-                &self.db,
-                &self.config.text_backend,
-                &self.rule_engine,
-                fasttext.as_deref(),
-                miniml.as_deref(),
-                vision.as_deref(),
-                &req,
-            )
-            .await
-            {
+            match process_tag_request(&self.db, tagger.as_ref(), &req).await {
                 Ok(n) => {
                     tags_created += n;
                 }
@@ -720,211 +592,12 @@ impl PulseCore {
         Ok((items_processed, tags_created))
     }
 
-    /// Delete all AI tags with confidence below the given threshold (global post-filter).
-    /// Used by `retag_all` to apply the user's confidence_threshold setting.
-    pub async fn delete_tags_below_confidence(&self, threshold: f32) -> Result<(), PulseError> {
-        self.db
-            .delete_tags_below_confidence(threshold)
-            .await
-            .map_err(PulseError::Storage)
-    }
-
     pub async fn get_item_tags(&self, item_id: &ItemId) -> Result<Vec<AiTag>, PulseError> {
         let iid = item_id.clone();
         self.db
             .with_reader(|pool| async move { storage::queries::get_ai_tags(&pool, &iid).await })
             .await
             .map_err(PulseError::Storage)
-    }
-
-    // ─── AI model management ──────────────────────────────────────────────────
-
-    /// Return the path where model files should be placed for a given model name.
-    pub fn model_dir(&self, model_name: &str) -> std::path::PathBuf {
-        self.config.data_dir.join("models").join(model_name)
-    }
-
-    // ─── Vision model management ──────────────────────────────────────────────
-
-    pub fn active_vision_model_name(&self) -> Option<String> {
-        let path = self.config.data_dir.join("active_vision_model");
-        std::fs::read_to_string(path)
-            .ok()
-            .map(|s| s.trim().to_string())
-    }
-
-    pub fn set_active_vision_model(&self, model_name: &str) -> Result<(), PulseError> {
-        let model_dir = self.config.data_dir.join("models").join(model_name);
-        // Accept any supported vision model filename (MobileCLIP int8 or CLIP ViT-B/32 q4f16)
-        let has_model = [
-            "vision_model_quantized.onnx",
-            "vision_model_q4f16.onnx",
-            "vision_model.onnx",
-        ]
-        .iter()
-        .any(|f| model_dir.join(f).exists());
-        if !has_model {
-            return Err(PulseError::NotFound(format!(
-                "vision model '{}' not found at {:?} — run 'pulse ai vision-download {}' first",
-                model_name, model_dir, model_name
-            )));
-        }
-        // label_embeddings.bin is generated at load time; no need to pre-check
-        let active_file = self.config.data_dir.join("active_vision_model");
-        std::fs::write(&active_file, model_name)
-            .map_err(|e| PulseError::Config(format!("failed to write active_vision_model: {e}")))?;
-        Ok(())
-    }
-
-    pub fn unset_active_vision_model(&self) -> Result<(), PulseError> {
-        let active_file = self.config.data_dir.join("active_vision_model");
-        if active_file.exists() {
-            std::fs::remove_file(&active_file).map_err(|e| {
-                PulseError::Config(format!("failed to remove active_vision_model: {e}"))
-            })?;
-        }
-        Ok(())
-    }
-
-    // ─── Tagger hot-reload ────────────────────────────────────────────────────
-
-    /// Whether a CLIP vision tagger is currently loaded.
-    pub fn vision_loaded(&self) -> bool {
-        self.vision_tagger.is_loaded()
-    }
-
-    /// Reload the CLIP vision tagger from the active_vision_model file.
-    /// If `label_embeddings.bin` is missing, automatically computes it from
-    /// the downloaded text encoder before loading the vision model.
-    pub fn reload_vision_tagger(&self) -> Result<(), PulseError> {
-        let active_file = self.config.data_dir.join("active_vision_model");
-        let model_name = std::fs::read_to_string(&active_file)
-            .map_err(|e| PulseError::Config(format!("no active vision model set: {e}")))?;
-        let model_dir = self.config.data_dir.join("models").join(model_name.trim());
-
-        // Auto-compute label embeddings from the text encoder if not yet present.
-        #[cfg(feature = "ai-vision")]
-        {
-            let embeddings_path = model_dir.join("label_embeddings.bin");
-            if !embeddings_path.exists() {
-                tracing::info!("label_embeddings.bin missing — computing from text encoder");
-                ai::vision::compute_clip_label_embeddings(&model_dir)
-                    .map_err(PulseError::Tagging)?;
-            }
-        }
-
-        let tagger = VisionTagger::load(&model_dir).map_err(PulseError::Tagging)?;
-        self.vision_tagger.store(Arc::new(tagger));
-        tracing::info!(
-            "CLIP vision tagger hot-reloaded from {}",
-            model_dir.display()
-        );
-        Ok(())
-    }
-
-    // ─── FastText model management ────────────────────────────────────────────
-
-    pub fn fasttext_loaded(&self) -> bool {
-        self.fasttext_tagger.is_loaded()
-    }
-    pub fn miniml_loaded(&self) -> bool {
-        self.miniml_tagger.is_loaded()
-    }
-
-    pub fn active_fasttext_model_name(&self) -> Option<String> {
-        let path = self.config.data_dir.join("active_fasttext_model");
-        std::fs::read_to_string(path)
-            .ok()
-            .map(|s| s.trim().to_string())
-    }
-
-    pub fn active_miniml_model_name(&self) -> Option<String> {
-        let path = self.config.data_dir.join("active_miniml_model");
-        std::fs::read_to_string(path)
-            .ok()
-            .map(|s| s.trim().to_string())
-    }
-
-    pub fn set_active_fasttext_model(&self, model_name: &str) -> Result<(), PulseError> {
-        let model_dir = self.config.data_dir.join("models").join(model_name);
-        if !model_dir.join("fasttext.pftm").exists() {
-            return Err(PulseError::NotFound(format!(
-                "FastText model '{}' not found — run scripts/train_fasttext.py first",
-                model_name
-            )));
-        }
-        let ptr = self.config.data_dir.join("active_fasttext_model");
-        std::fs::write(&ptr, model_name).map_err(|e| {
-            PulseError::Config(format!("failed to write active_fasttext_model: {e}"))
-        })?;
-        Ok(())
-    }
-
-    pub fn set_active_miniml_model(&self, model_name: &str) -> Result<(), PulseError> {
-        let model_dir = self.config.data_dir.join("models").join(model_name);
-        let has_model = model_dir.join("model.onnx").exists()
-            || model_dir.join("model_quantized.onnx").exists();
-        if !has_model {
-            return Err(PulseError::NotFound(format!(
-                "MiniLM model '{}' not found — download model.onnx and run scripts/train_miniml.py first",
-                model_name
-            )));
-        }
-        let ptr = self.config.data_dir.join("active_miniml_model");
-        std::fs::write(&ptr, model_name)
-            .map_err(|e| PulseError::Config(format!("failed to write active_miniml_model: {e}")))?;
-        Ok(())
-    }
-
-    pub fn reload_fasttext_tagger(&self) -> Result<(), PulseError> {
-        let ptr = self.config.data_dir.join("active_fasttext_model");
-        let model_name = std::fs::read_to_string(&ptr)
-            .map_err(|e| PulseError::Config(format!("no active fasttext model set: {e}")))?;
-        let model_dir = self.config.data_dir.join("models").join(model_name.trim());
-        let tagger = FastTextTagger::load(&model_dir).map_err(PulseError::Tagging)?;
-        self.fasttext_tagger.store(Arc::new(tagger));
-        tracing::info!("FastText tagger hot-reloaded from {}", model_dir.display());
-        Ok(())
-    }
-
-    pub fn reload_miniml_tagger(&self) -> Result<(), PulseError> {
-        let ptr = self.config.data_dir.join("active_miniml_model");
-        let model_name = std::fs::read_to_string(&ptr)
-            .map_err(|e| PulseError::Config(format!("no active miniml model set: {e}")))?;
-        let model_dir = self.config.data_dir.join("models").join(model_name.trim());
-        let tagger = MiniMlTagger::load(&model_dir).map_err(PulseError::Tagging)?;
-        self.miniml_tagger.store(Arc::new(tagger));
-        tracing::info!("MiniLM tagger hot-reloaded from {}", model_dir.display());
-        Ok(())
-    }
-
-    /// Unload the vision tagger from memory and clear the active-model pointer.
-    pub fn remove_vision_model(&self, model_name: &str) -> Result<(), PulseError> {
-        let model_dir = self.config.data_dir.join("models").join(model_name);
-        if model_dir.exists() {
-            std::fs::remove_dir_all(&model_dir)
-                .map_err(|e| PulseError::Config(format!("failed to remove vision model: {e}")))?;
-        }
-        if self.active_vision_model_name().as_deref() == Some(model_name) {
-            let _ = self.unset_active_vision_model();
-        }
-        self.vision_tagger.clear();
-        Ok(())
-    }
-
-    /// Unload the MiniLM tagger from memory and clear the active-model pointer.
-    pub fn remove_miniml_model(&self, model_name: &str) -> Result<(), PulseError> {
-        let model_dir = self.config.data_dir.join("models").join(model_name);
-        if model_dir.exists() {
-            std::fs::remove_dir_all(&model_dir)
-                .map_err(|e| PulseError::Config(format!("failed to remove miniml model: {e}")))?;
-        }
-        if self.active_miniml_model_name().as_deref() == Some(model_name) {
-            let ptr = self.config.data_dir.join("active_miniml_model");
-            let _ = std::fs::remove_file(&ptr);
-        }
-        self.miniml_tagger.clear();
-        Ok(())
     }
 
     // ─── Stats ────────────────────────────────────────────────────────────────
@@ -936,14 +609,11 @@ impl PulseCore {
             .map_err(PulseError::Storage)
     }
 
-    pub async fn get_ai_stats(
+    pub async fn get_tag_stats(
         &self,
-        signal_threshold: f64,
-    ) -> Result<storage::queries::AiStats, PulseError> {
+    ) -> Result<storage::queries::TagStats, PulseError> {
         self.db
-            .with_reader(|pool| async move {
-                storage::queries::get_ai_stats(&pool, signal_threshold).await
-            })
+            .with_reader(|pool| async move { storage::queries::get_tag_stats(&pool).await })
             .await
             .map_err(PulseError::Storage)
     }

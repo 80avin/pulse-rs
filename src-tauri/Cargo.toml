@@ -27,8 +27,8 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
 
-# pulse-core provides: sync, storage, AI pipeline, model management
-pulse-core = { path = "../crates/pulse-core", features = ["ai-vision", "ai-fasttext", "ai-miniml"] }
+# pulse-core provides: sync, storage, rule-based tagging
+pulse-core = { path = "../crates/pulse-core" }
 
 # Force bundled SQLite so Android doesn't need a system libsqlite3
 libsqlite3-sys = { version = "0.28", features = ["bundled"] }

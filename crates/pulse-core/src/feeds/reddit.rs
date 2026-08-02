@@ -339,9 +339,11 @@ fn normalize_reddit_post(
 
 /// Extract subreddit name from a Reddit URL.
 /// e.g. `https://www.reddit.com/r/rust/hot.json` → `"rust"`
+/// `https://www.reddit.com/r/rust.rss` → `"rust"` (strip the format extension)
 fn subreddit_from_url(url: &str) -> Option<&str> {
     let after_r = url.split("/r/").nth(1)?;
     let sub = after_r.split('/').next()?;
+    let sub = sub.split('.').next()?; // strip .rss / .json / .atom
     if sub.is_empty() { None } else { Some(sub) }
 }
 
@@ -354,4 +356,47 @@ fn sort_from_url(url: &str) -> Option<&str> {
     let sort_part = parts.next()?;
     let sort = sort_part.split('.').next()?;
     if sort.is_empty() { None } else { Some(sort) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{subreddit_from_url, sort_from_url};
+
+    #[test]
+    fn parses_subreddit_from_plain_url() {
+        assert_eq!(subreddit_from_url("https://www.reddit.com/r/rust"), Some("rust"));
+        assert_eq!(subreddit_from_url("https://www.reddit.com/r/rust/"), Some("rust"));
+        assert_eq!(
+            subreddit_from_url("https://www.reddit.com/r/rust/hot.json"),
+            Some("rust")
+        );
+    }
+
+    #[test]
+    fn strips_format_extensions_from_subreddit() {
+        // These are the URLs detect.rs generates for the share flow.
+        assert_eq!(
+            subreddit_from_url("https://www.reddit.com/r/rust.rss"),
+            Some("rust")
+        );
+        assert_eq!(
+            subreddit_from_url("https://www.reddit.com/r/rust.json"),
+            Some("rust")
+        );
+    }
+
+    #[test]
+    fn returns_none_for_invalid_urls() {
+        assert_eq!(subreddit_from_url("https://www.reddit.com/"), None);
+        assert_eq!(subreddit_from_url("https://www.reddit.com/r/"), None);
+        assert_eq!(subreddit_from_url("https://example.com/x"), None);
+    }
+
+    #[test]
+    fn parses_sort_order() {
+        assert_eq!(sort_from_url("https://www.reddit.com/r/rust/new.json"), Some("new"));
+        assert_eq!(sort_from_url("https://www.reddit.com/r/rust/top.json"), Some("top"));
+        assert_eq!(sort_from_url("https://www.reddit.com/r/rust"), None);
+        assert_eq!(sort_from_url("https://www.reddit.com/r/rust.rss"), None);
+    }
 }

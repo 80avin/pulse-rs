@@ -77,9 +77,9 @@ async fn cmd_stats(args: DbStatsArgs, core: &PulseCore, global_json: bool) -> an
 }
 
 async fn cmd_vacuum(core: &PulseCore) -> anyhow::Result<()> {
-    // Run VACUUM via the reader pool (VACUUM must be done outside transactions)
-    let pool = core.db.reader_pool().clone();
-    sqlx::query("VACUUM").execute(&pool).await?;
+    // VACUUM must go through the writer actor (the reader pool is read-only),
+    // which also rebuilds the FTS index afterwards (VACUUM can renumber rowids).
+    core.db.vacuum().await?;
     println!("VACUUM complete");
     Ok(())
 }

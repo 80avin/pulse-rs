@@ -5,16 +5,11 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Core library for Pulse — local-first feed reader with on-device AI classification"
+description = "Core library for Pulse — local-first feed reader with deterministic rule-based tagging"
 edition = "2024"
 
 [lib]
 name = "pulse_core"
-
-[features]
-ai-vision = ["dep:ort", "dep:image", "dep:tokenizers"]
-ai-fasttext = []
-ai-miniml = ["dep:ort", "dep:tokenizers"]
 
 [dependencies]
 tokio = { workspace = true }
@@ -31,9 +26,6 @@ tracing = { workspace = true }
 regex = { workspace = true }
 scraper = { workspace = true }
 futures = "0.3"
-ort = { workspace = true, optional = true }
-tokenizers = { workspace = true, optional = true }
-image = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

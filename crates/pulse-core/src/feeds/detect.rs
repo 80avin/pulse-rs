@@ -117,13 +117,10 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
         || content_type.contains("application/feed")
         || (content_type.contains("xml") && !content_type.contains("html"));
 
-    let bytes = response.bytes().await.map_err(|e| FeedError::Network {
-        url: url.clone(),
-        source: e,
-    })?;
+    let bytes = crate::feeds::read_body_capped(response, 5 * 1024 * 1024).await?;
 
     if is_feed_ct {
-        let name = feed_rs::parser::parse(bytes.as_ref())
+        let name = feed_rs::parser::parse(bytes.as_slice())
             .ok()
             .and_then(|f| f.title)
             .map(|t| t.content)
@@ -228,20 +225,18 @@ fn detect_well_known(host: &str, path: &str, query: &str) -> Option<FeedCandidat
                 ));
             }
         }
-        // /@handle — YouTube embeds <link rel="alternate"> in page HTML so the
-        // generic scraper picks it up. Extract a title hint from the handle.
-        if let Some(handle) = path.strip_prefix("/@") {
-            let handle = handle.trim_end_matches('/').split('/').next().unwrap_or("");
-            if !handle.is_empty() {
-                // Return None to fall through to the HTTP scraper,
-                // but we can't pre-set the name without the network here.
-                let _ = handle;
-            }
-        }
+        // /@handle — the generic scraper picks up the <link rel="alternate"> from
+        // the page HTML; no special handling needed here.
     }
 
     // ── GitHub ─────────────────────────────────────────────────────────────────
     if host == "github.com" || host == "www.github.com" {
+        // Non-user first segments (site chrome, not profiles).
+        const NON_USER: &[&str] = &[
+            "topics", "trending", "explore", "sponsors", "features", "marketplace",
+            "collections", "settings", "login", "signup", "search", "about", "pricing",
+            "team", "enterprise", "customer-stories", "readme", "orgs", "contact", "site",
+        ];
         let parts: Vec<&str> = path
             .trim_start_matches('/')
             .split('/')
@@ -268,7 +263,7 @@ fn detect_well_known(host: &str, path: &str, query: &str) -> Option<FeedCandidat
                     ],
                 });
             }
-            [user] if !user.starts_with('.') => {
+            [user] if !user.starts_with('.') && !NON_USER.contains(&user) => {
                 return Some(make(
                     format!("https://github.com/{user}.atom"),
                     format!("{user} (GitHub)"),
@@ -309,6 +304,7 @@ fn detect_well_known(host: &str, path: &str, query: &str) -> Option<FeedCandidat
             .collect();
         if let [pub_name] = parts.as_slice()
             && !pub_name.starts_with('@')
+            && *pub_name != "feed"
         {
             return Some(make(
                 format!("https://medium.com/feed/{pub_name}"),
@@ -325,7 +321,9 @@ fn detect_well_known(host: &str, path: &str, query: &str) -> Option<FeedCandidat
             .split('/')
             .filter(|s| !s.is_empty())
             .collect();
-        if let [user] = parts.as_slice() {
+        if let [user] = parts.as_slice()
+            && *user != "feed"
+        {
             return Some(make(
                 format!("https://dev.to/feed/{user}"),
                 format!("{user} (Dev.to)"),
@@ -381,4 +379,40 @@ fn domain_name(url: &str) -> String {
     reqwest::Url::parse(url)
         .map(|u| u.host_str().unwrap_or("").replace("www.", "").to_string())
         .unwrap_or_default()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::detect_well_known;
+
+    #[test]
+    fn github_chrome_segments_do_not_become_feeds() {
+        for path in ["/topics", "/trending", "/explore", "/features", "/marketplace"] {
+            let cand = detect_well_known("github.com", path, "");
+            assert!(
+                cand.is_none(),
+                "github.com{path} must not be treated as a user feed (got {:?})",
+                cand.map(|c| c.feed_url)
+            );
+        }
+    }
+
+    #[test]
+    fn github_user_and_repo_still_match() {
+        let cand = detect_well_known("github.com", "/rust-lang/rust", "").expect("repo feed");
+        assert_eq!(cand.feed_url, "https://github.com/rust-lang/rust/releases.atom");
+
+        let cand = detect_well_known("github.com", "/torvalds", "").expect("user feed");
+        assert_eq!(cand.feed_url, "https://github.com/torvalds.atom");
+    }
+
+    #[test]
+    fn medium_and_devto_feed_paths_do_not_self_reference() {
+        assert!(detect_well_known("medium.com", "/feed", "").is_none());
+        assert!(detect_well_known("dev.to", "/feed", "").is_none());
+        // A real publication still matches.
+        let cand = detect_well_known("medium.com", "/pragmatic-engineer", "").expect("medium pub");
+        assert!(cand.feed_url.ends_with("/feed/pragmatic-engineer"));
+    }
 }

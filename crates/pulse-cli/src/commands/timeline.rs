@@ -39,18 +39,22 @@ pub async fn run(args: TimelineArgs, core: &PulseCore, global_json: bool) -> any
         let groups = core.get_feed_groups().await?;
         match groups.iter().find(|g| g.name.eq_ignore_ascii_case(gname)) {
             Some(g) => Some(g.id.clone()),
-            None => {
-                crate::output::print_error(&format!("group '{}' not found", gname));
-                return Ok(());
-            }
+            None => anyhow::bail!("group '{}' not found", gname),
         }
+    } else {
+        None
+    };
+
+    // Resolve a --feed prefix to a full feed ID (list commands show truncated IDs).
+    let feed_id = if let Some(ref fid) = args.feed {
+        Some(crate::commands::feed::resolve_feed(core, fid).await?.id)
     } else {
         None
     };
 
     let filter = TimelineFilter {
         group_id,
-        feed_id: args.feed,
+        feed_id,
         is_read: if args.unread { Some(false) } else { None },
         is_saved: if args.saved { Some(true) } else { None },
         tag: args.tag,
@@ -83,13 +87,9 @@ pub fn print_items_human(items: &[FeedItemView]) {
         let age = relative_time(item.published_at);
         let score = score_display(item.score, &item.feed_type);
         let feed = item.feed_title.as_deref().unwrap_or(&item.feed_url);
-        let feed_trunc = if feed.len() > 20 { &feed[..20] } else { feed };
+        let feed_trunc = crate::output::truncate_chars(&feed, 20);
         let title = &item.title;
-        let title_trunc = if title.len() > 60 {
-            &title[..60]
-        } else {
-            title
-        };
+        let title_trunc = crate::output::truncate_chars(&title, 60);
         println!(
             "{} {} {}  {:<5}  {:<20}  \"{}\"",
             id_prefix, state, age, score, feed_trunc, title_trunc

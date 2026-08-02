@@ -52,60 +52,12 @@ pub struct GroupDto {
     pub n: i64,
 }
 
-/// AI status DTO
+/// Tag statistics DTO (tag distribution for the tag filter).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AiStatusDto {
-    pub vision_loaded: bool,
-    pub fasttext_loaded: bool,
-    pub miniml_loaded: bool,
-    pub vision_model_name: Option<String>,
-    pub fasttext_model_name: Option<String>,
-    pub miniml_model_name: Option<String>,
-    pub tagging_mode: String,
-}
-
-/// AI stats DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AiStatsDto {
+pub struct TagStatsDto {
     pub tagged_count: i64,
-    pub avg_score: f64,
     pub tag_counts: Vec<(String, i64)>,
-    pub high_signal: Vec<FeedItemDto>,
-}
-
-/// Known downloadable model info
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModelInfoDto {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub size_mb: u32,
-    pub downloaded: bool,
-    pub active: bool,
-    pub kind: String,
-}
-
-/// Download progress event payload
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DownloadProgressEvent {
-    pub model_id: String,
-    pub file: String,
-    pub bytes_done: u64,
-    pub bytes_total: u64,
-    pub done: bool,
-}
-
-/// Tagging progress event payload — emitted per-item during retag_all.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TaggingProgressEvent {
-    pub tagged: usize,
-    pub total: usize,
-    pub done: bool,
 }
 
 /// App settings DTO (round-tripped via tauri_settings.json)
@@ -119,13 +71,11 @@ pub struct AppSettingsDto {
     pub wifi_only: bool,
     // TODO: Planned features — not yet consumed by backend
     pub background_sync: bool,
-    pub ai_tagging: bool,
-    pub confidence_threshold: f64,
     // TODO: Planned features — not yet consumed by backend
     pub notify_high_signal: bool,
     // TODO: Planned features — not yet consumed by backend
     pub notify_saved: bool,
-    /// When true: pulse_core=debug + per-item inference logs. When false: info + warn only.
+    /// When true: pulse_core=debug. When false: info + warn only.
     #[serde(default)]
     pub verbose_logging: bool,
 }
@@ -138,8 +88,6 @@ impl Default for AppSettingsDto {
             sync_interval_min: 15,
             wifi_only: false,
             background_sync: true,
-            ai_tagging: true,
-            confidence_threshold: 0.5,
             notify_high_signal: false,
             notify_saved: false,
             verbose_logging: false,

@@ -300,11 +300,7 @@ async fn cmd_list(args: FeedListArgs, core: &PulseCore, global_json: bool) -> an
         let id_prefix = &f.id[..f.id.len().min(8)];
         let feed_type = f.feed_type.as_str();
         let title = f.title.as_deref().unwrap_or(&f.url);
-        let title_trunc = if title.len() > 32 {
-            &title[..32]
-        } else {
-            title
-        };
+        let title_trunc = crate::output::truncate_chars(&title, 32);
         let group_name = f
             .group_id
             .as_ref()
@@ -338,11 +334,31 @@ async fn cmd_list(args: FeedListArgs, core: &PulseCore, global_json: bool) -> an
     Ok(())
 }
 
+/// Resolve a feed by full ID or a unique prefix (list commands display 8-char
+/// truncated IDs, so every interactive command must accept prefixes).
+pub(crate) async fn resolve_feed(core: &PulseCore, id: &str) -> anyhow::Result<Feed> {
+    if let Ok(feed) = core.get_feed(&id.to_string()).await {
+        return Ok(feed);
+    }
+    let matches: Vec<Feed> = core
+        .get_feeds()
+        .await?
+        .into_iter()
+        .filter(|f| f.id.starts_with(id))
+        .collect();
+    match matches.len() {
+        1 => Ok(matches.into_iter().next().expect("len checked")),
+        0 => anyhow::bail!("feed not found: {id}"),
+        n => anyhow::bail!(
+            "ambiguous feed prefix '{id}' ({n} matches): {}",
+            matches.iter().map(|f| f.id.as_str()).collect::<Vec<_>>().join(", ")
+        ),
+    }
+}
+
 async fn cmd_show(args: FeedShowArgs, core: &PulseCore, global_json: bool) -> anyhow::Result<()> {
     let use_json = args.json || global_json;
-    let feed = core.get_feed(&args.id).await.inspect_err(|_e| {
-        print_error(&format!("feed not found: {}", args.id));
-    })?;
+    let feed = resolve_feed(core, &args.id).await?;
 
     if use_json {
         print_json(&feed);
@@ -390,37 +406,41 @@ async fn cmd_show(args: FeedShowArgs, core: &PulseCore, global_json: bool) -> an
 }
 
 async fn cmd_remove(args: FeedRemoveArgs, core: &PulseCore) -> anyhow::Result<()> {
+    let feed = resolve_feed(core, &args.id).await?;
     if !args.yes && !confirm(&format!("Remove feed {} and all its items?", &args.id)) {
         println!("cancelled");
         return Ok(());
     }
-    core.delete_feed(&args.id).await.map_err(|e| {
+    core.delete_feed(&feed.id).await.map_err(|e| {
         print_error(&format!("failed to remove feed: {e}"));
         e
     })?;
-    println!("removed feed {}", &args.id);
+    println!("removed feed {}", &feed.id);
     Ok(())
 }
 
 async fn cmd_enable(args: FeedIdArgs, core: &PulseCore, enabled: bool) -> anyhow::Result<()> {
-    let mut feed = core.get_feed(&args.id).await.inspect_err(|_e| {
-        print_error(&format!("feed not found: {}", args.id));
-    })?;
+    let mut feed = resolve_feed(core, &args.id).await?;
+    let feed_id = feed.id.clone();
     feed.is_enabled = enabled;
     feed.updated_at = chrono::Utc::now().timestamp();
     core.db.upsert_feed(feed).await?;
+    // A re-enabled feed must get its background sync task back in this session
+    // (the old one stopped when it observed is_enabled = false). Use the
+    // resolved full id — a prefix would spawn a task keyed by the wrong id.
+    if enabled {
+        core.scheduler.refresh_feed(feed_id.clone()).await;
+    }
     println!(
         "feed {} {}",
-        &args.id,
+        &feed_id[..feed_id.len().min(8)],
         if enabled { "enabled" } else { "disabled" }
     );
     Ok(())
 }
 
 async fn cmd_edit(args: FeedEditArgs, core: &PulseCore) -> anyhow::Result<()> {
-    let mut feed = core.get_feed(&args.id).await.inspect_err(|_e| {
-        print_error(&format!("feed not found: {}", args.id));
-    })?;
+    let mut feed = resolve_feed(core, &args.id).await?;
 
     if let Some(url) = args.url {
         feed.url = url;
@@ -459,9 +479,7 @@ async fn cmd_health(
     let use_json = args.json || global_json;
 
     let feeds = if let Some(ref id) = args.id {
-        vec![core.get_feed(id).await.inspect_err(|_e| {
-            print_error(&format!("feed not found: {id}"));
-        })?]
+        vec![resolve_feed(core, id).await?]
     } else {
         core.get_feeds().await?
     };
@@ -496,11 +514,7 @@ async fn cmd_health(
     );
     for h in &health {
         let title = h.title.as_deref().unwrap_or("-");
-        let title_trunc = if title.len() > 28 {
-            &title[..28]
-        } else {
-            title
-        };
+        let title_trunc = crate::output::truncate_chars(&title, 28);
         let rate = h
             .success_rate_pct
             .map(|r| format!("{:.0}%", r))

@@ -47,6 +47,9 @@ pub enum FeedError {
         source: reqwest::Error,
     },
 
+    #[error("Response body from {url} exceeded the {limit} byte limit")]
+    BodyTooLarge { url: String, limit: usize },
+
     #[error("JSON deserialize error for {url}: {source}")]
     Json {
         url: String,
@@ -72,29 +75,9 @@ pub enum SyncError {
 
 #[derive(Debug, Error)]
 pub enum TaggingError {
-    #[error("AI model not loaded")]
-    ModelNotLoaded,
-
     #[error("Storage error during tagging: {0}")]
     Storage(#[from] StorageError),
 
-    #[error("Rule evaluation error: {0}")]
-    Rule(String),
-
-    #[error("ONNX inference error: {0}")]
-    Onnx(String),
-
-    #[error("Model I/O error: {0}")]
-    ModelIo(String),
-
-    #[error("Tokenizer error: {0}")]
-    Tokenizer(String),
-
-    #[error("Image decode error: {0}")]
-    ImageDecode(String),
-
-    #[error("Image network error: {0}")]
-    ImageNetwork(String),
 }
 
 #[derive(Debug, Error)]

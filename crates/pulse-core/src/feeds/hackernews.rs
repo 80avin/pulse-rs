@@ -98,40 +98,71 @@ pub async fn fetch_hn(client: &Client, feed: &Feed) -> Result<HnFetchResult, Fee
     };
 
     if ids_to_fetch.is_empty() {
+        // Advance the cursor monotonically; a dip in the top-list max must not
+        // regress it (which would re-fetch already-seen stories).
+        let new_last_seen = max_id
+            .map(|m| last_seen_id.map_or(m, |l| m.max(l)))
+            .or(last_seen_id);
         return Ok(HnFetchResult {
             items: Vec::new(),
-            last_seen_id: max_id.or(last_seen_id),
-            was_cached: true,
+            last_seen_id: new_last_seen,
+            was_cached: false,
         });
     }
 
     // Compute namespace UUID for this feed
     let ns_uuid = Uuid::new_v5(&Uuid::NAMESPACE_URL, feed.url.as_bytes());
 
-    // Fetch items concurrently (up to CONCURRENT_ITEM_FETCHES at a time)
-    let items: Vec<FeedItem> = stream::iter(ids_to_fetch)
-        .map(|id| {
-            let client = client.clone();
-            let feed_id = feed.id.clone();
-            async move { fetch_hn_item(&client, id, &feed_id, ns_uuid, fetched_at).await }
-        })
-        .buffer_unordered(CONCURRENT_ITEM_FETCHES)
-        .filter_map(|r| async move {
-            match r {
-                Ok(Some(item)) => Some(item),
-                Ok(None) => None, // deleted/dead items
-                Err(e) => {
-                    tracing::warn!("Failed to fetch HN item: {}", e);
-                    None
-                }
+    // Fetch items concurrently (up to CONCURRENT_ITEM_FETCHES at a time).
+    // Track each fetch's outcome so the cursor only advances past stories that
+    // were actually retrieved — a transient failure must not permanently skip
+    // a story.
+    let results: Vec<(u64, Result<Option<FeedItem>, FeedError>)> =
+        stream::iter(ids_to_fetch)
+            .map(|id| {
+                let client = client.clone();
+                let feed_id = feed.id.clone();
+                async move { (id, fetch_hn_item(&client, id, &feed_id, ns_uuid, fetched_at).await) }
+            })
+            .buffer_unordered(CONCURRENT_ITEM_FETCHES)
+            .collect()
+            .await;
+
+    let mut items = Vec::new();
+    // Ids whose fetch succeeded (Ok(Some) or Ok(None) — deleted/dead stories are
+    // permanently gone, so they count as processed). Err ids are NOT advanced past.
+    let mut processed: Vec<u64> = Vec::new();
+    for (id, result) in results {
+        match result {
+            Ok(Some(item)) => {
+                processed.push(id);
+                items.push(item);
             }
-        })
-        .collect()
-        .await;
+            Ok(None) => processed.push(id), // deleted/dead item
+            Err(e) => tracing::warn!(%id, error = %e, "Failed to fetch HN item"),
+        }
+    }
+
+    // Cursor = the highest id in the contiguous run of successfully processed
+    // ids just above the previous cursor. If a middle story fails, the cursor
+    // stays below it so it is retried next sync instead of being skipped forever.
+    processed.sort_unstable();
+    let base = last_seen_id.unwrap_or(0);
+    let mut cursor = base;
+    let mut expected = base.saturating_add(1);
+    for id in processed {
+        if id == expected {
+            cursor = id;
+            expected = id.saturating_add(1);
+        } else if id > expected {
+            break;
+        }
+    }
+    let new_last_seen = cursor.max(last_seen_id.unwrap_or(0));
 
     Ok(HnFetchResult {
         items,
-        last_seen_id: max_id.or(last_seen_id),
+        last_seen_id: Some(new_last_seen),
         was_cached: false,
     })
 }

@@ -1,8 +1,5 @@
 use clap::{Args, Subcommand};
-use pulse_core::{
-    PulseCore,
-    types::{ItemStatePatch, TimelineCursor, TimelineFilter},
-};
+use pulse_core::{PulseCore, types::ItemStatePatch};
 
 use crate::output::{print_error, print_json, relative_time};
 
@@ -153,36 +150,20 @@ pub async fn run(args: ItemArgs, core: &PulseCore, global_json: bool) -> anyhow:
 async fn cmd_show(args: ItemShowArgs, core: &PulseCore, global_json: bool) -> anyhow::Result<()> {
     let use_json = args.json || global_json;
 
-    // Fetch via timeline with a filter by looking up item by ID
-    // Since PulseCore doesn't expose a direct get_item_view, we search via timeline
-    // and match by ID prefix/full match
-    let page = core
-        .get_timeline_page(
-            TimelineFilter {
-                is_read: None,
-                is_saved: None,
-                ..Default::default()
-            },
-            Some(TimelineCursor {
-                published_at: i64::MAX,
-                id: "\u{FFFF}".repeat(40),
-            }),
-            1000,
-        )
-        .await?;
-
-    // Try exact match first, then prefix match
-    let item = page
-        .items
-        .iter()
-        .find(|i| i.id == args.id)
-        .or_else(|| page.items.iter().find(|i| i.id.starts_with(&args.id)));
-
-    let item = match item {
-        Some(i) => i.clone(),
+    // Resolve prefix → full ID, then fetch the joined view directly (no
+    // recency cap — the old code only searched the newest 1000 items).
+    let full_id = match core.resolve_item_id(&args.id).await? {
+        Some(id) => id,
         None => {
             print_error(&format!("item not found: {}", args.id));
             return Ok(());
+        }
+    };
+    let item = match core.get_item_view(&full_id).await {
+        Ok(i) => i,
+        Err(e) => {
+            print_error(&format!("item not found: {}", args.id));
+            return Err(e.into());
         }
     };
 
@@ -279,7 +260,14 @@ async fn cmd_tags(args: ItemTagsArgs, core: &PulseCore, global_json: bool) -> an
     match args.command {
         ItemTagsCommand::Show(a) => {
             let use_json = a.json || global_json;
-            let tags = core.get_item_tags(&a.id).await.map_err(|e| {
+            let full_id = match core.resolve_item_id(&a.id).await? {
+                Some(id) => id,
+                None => {
+                    print_error(&format!("item not found: {}", a.id));
+                    return Ok(());
+                }
+            };
+            let tags = core.get_item_tags(&full_id).await.map_err(|e| {
                 print_error(&format!("failed to get tags: {e}"));
                 e
             })?;
@@ -306,7 +294,14 @@ async fn cmd_tags(args: ItemTagsArgs, core: &PulseCore, global_json: bool) -> an
 }
 
 async fn cmd_open(args: ItemIdArgs, core: &PulseCore) -> anyhow::Result<()> {
-    let item = core.get_item(&args.id).await?;
+    let full_id = match core.resolve_item_id(&args.id).await? {
+        Some(id) => id,
+        None => {
+            print_error(&format!("item not found: {}", args.id));
+            return Ok(());
+        }
+    };
+    let item = core.get_item(&full_id).await?;
     let url = item.url.as_deref().unwrap_or("");
     if url.is_empty() {
         print_error("item has no URL to open");

@@ -44,9 +44,13 @@ pub async fn detect_feed(url: String) -> Result<FeedCandidateDto, String> {
 }
 
 #[tauri::command]
-pub async fn get_pending_share(state: State<'_, AppState>) -> Result<Option<String>, String> {
-    let mut lock = state.pending_share.lock().unwrap();
-    Ok(lock.take())
+pub async fn get_pending_share() -> Result<Option<String>, String> {
+    // Read the JNI-buffered slot (the same store onShareUrl writes to).
+    let pending = crate::PENDING_SHARE
+        .get()
+        .and_then(|m| m.lock().ok())
+        .and_then(|mut g| g.take());
+    Ok(pending)
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -141,52 +145,6 @@ fn save_settings_to_disk(
     std::fs::write(&path, json)?;
     Ok(())
 }
-
-// ── Known downloadable models ──────────────────────────────────────────────────
-
-struct ModelSpec {
-    id: &'static str,
-    name: &'static str,
-    description: &'static str,
-    hf_owner: &'static str,
-    hf_repo: &'static str,
-    files: &'static [(&'static str, &'static str)],
-    size_mb: u32,
-    kind: &'static str,
-}
-
-const KNOWN_MODELS: &[ModelSpec] = &[
-    ModelSpec {
-        id: "clip-vit-b32",
-        name: "CLIP ViT-B/32",
-        description: "~125 MB — zero-shot image classification for Reddit image posts",
-        hf_owner: "Xenova",
-        hf_repo: "clip-vit-base-patch32",
-        files: &[
-            ("onnx/vision_model_q4f16.onnx", "vision_model_q4f16.onnx"),
-            (
-                "onnx/text_model_quantized.onnx",
-                "text_model_quantized.onnx",
-            ),
-            ("tokenizer.json", "tokenizer.json"),
-        ],
-        size_mb: 125,
-        kind: "vision",
-    },
-    ModelSpec {
-        id: "minilm",
-        name: "MiniLM-L6 Semantic Classifier",
-        description: "87 MB — semantic tagging for civic, local-rec, culture, research, clickbait, technical",
-        hf_owner: "Xenova",
-        hf_repo: "all-MiniLM-L6-v2",
-        files: &[
-            ("onnx/model.onnx", "model.onnx"),
-            ("tokenizer.json", "tokenizer.json"),
-        ],
-        size_mb: 87,
-        kind: "miniml",
-    },
-];
 
 // ── Source commands ────────────────────────────────────────────────────────────
 
@@ -287,7 +245,11 @@ pub async fn update_source(
     core.db
         .upsert_feed(updated)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // URL/kind edits must take effect immediately: kick the feed's sync task
+    // (respawns it if it stopped, otherwise triggers an immediate refresh).
+    core.scheduler.refresh_feed(id.clone()).await;
+    Ok(())
 }
 
 // ── Item commands ──────────────────────────────────────────────────────────────
@@ -381,10 +343,21 @@ pub async fn toggle_saved(
     state: State<'_, AppState>,
     id: String,
     saved: bool,
+) -> Result<(), String> {
+    let core = state.core().await?;
+    core.toggle_saved(&id, saved)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_item_note(
+    state: State<'_, AppState>,
+    id: String,
     note: Option<String>,
 ) -> Result<(), String> {
     let core = state.core().await?;
-    core.toggle_saved(&id, saved, note)
+    core.set_item_note(&id, note)
         .await
         .map_err(|e| e.to_string())
 }
@@ -606,286 +579,16 @@ pub async fn get_db_stats(state: State<'_, AppState>) -> Result<DbStatsDto, Stri
     })
 }
 
-// ── AI management commands ─────────────────────────────────────────────────────
+// ── Tag commands ────────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn get_ai_status(state: State<'_, AppState>) -> Result<AiStatusDto, String> {
+pub async fn get_tag_stats(state: State<'_, AppState>) -> Result<TagStatsDto, String> {
     let core = state.core().await?;
-    let fasttext_loaded = core.fasttext_loaded();
-    let miniml_loaded = core.miniml_loaded();
-    let vision_loaded = core.vision_loaded();
-    let vision_model_name = core.active_vision_model_name();
-    let fasttext_model_name = core.active_fasttext_model_name();
-    let miniml_model_name = core.active_miniml_model_name();
-    let tagging_mode = match (fasttext_loaded, miniml_loaded, vision_loaded) {
-        (true, true, true) => "fasttext+miniml+vision",
-        (true, true, false) => "fasttext+miniml",
-        (true, false, true) => "fasttext+vision",
-        (true, false, false) => "fasttext",
-        (false, _, true) => "vision",
-        _ => "none",
-    }
-    .to_string();
-    Ok(AiStatusDto {
-        vision_loaded,
-        fasttext_loaded,
-        miniml_loaded,
-        vision_model_name,
-        fasttext_model_name,
-        miniml_model_name,
-        tagging_mode,
-    })
-}
-
-#[tauri::command]
-pub async fn get_ai_stats(
-    state: State<'_, AppState>,
-    signal_threshold: f64,
-) -> Result<AiStatsDto, String> {
-    let core = state.core().await?;
-    let stats = core
-        .get_ai_stats(signal_threshold)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(AiStatsDto {
+    let stats = core.get_tag_stats().await.map_err(|e| e.to_string())?;
+    Ok(TagStatsDto {
         tagged_count: stats.tagged_count,
-        avg_score: stats.avg_score,
         tag_counts: stats.tag_counts,
-        high_signal: stats.high_signal.iter().map(adapt_item).collect(),
     })
-}
-
-#[tauri::command]
-pub async fn list_models(state: State<'_, AppState>) -> Result<Vec<ModelInfoDto>, String> {
-    let core = state.core().await?;
-    let active_vision = core.active_vision_model_name();
-    let active_fasttext = core.active_fasttext_model_name();
-    let active_miniml = core.active_miniml_model_name();
-
-    Ok(KNOWN_MODELS
-        .iter()
-        .map(|spec| {
-            let model_dir = core.config.models_dir().join(spec.id);
-            let downloaded = match spec.kind {
-                "vision" => {
-                    model_dir.join("vision_model_q4f16.onnx").exists()
-                        || model_dir.join("vision_model_quantized.onnx").exists()
-                        || model_dir.join("vision_model.onnx").exists()
-                        || model_dir.join("model.onnx").exists()
-                }
-                "miniml" => model_dir.join("model.onnx").exists(),
-                "fasttext" => model_dir.join("fasttext.pftm").exists(),
-                _ => false,
-            };
-            let active = match spec.kind {
-                "vision" => active_vision.as_deref() == Some(spec.id),
-                "fasttext" => active_fasttext.as_deref() == Some(spec.id),
-                "miniml" => active_miniml.as_deref() == Some(spec.id),
-                _ => false,
-            };
-            ModelInfoDto {
-                id: spec.id.to_string(),
-                name: spec.name.to_string(),
-                description: spec.description.to_string(),
-                size_mb: spec.size_mb,
-                downloaded,
-                active,
-                kind: spec.kind.to_string(),
-            }
-        })
-        .collect())
-}
-
-#[tauri::command]
-pub async fn download_model(
-    state: State<'_, AppState>,
-    app: tauri::AppHandle,
-    model_id: String,
-) -> Result<(), String> {
-    let core = state.core().await?;
-    let spec = KNOWN_MODELS
-        .iter()
-        .find(|m| m.id == model_id)
-        .ok_or_else(|| format!("unknown model '{}'", model_id))?;
-
-    let model_dir = core.config.models_dir().join(spec.id);
-    std::fs::create_dir_all(&model_dir).map_err(|e| e.to_string())?;
-
-    let client = reqwest::Client::builder()
-        .user_agent("Pulse/1.0 model-downloader")
-        .timeout(std::time::Duration::from_secs(600))
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    for (hf_path, local_name) in spec.files {
-        let url = format!(
-            "https://huggingface.co/{}/{}/resolve/main/{}",
-            spec.hf_owner, spec.hf_repo, hf_path
-        );
-        let dest = model_dir.join(local_name);
-
-        let resp = client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("download error for {}: {}", local_name, e))?;
-
-        if !resp.status().is_success() {
-            return Err(format!("HTTP {} for {}", resp.status(), local_name));
-        }
-
-        let total = resp.content_length().unwrap_or(0);
-        let mut bytes_done: u64 = 0;
-        let mut buf: Vec<u8> = if total > 0 {
-            Vec::with_capacity(total as usize)
-        } else {
-            Vec::new()
-        };
-
-        use futures_util::StreamExt;
-        let mut stream = resp.bytes_stream();
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|e| format!("stream error for {}: {}", local_name, e))?;
-            buf.extend_from_slice(&chunk);
-            bytes_done += chunk.len() as u64;
-            let _ = app.emit(
-                "ai://download-progress",
-                DownloadProgressEvent {
-                    model_id: model_id.clone(),
-                    file: local_name.to_string(),
-                    bytes_done,
-                    bytes_total: total,
-                    done: false,
-                },
-            );
-        }
-
-        std::fs::write(&dest, &buf).map_err(|e| e.to_string())?;
-    }
-
-    // Emit done before activation so the UI unblocks even if activation fails
-    let _ = app.emit(
-        "ai://download-progress",
-        DownloadProgressEvent {
-            model_id: model_id.clone(),
-            file: "done".into(),
-            bytes_done: 0,
-            bytes_total: 0,
-            done: true,
-        },
-    );
-
-    // Activate + hot-reload the model into memory (best-effort — files are on disk regardless)
-    if spec.kind == "vision" {
-        // Delete stale label_embeddings.bin so descriptions are always fresh after download.
-        let stale = model_dir.join("label_embeddings.bin");
-        if stale.exists() {
-            let _ = std::fs::remove_file(&stale);
-        }
-        if let Err(e) = core.set_active_vision_model(spec.id) {
-            tracing::error!(model_id = %model_id, error = %e, "vision model activation failed after download");
-        } else if let Err(e) = core.reload_vision_tagger() {
-            tracing::error!(model_id = %model_id, error = %e, "vision model hot-reload failed after activation");
-        }
-    } else if spec.kind == "miniml" {
-        // mlp_head.pmlp + miniml_thresholds.json are extracted by lib.rs on startup;
-        // model.onnx + tokenizer.json were just downloaded above — now activate.
-        if let Err(e) = core.set_active_miniml_model(spec.id) {
-            tracing::error!(model_id = %model_id, error = %e, "miniml model activation failed after download");
-        } else if let Err(e) = core.reload_miniml_tagger() {
-            tracing::error!(model_id = %model_id, error = %e, "miniml model hot-reload failed after activation");
-        }
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn delete_model(state: State<'_, AppState>, model_id: String) -> Result<(), String> {
-    let core = state.core().await?;
-    let spec = KNOWN_MODELS.iter().find(|m| m.id == model_id);
-    match spec.map(|s| s.kind) {
-        Some("vision") => core
-            .remove_vision_model(&model_id)
-            .map_err(|e| e.to_string()),
-        Some("miniml") => core
-            .remove_miniml_model(&model_id)
-            .map_err(|e| e.to_string()),
-        // NLI and unknown — fall back to the generic remove_model path
-        _ => Err(format!("unknown model kind for deletion: '{}'", model_id)),
-    }
-}
-
-/// Switch to an already-downloaded model without re-downloading it.
-#[tauri::command]
-pub async fn activate_model(state: State<'_, AppState>, model_id: String) -> Result<(), String> {
-    let core = state.core().await?;
-    let spec = KNOWN_MODELS
-        .iter()
-        .find(|m| m.id == model_id)
-        .ok_or_else(|| format!("unknown model '{}'", model_id))?;
-
-    match spec.kind {
-        "vision" => {
-            core.set_active_vision_model(&model_id)
-                .map_err(|e| e.to_string())?;
-            core.reload_vision_tagger().map_err(|e| e.to_string())?;
-        }
-        "fasttext" => {
-            core.set_active_fasttext_model(&model_id)
-                .map_err(|e| e.to_string())?;
-            core.reload_fasttext_tagger().map_err(|e| e.to_string())?;
-        }
-        "miniml" => {
-            core.set_active_miniml_model(&model_id)
-                .map_err(|e| e.to_string())?;
-            core.reload_miniml_tagger().map_err(|e| e.to_string())?;
-        }
-        _ => return Err(format!("unknown model kind '{}'", spec.kind)),
-    }
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn retag_all(state: State<'_, AppState>, app: tauri::AppHandle) -> Result<i64, String> {
-    let settings = load_settings(&state.data_dir);
-
-    // If the user has disabled AI tagging, skip entirely.
-    if !settings.ai_tagging {
-        return Ok(0);
-    }
-
-    let core = state.core().await?;
-    let app2 = app.clone();
-    let progress = move |tagged: usize, total: usize| {
-        let _ = app2.emit(
-            "ai://tagging-progress",
-            TaggingProgressEvent {
-                tagged,
-                total,
-                done: false,
-            },
-        );
-    };
-    let (items, tags) = core
-        .run_tagger_direct(None, true, Some(&progress))
-        .await
-        .map_err(|e| e.to_string())?;
-    let _ = app.emit(
-        "ai://tagging-progress",
-        TaggingProgressEvent {
-            tagged: items,
-            total: items,
-            done: true,
-        },
-    );
-
-    let threshold = settings.confidence_threshold as f32;
-    if threshold > 0.15 {
-        let _ = core.delete_tags_below_confidence(threshold).await;
-    }
-
-    Ok(tags as i64)
 }
 
 // ── Diagnostics commands ───────────────────────────────────────────────────────

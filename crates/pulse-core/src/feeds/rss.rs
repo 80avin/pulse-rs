@@ -75,13 +75,10 @@ pub async fn fetch_rss(client: &Client, feed: &Feed) -> Result<RssFetchResult, F
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
-    let bytes = response.bytes().await.map_err(|e| FeedError::Network {
-        url: url.clone(),
-        source: e,
-    })?;
+    let bytes = crate::feeds::read_body_capped(response, 10 * 1024 * 1024).await?;
 
     // Parse with feed-rs
-    let parsed = feed_rs::parser::parse(bytes.as_ref()).map_err(|e| FeedError::Parse {
+    let parsed = feed_rs::parser::parse(bytes.as_slice()).map_err(|e| FeedError::Parse {
         url: url.clone(),
         source: Box::new(e),
     })?;
@@ -123,15 +120,31 @@ fn normalize_rss_entry(
     ns_uuid: Uuid,
     fetched_at: i64,
 ) -> FeedItem {
-    // source_guid: use entry.id, or hash the link URL
-    let source_guid = if entry.id.is_empty() {
-        entry
-            .links
-            .first()
-            .map(|l| format!("sha256:{:x}", md5_hash(&l.href)))
-            .unwrap_or_else(|| format!("sha256:{:x}", md5_hash(&entry.id)))
-    } else {
+    // source_guid: prefer entry.id; else a stable hash of the link URL; else a
+    // stable hash of the item's own content, so distinct id-less, link-less
+    // entries never collapse to a single item.
+    let source_guid = if !entry.id.is_empty() {
         entry.id.clone()
+    } else if let Some(link) = entry.links.first() {
+        // Keep the historical scheme for linked entries so existing item IDs
+        // (and read/saved state) survive upgrades. The `sha256:` label is a
+        // legacy misnomer for SipHash, kept for backward compatibility.
+        format!("sha256:{:x}", md5_hash(&link.href))
+    } else {
+        // No id and no link: previously every such entry hashed the empty
+        // string and collapsed into a single item. Hash the item's own content
+        // so distinct entries stay distinct.
+        let title = entry
+            .title
+            .as_ref()
+            .map(|t| collapse_whitespace(&strip_html(&t.content)))
+            .unwrap_or_default();
+        let published = entry
+            .published
+            .or(entry.updated)
+            .map(|dt| dt.timestamp())
+            .unwrap_or(fetched_at);
+        format!("sha256:{:x}:{}", md5_hash(&format!("{title}:{published}")), published)
     };
 
     let item_id = Uuid::new_v5(&ns_uuid, source_guid.as_bytes()).to_string();
@@ -189,10 +202,79 @@ fn normalize_rss_entry(
     }
 }
 
-/// Simple hash for fallback GUID generation
+/// SipHash-based fallback GUID hash. Legacy label says "md5"/"sha256"; the
+/// algorithm is SipHash via `DefaultHasher` (stable in practice, kept to
+/// preserve existing item IDs across upgrades).
 fn md5_hash(s: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     s.hash(&mut hasher);
     hasher.finish()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use feed_rs::model::{Entry, Link, Text};
+    use uuid::Uuid;
+
+    fn entry() -> Entry {
+        Entry::default()
+    }
+
+    fn text(s: &str) -> Text {
+        Text {
+            content_type: "text/plain".parse().unwrap(),
+            src: None,
+            content: s.into(),
+        }
+    }
+
+    fn link(href: &str) -> Link {
+        Link { href: href.into(), rel: None, media_type: None, href_lang: None, title: None, length: None }
+    }
+
+    fn guid(e: &Entry) -> String {
+        normalize_rss_entry(e.clone(), "feed", "https://x", Uuid::new_v4(), 1_700_000_000).source_guid
+    }
+
+    #[test]
+    fn empty_id_and_empty_link_entries_do_not_collapse() {
+        // Two distinct entries with neither id nor link previously hashed the
+        // empty string and collapsed into ONE item. They must stay distinct.
+        let mut a = entry();
+        a.title = Some(text("First post"));
+        let mut b = entry();
+        b.title = Some(text("Second post"));
+        assert_ne!(guid(&a), guid(&b), "distinct items collapsed to one guid");
+    }
+
+    #[test]
+    fn linked_guid_is_stable_and_unique() {
+        let mut a = entry();
+        a.links = vec![link("https://example.com/1")];
+        let mut b = entry();
+        b.links = vec![link("https://example.com/1")];
+        assert_eq!(guid(&a), guid(&b));
+        let mut c = entry();
+        c.links = vec![link("https://example.com/2")];
+        assert_ne!(guid(&a), guid(&c));
+    }
+
+    #[test]
+    fn real_entry_id_is_used_verbatim() {
+        let mut a = entry();
+        a.id = "post-1".into();
+        assert_eq!(guid(&a), "post-1");
+    }
+
+    #[test]
+    fn legacy_link_guid_scheme_is_preserved() {
+        // The old scheme hashed only the href; changing it would re-ingest every
+        // id-less linked item as a new row on upgrade. Verify it's unchanged.
+        let mut a = entry();
+        a.links = vec![link("https://example.com/stable")];
+        assert_eq!(guid(&a), format!("sha256:{:x}", md5_hash("https://example.com/stable")));
+    }
 }

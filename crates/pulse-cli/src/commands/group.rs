@@ -169,9 +169,7 @@ async fn cmd_add_feed(args: GroupAddFeedArgs, core: &PulseCore) -> anyhow::Resul
         }
     };
 
-    let mut feed = core.get_feed(&args.feed_id).await.inspect_err(|_e| {
-        print_error(&format!("feed not found: {}", args.feed_id));
-    })?;
+    let mut feed = crate::commands::feed::resolve_feed(core, &args.feed_id).await?;
 
     feed.group_id = Some(group.id.clone());
     feed.updated_at = chrono::Utc::now().timestamp();

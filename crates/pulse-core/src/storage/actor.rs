@@ -100,11 +100,11 @@ pub enum DbCommand {
         reply: oneshot::Sender<DbResult<()>>,
     },
 
-    /// Delete all AI tags with confidence below the given threshold (global post-filter).
-    DeleteTagsBelowConfidence {
-        threshold: f32,
-        reply: oneshot::Sender<DbResult<()>>,
-    },
+
+    /// VACUUM the database and rebuild the FTS index afterwards.
+    /// VACUUM can renumber implicit rowids, which would silently corrupt the
+    /// external-content FTS mapping, so the rebuild is mandatory.
+    Vacuum { reply: oneshot::Sender<DbResult<()>> },
 }
 
 /// The DB writer actor task. Uses a single-connection pool to serialize writes.
@@ -218,15 +218,9 @@ pub async fn db_writer_task(mut rx: mpsc::Receiver<DbCommand>, pool: SqlitePool)
                 let _ = reply.send(result);
             }
 
-            DbCommand::DeleteTagsBelowConfidence { threshold, reply } => {
-                let r = sqlx::query("DELETE FROM ai_tags WHERE confidence < ?")
-                    .bind(threshold as f64)
-                    .execute(&pool)
-                    .await;
-                if let Err(ref e) = r {
-                    tracing::warn!("delete_tags_below_confidence failed: {}", e);
-                }
-                let _ = reply.send(r.map(|_| ()).map_err(StorageError::Sqlite));
+            DbCommand::Vacuum { reply } => {
+                let result = vacuum_db(&pool).await;
+                let _ = reply.send(result);
             }
         }
     }
@@ -294,7 +288,7 @@ async fn upsert_items(pool: &SqlitePool, items: &[FeedItem]) -> DbResult<usize> 
 
             if let Some(rowid) = rowid {
                 sqlx::query(
-                    "INSERT INTO feed_items_fts(rowid, item_id, title, body_text, author)
+                    "INSERT INTO feed_items_fts(rowid, id, title, body_text, author)
                      VALUES (?, ?, ?, ?, ?)",
                 )
                 .bind(rowid)
@@ -319,6 +313,18 @@ async fn update_item_state(
     patch: &ItemStatePatch,
 ) -> DbResult<()> {
     let now = chrono::Utc::now().timestamp();
+
+    // Ensure a state row exists (created lazily for items synced before this fix);
+    // otherwise the UPDATEs below would silently no-op.
+    sqlx::query(
+        "INSERT INTO item_states (item_id, updated_at) VALUES (?, ?)
+         ON CONFLICT(item_id) DO NOTHING",
+    )
+    .bind(item_id)
+    .bind(now)
+    .execute(pool)
+    .await
+    .map_err(StorageError::Sqlite)?;
 
     if let Some(r) = patch.is_read {
         sqlx::query(
@@ -381,6 +387,23 @@ async fn update_item_state(
     Ok(())
 }
 
+async fn vacuum_db(pool: &SqlitePool) -> DbResult<()> {
+    // Must run outside a transaction; the writer connection is a single,
+    // otherwise-idle connection at this point.
+    sqlx::raw_sql("VACUUM")
+        .execute(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
+    // VACUUM can renumber implicit rowids, which would silently break the
+    // external-content FTS mapping (indexed by rowid). Rebuild the index so it
+    // points at the correct rows again.
+    sqlx::raw_sql("INSERT INTO feed_items_fts(feed_items_fts) VALUES('rebuild')")
+        .execute(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
+    Ok(())
+}
+
 async fn upsert_feed(pool: &SqlitePool, feed: &Feed) -> DbResult<()> {
     let source_config = serde_json::to_string(&feed.source_config)?;
 
@@ -392,6 +415,8 @@ async fn upsert_feed(pool: &SqlitePool, feed: &Feed) -> DbResult<()> {
           avg_latency_ms, next_fetch_at, source_config, language, hue, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
+             url = excluded.url,
+             feed_type = excluded.feed_type,
              title = excluded.title,
              description = excluded.description,
              site_url = excluded.site_url,
@@ -403,6 +428,7 @@ async fn upsert_feed(pool: &SqlitePool, feed: &Feed) -> DbResult<()> {
              last_modified = excluded.last_modified,
              language = excluded.language,
              hue = excluded.hue,
+             source_config = excluded.source_config,
              next_fetch_at = excluded.next_fetch_at,
              updated_at = excluded.updated_at",
     )
@@ -886,10 +912,9 @@ impl DbHandle {
             .await
     }
 
-    /// Delete all AI tags with confidence below the given threshold.
-    pub async fn delete_tags_below_confidence(&self, threshold: f32) -> DbResult<()> {
-        self.send(|reply| DbCommand::DeleteTagsBelowConfidence { threshold, reply })
-            .await
+    /// VACUUM the database (writer connection) and rebuild the FTS index.
+    pub async fn vacuum(&self) -> DbResult<()> {
+        self.send(|reply| DbCommand::Vacuum { reply }).await
     }
 
     /// Get reference to reader pool for read-only queries
@@ -904,5 +929,291 @@ impl DbHandle {
         Fut: std::future::Future<Output = DbResult<T>>,
     {
         f(self.reader_pool.clone()).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::PulseConfig;
+    use crate::storage::connection::open_writer_pool;
+    use crate::storage::migrations::run_migrations;
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    async fn test_pool() -> SqlitePool {
+        let dir = std::env::temp_dir().join(format!("pulse-core-actor-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let config = PulseConfig::default().with_data_dir(dir.clone());
+        let pool = open_writer_pool(&config.db_path, &config).await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    async fn seed_item(pool: &SqlitePool, item_id: &str, with_state: bool) {
+        let now = Utc::now().timestamp();
+        sqlx::query(
+            "INSERT INTO feeds (id, url, feed_type, title, created_at, updated_at)
+             VALUES ('f1', 'https://example.com/rss', 'rss', 'test', ?, ?)",
+        )
+        .bind(now)
+        .bind(now)
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO feed_items (id, feed_id, source_guid, title, published_at, fetched_at)
+             VALUES (?, 'f1', 'g1', 'title', ?, ?)",
+        )
+        .bind(item_id)
+        .bind(now)
+        .bind(now)
+        .execute(pool)
+        .await
+        .unwrap();
+        if with_state {
+            sqlx::query("INSERT INTO item_states (item_id, updated_at) VALUES (?, ?)")
+                .bind(item_id)
+                .bind(now)
+                .execute(pool)
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn note_of(pool: &SqlitePool, item_id: &str) -> Option<String> {
+        sqlx::query_scalar::<_, Option<String>>(
+            "SELECT note FROM item_states WHERE item_id = ?",
+        )
+        .bind(item_id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn note_is_set_and_cleared() {
+        let pool = test_pool().await;
+        seed_item(&pool, "i1", true).await;
+
+        update_item_state(
+            &pool,
+            &"i1".into(),
+            &ItemStatePatch { note: Some(Some("keep me".into())), ..Default::default() },
+        )
+        .await
+        .unwrap();
+        assert_eq!(note_of(&pool, "i1").await.as_deref(), Some("keep me"));
+
+        // Clearing: note = None clears the column (must not be a silent no-op).
+        update_item_state(
+            &pool,
+            &"i1".into(),
+            &ItemStatePatch { note: Some(None), ..Default::default() },
+        )
+        .await
+        .unwrap();
+        assert_eq!(note_of(&pool, "i1").await, None);
+    }
+
+    #[tokio::test]
+    async fn saved_toggle_preserves_note() {
+        let pool = test_pool().await;
+        seed_item(&pool, "i1", true).await;
+        update_item_state(
+            &pool,
+            &"i1".into(),
+            &ItemStatePatch { note: Some(Some("keep me".into())), ..Default::default() },
+        )
+        .await
+        .unwrap();
+
+        // Mirrors PulseCore::toggle_saved: is_saved set, note untouched.
+        update_item_state(
+            &pool,
+            &"i1".into(),
+            &ItemStatePatch { is_saved: Some(true), note: None, ..Default::default() },
+        )
+        .await
+        .unwrap();
+        assert_eq!(note_of(&pool, "i1").await.as_deref(), Some("keep me"));
+
+        update_item_state(
+            &pool,
+            &"i1".into(),
+            &ItemStatePatch { is_saved: Some(false), note: None, ..Default::default() },
+        )
+        .await
+        .unwrap();
+        assert_eq!(note_of(&pool, "i1").await.as_deref(), Some("keep me"));
+    }
+
+    #[tokio::test]
+    async fn missing_state_row_is_created_not_silently_dropped() {
+        let pool = test_pool().await;
+        seed_item(&pool, "i1", false).await;
+
+        update_item_state(
+            &pool,
+            &"i1".into(),
+            &ItemStatePatch { is_read: Some(true), ..Default::default() },
+        )
+        .await
+        .unwrap();
+
+        let read: i64 =
+            sqlx::query_scalar("SELECT is_read FROM item_states WHERE item_id = ?")
+                .bind("i1")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(read, 1);
+    }
+}
+
+#[cfg(test)]
+mod upsert_feed_tests {
+    use super::*;
+    use crate::config::PulseConfig;
+    use crate::storage::connection::open_writer_pool;
+    use crate::storage::migrations::run_migrations;
+    use chrono::Utc;
+    use sqlx::Row;
+    use uuid::Uuid;
+
+    fn feed(id: &str, url: &str) -> Feed {
+        let now = Utc::now().timestamp();
+        Feed {
+            id: id.into(),
+            url: url.into(),
+            feed_type: crate::types::FeedType::Rss,
+            title: Some("t".into()),
+            description: None,
+            site_url: None,
+            icon_url: None,
+            group_id: None,
+            poll_interval_secs: 3600,
+            is_enabled: true,
+            etag: None,
+            last_modified: None,
+            last_fetched_at: None,
+            last_success_at: None,
+            last_item_at: None,
+            failure_streak: 0,
+            total_fetches: 0,
+            total_failures: 0,
+            avg_latency_ms: None,
+            next_fetch_at: None,
+            source_config: serde_json::json!({}),
+            language: None,
+            hue: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[tokio::test]
+    async fn upsert_feed_persists_url_and_feed_type_edits() {
+        let dir = std::env::temp_dir().join(format!("pulse-core-feed-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let config = PulseConfig::default().with_data_dir(dir);
+        let pool = open_writer_pool(&config.db_path, &config).await.unwrap();
+        run_migrations(&pool).await.unwrap();
+
+        upsert_feed(&pool, &feed("f1", "https://example.com/old")).await.unwrap();
+
+        let mut edited = feed("f1", "https://example.com/new");
+        edited.feed_type = crate::types::FeedType::Hn;
+        edited.source_config = serde_json::json!({ "last_seen_id": 42 });
+        upsert_feed(&pool, &edited).await.unwrap();
+
+        let row = sqlx::query("SELECT url, feed_type, source_config FROM feeds WHERE id = 'f1'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let url: String = row.get("url");
+        let feed_type: String = row.get("feed_type");
+        let source_config: String = row.get("source_config");
+        assert_eq!(url, "https://example.com/new");
+        assert_eq!(feed_type, "hn");
+        assert_eq!(source_config, r#"{"last_seen_id":42}"#);
+    }
+}
+
+
+#[cfg(test)]
+mod vacuum_tests {
+    use super::*;
+    use crate::config::PulseConfig;
+    use crate::storage::connection::open_writer_pool;
+    use crate::storage::migrations::run_migrations;
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    async fn test_pool() -> SqlitePool {
+        let dir = std::env::temp_dir().join(format!("pulse-core-vac-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let config = PulseConfig::default().with_data_dir(dir);
+        let pool = open_writer_pool(&config.db_path, &config).await.unwrap();
+        run_migrations(&pool).await.unwrap();
+        pool
+    }
+
+    async fn seed_item(pool: &SqlitePool, item_id: &str, title: &str) {
+        let now = Utc::now().timestamp();
+        sqlx::query(
+            "INSERT INTO feeds (id, url, feed_type, title, created_at, updated_at)
+             VALUES ('f1', 'https://example.com/rss', 'rss', 'test', ?, ?)",
+        )
+        .bind(now)
+        .bind(now)
+        .execute(pool)
+        .await
+        .unwrap();
+        let rowid: i64 = sqlx::query(
+            "INSERT INTO feed_items (id, feed_id, source_guid, title, published_at, fetched_at, body_text)
+             VALUES (?, 'f1', ?, ?, ?, ?, ?)",
+        )
+        .bind(item_id)
+        .bind(item_id)
+        .bind(title)
+        .bind(now)
+        .bind(now)
+        .bind(title)
+        .execute(pool)
+        .await
+        .unwrap()
+        .last_insert_rowid();
+        sqlx::query(
+            "INSERT INTO feed_items_fts(rowid, id, title, body_text, author)
+             VALUES (?, ?, ?, ?, '')",
+        )
+        .bind(rowid)
+        .bind(item_id)
+        .bind(title)
+        .bind(title)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn vacuum_preserves_fts_search() {
+        let pool = test_pool().await;
+        seed_item(&pool, "i1", "Rust borrow checker deep dive").await;
+
+        vacuum_db(&pool).await.unwrap();
+
+        // Search must still hit the item after VACUUM + FTS rebuild.
+        let found: Option<String> = sqlx::query_scalar(
+            "SELECT fi.id FROM feed_items_fts
+             JOIN feed_items fi ON fi.rowid = feed_items_fts.rowid
+             WHERE feed_items_fts MATCH ?",
+        )
+        .bind("borrow")
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        assert_eq!(found.as_deref(), Some("i1"));
     }
 }

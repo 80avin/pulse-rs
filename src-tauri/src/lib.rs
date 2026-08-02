@@ -32,14 +32,6 @@ fn read_verbose_setting(data_dir: &std::path::Path) -> bool {
         .unwrap_or(false)
 }
 
-fn read_ai_enabled_setting(data_dir: &std::path::Path) -> bool {
-    std::fs::read_to_string(data_dir.join("tauri_settings.json"))
-        .ok()
-        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
-        .and_then(|v| v["aiTagging"].as_bool())
-        .unwrap_or(true) // default on: load models unless user explicitly disabled
-}
-
 /// Set up the tracing subscriber for the lifetime of the app.
 ///
 /// Returns:
@@ -89,7 +81,10 @@ fn init_tracing(
 }
 
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
-static PENDING_SHARE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+pub(crate) static PENDING_SHARE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+
+/// Process start instant — used to gate cold-start share buffering (below).
+static BOOT_TIME: OnceLock<std::time::Instant> = OnceLock::new();
 #[cfg(target_os = "android")]
 static ANDROID_VM: OnceLock<jni::JavaVM> = OnceLock::new();
 
@@ -107,7 +102,6 @@ pub struct AppState {
     init_rx: tokio::sync::watch::Receiver<InitState>,
     /// Available immediately — before PulseCore is ready. Used by diagnostic commands.
     pub data_dir: std::path::PathBuf,
-    pub pending_share: Arc<Mutex<Option<String>>>,
     /// Live handle to change the tracing filter without restarting.
     pub log_filter: LogFilterHandle,
     /// Keeps the background log-flush thread alive for the app lifetime.
@@ -135,62 +129,10 @@ impl AppState {
     }
 }
 
-// FastText model embedded at compile time (9.6 MB + tiny thresholds file).
-// Extracted to data_dir on first run; re-extracted on version bump.
-const BUNDLED_FASTTEXT_PFTM: &[u8] = include_bytes!("../bundled/fasttext-v2/fasttext.pftm");
-const BUNDLED_FASTTEXT_THRESHOLDS: &[u8] =
-    include_bytes!("../bundled/fasttext-v2/fasttext_thresholds.json");
-// Bump this string whenever the bundled fasttext model or thresholds change.
-// Users will get the updated model extracted on the next app launch.
-const BUNDLED_FASTTEXT_VERSION: &str = "v2-20250519b";
-
-// MiniLM MLP head embedded (~208 KB). The ONNX backbone (87 MB) is downloaded
-// separately from HuggingFace; these small files accompany it.
-const BUNDLED_MINIML_MLP: &[u8] = include_bytes!("../bundled/minilm/mlp_head.pmlp");
-const BUNDLED_MINIML_THRESHOLDS: &[u8] = include_bytes!("../bundled/minilm/miniml_thresholds.json");
-
-/// Extract bundled model bytes to data_dir.
-/// FastText is re-extracted whenever BUNDLED_FASTTEXT_VERSION changes so that
-/// app updates deliver new vocabulary and thresholds to existing installations.
-/// MiniLM supporting files are always overwritten so MLP head improvements land
-/// automatically without requiring the user to re-download the ONNX backbone.
-fn extract_bundled_models(data_dir: &std::path::Path) {
-    // FastText — fully bundled, always available without any download.
-    let ft_dir = data_dir.join("models").join("fasttext-v2");
-    let version_file = ft_dir.join("version");
-    let installed_version = std::fs::read_to_string(&version_file).unwrap_or_default();
-    if installed_version.trim() != BUNDLED_FASTTEXT_VERSION
-        && std::fs::create_dir_all(&ft_dir).is_ok()
-    {
-        let _ = std::fs::write(ft_dir.join("fasttext.pftm"), BUNDLED_FASTTEXT_PFTM);
-        let _ = std::fs::write(
-            ft_dir.join("fasttext_thresholds.json"),
-            BUNDLED_FASTTEXT_THRESHOLDS,
-        );
-        let _ = std::fs::write(&version_file, BUNDLED_FASTTEXT_VERSION);
-    }
-    // Write the active-model pointer if not already configured.
-    let ft_ptr = data_dir.join("active_fasttext_model");
-    if !ft_ptr.exists() {
-        let _ = std::fs::write(&ft_ptr, "fasttext-v2");
-    }
-
-    // MiniLM MLP head — bundled; model.onnx must be downloaded by the user.
-    // Always written so an app update delivers an improved MLP head without
-    // requiring the user to re-download the ONNX backbone.
-    let ml_dir = data_dir.join("models").join("minilm");
-    if std::fs::create_dir_all(&ml_dir).is_ok() {
-        let _ = std::fs::write(ml_dir.join("mlp_head.pmlp"), BUNDLED_MINIML_MLP);
-        let _ = std::fs::write(
-            ml_dir.join("miniml_thresholds.json"),
-            BUNDLED_MINIML_THRESHOLDS,
-        );
-    }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let _ = PENDING_SHARE.set(Mutex::new(None));
+    let _ = BOOT_TIME.set(std::time::Instant::now());
 
     let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
 
@@ -221,29 +163,20 @@ pub fn run() {
                 "coldstart: setup: data_dir ready"
             );
 
-            // Extract FastText + MiniLM MLP head to data_dir on first run.
-            extract_bundled_models(&data_dir);
             tracing::info!(
                 elapsed_ms = t_setup.elapsed().as_millis(),
-                "coldstart: setup: extract_bundled_models done"
+                "coldstart: setup: data_dir ready"
             );
 
             // Build config before moving data_dir into AppState.
-            // Read ai_enabled from persisted settings so model loading is skipped at startup
-            // when the user has disabled AI tagging — saves significant memory on low-end devices.
-            let ai_enabled = read_ai_enabled_setting(&data_dir);
-            let config = PulseConfig::default_config()
-                .with_data_dir(data_dir.clone())
-                .with_ai_enabled(ai_enabled);
+            let config = PulseConfig::default_config().with_data_dir(data_dir.clone());
 
             // Manage AppState immediately so Tauri can start dispatching queued IPC.
             // Commands await `state.core()` which blocks on init_rx until PulseCore is ready.
             let (init_tx, init_rx) = tokio::sync::watch::channel(InitState::Pending);
-            let pending_share = Arc::new(Mutex::new(None));
             app.manage(AppState {
                 init_rx,
                 data_dir,
-                pending_share,
                 log_filter,
                 _log_guard: log_guard,
             });
@@ -313,6 +246,7 @@ pub fn run() {
             commands::mark_items_read,
             commands::mark_source_read,
             commands::toggle_saved,
+            commands::set_item_note,
             commands::hide_item,
             commands::get_groups,
             commands::add_group,
@@ -325,13 +259,7 @@ pub fn run() {
             commands::get_db_stats,
             commands::search_items,
             // AI management
-            commands::get_ai_status,
-            commands::get_ai_stats,
-            commands::list_models,
-            commands::download_model,
-            commands::delete_model,
-            commands::activate_model,
-            commands::retag_all,
+                                                                                    commands::get_tag_stats,
             // Share intent
             commands::detect_feed,
             commands::get_pending_share,
@@ -390,17 +318,25 @@ pub extern "C" fn Java_com_avinthakur080_pulse_1rs_ShareBridge_onShareUrl<'local
         return;
     }
 
+    // Buffer the URL for recovery via get_pending_share, but ONLY during the
+    // startup window when the WebView listener may not be live yet. Buffering
+    // mid-session would leave a stale URL that pops an old ShareSheet on the
+    // next cold start.
+    let within_boot_window = BOOT_TIME
+        .get()
+        .map_or(true, |t| t.elapsed() < std::time::Duration::from_secs(10));
+    if within_boot_window {
+        if let Some(pending) = PENDING_SHARE.get() {
+            if let Ok(mut lock) = pending.lock() {
+                *lock = Some(url.clone());
+            }
+        }
+    }
+
     if let Some(handle) = APP_HANDLE.get() {
         let _ = handle.emit(
             "share://incoming-url",
             crate::models::IncomingShareEvent { url },
         );
-    } else {
-        // App not fully initialized yet (cold start) — store for later drain
-        if let Some(pending) = PENDING_SHARE.get() {
-            if let Ok(mut lock) = pending.lock() {
-                *lock = Some(url);
-            }
-        }
     }
 }

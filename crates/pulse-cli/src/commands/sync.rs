@@ -46,14 +46,10 @@ pub async fn run(args: SyncArgs, core: &PulseCore, global_json: bool) -> anyhow:
 
 async fn cmd_run(args: SyncRunArgs, core: &PulseCore) -> anyhow::Result<()> {
     if args.detach {
-        if let Some(ref feed_id) = args.feed {
-            core.scheduler.refresh_feed(feed_id.clone()).await;
-            eprintln!("sync started for feed {} in background", feed_id);
-        } else {
-            core.scheduler.start_all().await;
-            eprintln!("sync started in background");
-        }
-        return Ok(());
+        // `sync run --detach` cannot just spawn an in-process task: main() calls
+        // core.shutdown() on exit, which aborts it before it can run. Spawn a
+        // detached child process that performs the blocking sync instead.
+        return cmd_detach(core, args.feed.as_deref(), args.force);
     }
 
     let feeds = core.get_feeds().await?;
@@ -72,26 +68,56 @@ async fn cmd_run(args: SyncRunArgs, core: &PulseCore) -> anyhow::Result<()> {
     }
 
     let mut total = 0usize;
+    let mut failures = 0usize;
     for feed in &targets {
         let title = feed.title.as_deref().unwrap_or(&feed.url);
         if args.force
             && let Err(e) = core.clear_feed_cache(&feed.id).await
         {
-            eprintln!("warn: could not clear cache for '{}': {}", title, e);
-        }
+            eprintln!("warn: could not clear cache for '{}': {}", title, e);        }
         eprint!("syncing '{}'...", title);
         match core.sync_feed(&feed.id).await {
             Ok(n) => {
                 eprintln!(" {} new items", n);
                 total += n;
             }
-            Err(e) => eprintln!(" error: {}", e),
+            Err(e) => {
+                eprintln!(" error: {}", e);
+                failures += 1;
+            }
         }
     }
 
     if targets.len() > 1 {
         eprintln!("total: {} new items across {} feeds", total, targets.len());
     }
+    if failures > 0 {
+        anyhow::bail!("{} of {} feeds failed to sync", failures, targets.len());
+    }
+    Ok(())
+}
+
+/// Spawn a detached child process running the blocking sync, so the parent can
+/// exit (main() aborts in-process tasks on shutdown).
+fn cmd_detach(core: &PulseCore, feed: Option<&str>, force: bool) -> anyhow::Result<()> {
+    use std::process::{Command, Stdio};
+
+    let mut cmd = Command::new(std::env::current_exe()?);
+    let custom_db = core.config.db_path != core.config.data_dir.join("pulse.db");
+    if custom_db {
+        cmd.arg("--db").arg(&core.config.db_path);
+    } else {
+        cmd.arg("--data-dir").arg(&core.config.data_dir);
+    }
+    cmd.arg("sync").arg("run");
+    if let Some(f) = feed {
+        cmd.arg("--feed").arg(f);
+    }
+    if force {
+        cmd.arg("--force");
+    }
+    cmd.stdout(Stdio::null()).stderr(Stdio::null()).spawn()?;
+    eprintln!("sync started in background");
     Ok(())
 }
 
@@ -137,11 +163,7 @@ async fn cmd_status(
     );
     for s in &statuses {
         let title = s.title.as_deref().unwrap_or("-");
-        let title_trunc = if title.len() > 28 {
-            &title[..28]
-        } else {
-            title
-        };
+        let title_trunc = crate::output::truncate_chars(&title, 28);
         let next = s
             .next_fetch_at
             .map(|ts| {

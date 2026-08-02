@@ -54,7 +54,7 @@ impl SyncScheduler {
         }
     }
 
-    /// Start sync tasks for all enabled feeds
+    /// Start sync tasks for all enabled feeds (respects each feed's schedule).
     pub async fn start_all(&self) {
         let feeds = self
             .db
@@ -63,12 +63,27 @@ impl SyncScheduler {
             .unwrap_or_default();
 
         for feed in feeds.into_iter().filter(|f| f.is_enabled) {
-            self.spawn_feed_task(feed.id).await;
+            self.spawn_feed_task(feed.id, false).await;
         }
     }
 
-    /// Spawn a sync task for a specific feed
-    pub async fn spawn_feed_task(&self, feed_id: FeedId) {
+    /// Whether a live sync task exists for the feed. A finished handle (task that
+    /// exited naturally — feed disabled, load error, removal) counts as absent.
+    pub async fn live_task(&self, feed_id: &FeedId) -> bool {
+        let tasks = self.tasks.lock().await;
+        match tasks.get(feed_id) {
+            Some(handle) => !handle.is_finished(),
+            None => false,
+        }
+    }
+
+    /// Spawn a sync task for a specific feed. Replaces any existing handle for the
+    /// feed (aborting it) under a single lock section, so duplicate tasks are
+    /// impossible and stale handles never block a respawn.
+    ///
+    /// When `sync_immediately` is true the task performs one sync right away —
+    /// used for refresh, add-feed, and re-enable flows.
+    pub async fn spawn_feed_task(&self, feed_id: FeedId, sync_immediately: bool) {
         let db = self.db.clone();
         let tagger = self.tagger.clone();
         let http = self.http.clone();
@@ -77,10 +92,22 @@ impl SyncScheduler {
         let feed_id_clone = feed_id.clone();
 
         let handle = tokio::spawn(async move {
-            feed_sync_task(feed_id_clone, db, tagger, http, reddit_auth, cmd_rx).await;
+            feed_sync_task(
+                feed_id_clone,
+                db,
+                tagger,
+                http,
+                reddit_auth,
+                cmd_rx,
+                sync_immediately,
+            )
+            .await;
         });
 
-        self.tasks.lock().await.insert(feed_id, handle);
+        let mut tasks = self.tasks.lock().await;
+        if let Some(prev) = tasks.insert(feed_id, handle) {
+            prev.abort();
+        }
     }
 
     pub fn send_command(&self, cmd: SyncCommand) {
@@ -93,18 +120,18 @@ impl SyncScheduler {
     }
 
     pub async fn refresh_feed(&self, feed_id: FeedId) {
-        self.send_command(SyncCommand::RefreshFeed(feed_id.clone()));
-        let has_task = self.tasks.lock().await.contains_key(&feed_id);
-        if !has_task {
-            self.spawn_feed_task(feed_id).await;
+        if self.live_task(&feed_id).await {
+            self.send_command(SyncCommand::RefreshFeed(feed_id));
+        } else {
+            self.spawn_feed_task(feed_id, true).await;
         }
     }
 
     pub async fn add_feed(&self, feed_id: FeedId) {
-        self.send_command(SyncCommand::AddFeed(feed_id.clone()));
-        let has_task = self.tasks.lock().await.contains_key(&feed_id);
-        if !has_task {
-            self.spawn_feed_task(feed_id).await;
+        if self.live_task(&feed_id).await {
+            self.send_command(SyncCommand::AddFeed(feed_id));
+        } else {
+            self.spawn_feed_task(feed_id, true).await;
         }
     }
 
@@ -144,19 +171,42 @@ async fn feed_sync_task(
     http: Client,
     reddit_auth: Option<Arc<RedditAuth>>,
     mut cmd_rx: broadcast::Receiver<SyncCommand>,
+    sync_immediately: bool,
 ) {
     tracing::debug!(feed_id = %feed_id, "Feed sync task started");
 
+    // Immediate first sync for refresh/add/re-enable spawns. The schedule loop
+    // below picks up the freshly computed next_fetch_at afterwards.
+    if sync_immediately {
+        match load_feed(&db, &feed_id).await {
+            Some(feed) if feed.is_enabled => {
+                if let Err(e) = perform_sync(&feed_id, &db, &tagger, &http, reddit_auth.as_deref()).await
+                {
+                    tracing::warn!(feed_id = %feed_id, error = %e, "Initial sync failed");
+                }
+            }
+            _ => {}
+        }
+    }
+
     loop {
-        let fid = feed_id.clone();
-        let feed = match db
-            .with_reader(|pool| async move { get_feed(&pool, &fid).await })
-            .await
-        {
-            Ok(f) => f,
-            Err(e) => {
-                tracing::error!(feed_id = %feed_id, "Failed to load feed: {}", e);
-                break;
+        let feed = match load_feed(&db, &feed_id).await {
+            Some(f) => f,
+            None => {
+                // Transient read errors (e.g. a busy DB) must not permanently
+                // kill the task. Back off briefly and try again. A genuinely
+                // removed feed is aborted via the RemoveFeed command instead.
+                tokio::select! {
+                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(30)) => {}
+                    cmd = cmd_rx.recv() => {
+                        match cmd {
+                            Ok(SyncCommand::RemoveFeed(id)) if id == feed_id => break,
+                            Ok(SyncCommand::Shutdown) => break,
+                            _ => {}
+                        }
+                    }
+                }
+                continue;
             }
         };
 
@@ -204,6 +254,20 @@ async fn feed_sync_task(
     }
 
     tracing::debug!(feed_id = %feed_id, "Feed sync task stopped");
+}
+
+async fn load_feed(db: &DbHandle, feed_id: &FeedId) -> Option<crate::types::Feed> {
+    let fid = feed_id.clone();
+    match db
+        .with_reader(|pool| async move { get_feed(&pool, &fid).await })
+        .await
+    {
+        Ok(feed) => Some(feed),
+        Err(e) => {
+            tracing::error!(feed_id = %feed_id, "Failed to load feed: {}", e);
+            None
+        }
+    }
 }
 
 /// Perform a single sync cycle for the given feed and return the number of new items.
@@ -283,6 +347,22 @@ pub(crate) async fn perform_sync(
                 .await
             {
                 tracing::warn!(feed_id = %feed_id, error = %e2, "Failed to update health after sync failure");
+            }
+            // Schedule the retry with exponential backoff based on the NEW
+            // failure streak. Without this, a failing feed hot-loops (delay 0)
+            // until it exhausts its failure budget and disables itself.
+            let fid3 = feed_id.clone();
+            if let Ok(updated_feed) = db
+                .with_reader(|pool| async move { get_feed(&pool, &fid3).await })
+                .await
+            {
+                let next_fetch = compute_next_fetch(&updated_feed);
+                let mut feed_update = updated_feed;
+                feed_update.next_fetch_at = Some(next_fetch);
+                feed_update.updated_at = chrono::Utc::now().timestamp();
+                if let Err(e3) = db.upsert_feed(feed_update).await {
+                    tracing::warn!(feed_id = %feed_id, error = %e3, "Failed to schedule backoff after sync failure");
+                }
             }
             Err(e)
         }
