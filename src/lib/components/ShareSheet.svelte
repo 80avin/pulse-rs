@@ -63,15 +63,15 @@
 
       <!-- Feed name -->
       <div class="flex flex-col gap-1.25">
-        <label class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">NAME</label>
-        <input bind:value={shareSheet.name} placeholder="Feed name"
+        <label for="ss-name" class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">NAME</label>
+        <input id="ss-name" bind:value={shareSheet.name} placeholder="Feed name"
           class="bg-bg-0 text-ink-0 w-full box-border p-2.5 rounded border border-bd-1 text-[12px] leading-none font-mono" />
       </div>
 
       <!-- Feed URL + no-feed warning -->
       <div class="flex flex-col gap-1.25">
-        <label class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">FEED URL</label>
-        <input bind:value={shareSheet.feedUrl} placeholder="https://…"
+        <label for="ss-url" class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">FEED URL</label>
+        <input id="ss-url" bind:value={shareSheet.feedUrl} placeholder="https://…"
           class="bg-bg-0 text-ink-0 w-full box-border p-2.5 rounded text-[11px] leading-none font-mono" style="border:1px solid {noFeedFound ? T.red : T.bd1};" />
         {#if noFeedFound}
           <span class="text-red text-[9px] leading-[1.4] font-mono">No feed source found at this URL. Paste a direct RSS/Atom URL above if you have one.</span>
@@ -81,7 +81,7 @@
       <!-- Alternate feed picker -->
       {#if (shareSheet.candidate?.candidates?.length ?? 0) > 1}
         <div class="flex flex-col gap-1">
-          <label class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">ALTERNATE FEEDS</label>
+          <span class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">ALTERNATE FEEDS</span>
           {#each shareSheet.candidate!.candidates as c}
             <button onclick={() => { shareSheet.feedUrl = c.url; if (c.title) shareSheet.name = c.title; }}
               class="text-left cursor-pointer p-2 rounded text-[10px] leading-[1.4] font-mono text-ink-1" style="background:{shareSheet.feedUrl===c.url?T.bg3:T.bg0};border:1px solid {shareSheet.feedUrl===c.url?T.cyan:T.bd1};">
@@ -96,14 +96,14 @@
       <div class="flex gap-2">
         <!-- Type toggle -->
         <div class="flex-1 flex flex-col gap-1.25">
-          <label class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">TYPE</label>
+          <span class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">TYPE</span>
           <SegmentedControl options={['rss','hn','reddit']} active={shareSheet.kind} onChange={v => { shareSheet.kind = v as typeof shareSheet.kind; }} />
         </div>
 
         <!-- Group selector -->
         <div class="flex-1 flex flex-col gap-1.25">
-          <label class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">GROUP</label>
-          <select bind:value={shareSheet.group}
+          <label for="ss-group" class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">GROUP</label>
+          <select id="ss-group" bind:value={shareSheet.group}
             class="w-full bg-bg-0 border border-bd-1 text-ink-0 p-2 rounded text-[11px] leading-none font-mono">
             {#each groups as g}<option value={g.id}>{g.name}</option>{/each}
             <option value="__new__">+ new group</option>
@@ -114,11 +114,10 @@
       <!-- New group name input (shown when __new__ selected) -->
       {#if creatingGroup}
         <div class="flex flex-col gap-1.25">
-          <label class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">NEW GROUP NAME</label>
-          <input
+          <label for="ss-newgroup" class="text-ink-3 tracking-[0.5px] text-[9px] leading-none font-mono">NEW GROUP NAME</label>
+          <input id="ss-newgroup"
             bind:value={shareSheet.newGroupName}
             placeholder="e.g. Tech, Local, Work…"
-            autofocus
             class="bg-bg-0 text-ink-0 w-full box-border p-2.5 rounded border border-cyan text-[12px] leading-none font-mono"
           />
         </div>

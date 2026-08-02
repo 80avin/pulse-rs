@@ -244,7 +244,7 @@
     </div>
 
     <!-- Main body -->
-    <div class="flex-1 flex overflow-hidden relative" onmousemove={onMouseMove} onmouseup={stopDrag} onmouseleave={stopDrag}>
+    <div class="flex-1 flex overflow-hidden relative" role="presentation" onmousemove={onMouseMove} onmouseup={stopDrag} onmouseleave={stopDrag}>
       {#if leftRailCollapsed}
         <div class="w-8 shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col items-center pt-1 overflow-hidden gap-1.5">
           <button onclick={toggleLeftRail} aria-label="Expand sidebar" title="Expand sidebar" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>

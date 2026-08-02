@@ -19,7 +19,7 @@
   <!-- Theme mode -->
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
-      <label class="text-[11px] leading-none font-mono text-ink-1">Theme</label>
+      <span class="text-[11px] leading-none font-mono text-ink-1">Theme</span>
     </div>
     <div class="flex gap-1.5" role="group" aria-label="Theme mode">
       <button
@@ -55,7 +55,7 @@
   <!-- Accent color -->
   <div class="flex flex-col gap-2 mt-4">
     <div class="flex items-center justify-between">
-      <label class="text-[11px] leading-none font-mono text-ink-1">Accent Color</label>
+      <span class="text-[11px] leading-none font-mono text-ink-1">Accent Color</span>
     </div>
     <div class="flex gap-1.5" role="group" aria-label="Accent color">
       {#each ACCENT_OPTIONS as opt}
@@ -74,7 +74,7 @@
   <!-- Density -->
   <div class="flex flex-col gap-2 mt-4">
     <div class="flex items-center justify-between">
-      <label class="text-[11px] leading-none font-mono text-ink-1">Density</label>
+      <span class="text-[11px] leading-none font-mono text-ink-1">Density</span>
     </div>
     <div class="flex gap-1.5" role="group" aria-label="Density">
       {#each (['dense', 'normal', 'roomy'] as const) as d}

@@ -32,7 +32,7 @@
       <button
         onclick={() => onFilter(tab.id)}
         aria-pressed={a}
-        class="shrink-0 border-none border-r border-bd-0 cursor-pointer flex items-center px-3 py-2.5 gap-1.25 tracking-[0.3px] text-[11px] leading-none font-mono" style="
+        class="shrink-0 border-none border-r border-bd-0 cursor-pointer flex items-center px-3 min-h-11 gap-1.25 tracking-[0.3px] text-[11px] leading-none font-mono" style="
           background:{a ? T.bg3 : 'transparent'};
           color:{a ? (tab.color ?? T.cyan) : T.ink1};
           font-weight:{a ? '600' : '400'};
@@ -45,7 +45,7 @@
     <div class="flex-1 min-w-[4px]"></div>
     <button
       onclick={() => onSort(sort === 'time' ? 'score' : 'time')}
-      class="shrink-0 bg-transparent border-none border-l border-bd-0 text-ink-1 cursor-pointer flex items-center p-2.5 px-3 gap-1 tracking-[0.3px] text-[11px] leading-none font-mono"
+      class="shrink-0 bg-transparent border-none border-l border-bd-0 text-ink-1 cursor-pointer flex items-center min-h-11 px-3 gap-1 tracking-[0.3px] text-[11px] leading-none font-mono" aria-label="Toggle sort order"
     >
       <span class="text-ink-3">sort</span>
       <span>{sort === 'time' ? 'time ↓' : 'score ↓'}</span>
@@ -53,7 +53,7 @@
     <button
       onclick={onMarkAllRead}
       title="Mark all read"
-      class="shrink-0 bg-transparent border-none border-l border-bd-0 text-green flex items-center cursor-pointer p-2.5 px-3"
+      class="shrink-0 bg-transparent border-none border-l border-bd-0 text-green flex items-center cursor-pointer min-h-11 px-3" aria-label="Mark all read"
     >
       <Icon name="check" size={14} />
     </button>

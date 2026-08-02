@@ -389,12 +389,12 @@
 
   <div class="flex gap-2">
     <div class="flex-1 flex flex-col gap-1.5">
-      <label class="text-ink-3 text-[10px] leading-none font-mono">TYPE</label>
+      <span class="text-ink-3 text-[10px] leading-none font-mono">TYPE</span>
         <SegmentedControl options={['rss','hn','reddit']} active={editKind} onChange={v => { editKind = v as typeof editKind; }} />
     </div>
     <div class="flex-1 flex flex-col gap-1.5">
-      <label class="text-ink-3 text-[10px] leading-none font-mono">GROUP</label>
-      <select
+      <label for="se-group" class="text-ink-3 text-[10px] leading-none font-mono">GROUP</label>
+      <select id="se-group"
         bind:value={editGroup}
         class="w-full p-2 bg-bg-0 border border-bd-1 rounded text-ink-0 cursor-pointer text-[12px] leading-none font-mono"
       >
@@ -405,7 +405,7 @@
 
   <div class="flex flex-col gap-1.5">
     <div class="flex items-center justify-between">
-      <label class="text-ink-3 text-[10px] leading-none font-mono">COLOUR</label>
+      <span class="text-ink-3 text-[10px] leading-none font-mono">COLOUR</span>
       {#if editHue != null}
         <button
           onclick={() => editHue = undefined}

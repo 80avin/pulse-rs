@@ -23,15 +23,15 @@
     <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px] flex-1">
       sources <span class="text-ink-3">· {sources.length}</span>
     </span>
-    <button onclick={doSync} class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-8.5 h-8.5">
+    <button onclick={doSync} aria-label="Sync feeds" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11">
       <span class={syncState.syncing ? 'syncing' : ''}>
         <Icon name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1} />
       </span>
     </button>
     <button
       onclick={() => { document.querySelector('.add-source-target')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}
-      class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-8.5 h-8.5"
-      title="Add source"
+      class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11"
+      title="Add source" aria-label="Add source"
     >
       <Icon name="plus" size={16} color={T.cyan} />
     </button>

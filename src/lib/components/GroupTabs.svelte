@@ -43,7 +43,7 @@
     if (active === id) onSelect('all');
   }
 
-  let activeTab = $state(active);
+  let activeTab = $state<string>();
   $effect(() => { activeTab = active; });
 </script>
 
@@ -77,7 +77,6 @@
               onkeydown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') renamingId = null; }}
               onblur={commitRename}
               class="text-ink-0 bg-bg-0 border border-cyan outline-none w-full px-1.5 py-1 rounded-sm text-[13px] leading-[1.2] font-mono"
-              autofocus
             />
           {:else}
             <span class="text-ink-0 bg-bg-0 border border-bd-1 px-1.5 py-1 rounded-sm text-[13px] leading-[1.2] font-mono">{g.name}</span>
@@ -85,13 +84,15 @@
           <span class="text-ink-2 tabular-nums text-[10px] leading-none font-mono">{counts[g.id] ?? g.n}</span>
           <button
             onclick={() => startRename(g)}
-            class="p-0 bg-transparent border border-bd-1 text-ink-1 flex items-center justify-center cursor-pointer rounded-sm w-7.5 h-7.5"
+            aria-label={`Rename group ${g.name}`}
+            class="p-0 bg-transparent border border-bd-1 text-ink-1 flex items-center justify-center cursor-pointer rounded-sm min-w-11 min-h-11"
           >
             <Icon name="edit" size={13} />
           </button>
           <button
             onclick={() => handleDelete(g.id)}
-            class="p-0 bg-transparent text-red flex items-center justify-center cursor-pointer rounded-sm w-7.5 h-7.5 border border-red-dim"
+            aria-label={`Delete group ${g.name}`}
+            class="p-0 bg-transparent text-red flex items-center justify-center cursor-pointer rounded-sm min-w-11 min-h-11 border border-red-dim"
           >
             <Icon name="trash" size={13} />
           </button>
@@ -108,7 +109,6 @@
           onkeydown={(e) => { if (e.key === 'Enter') commitNewGroup(); if (e.key === 'Escape') { showNewInput = false; newName = ''; } }}
           onblur={commitNewGroup}
           class="flex-1 text-ink-0 bg-bg-0 border border-cyan outline-none rounded-sm px-2 py-1.5 text-[12px] leading-none font-mono"
-          autofocus
         />
       </div>
     {:else}

@@ -155,11 +155,11 @@
     </div>
     <div class="flex items-center gap-2">
       <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">Wi-Fi only</span>
-      <ToggleSwitch on={settings.wifiOnly} change={() => { settings.wifiOnly = !settings.wifiOnly; }} />
+      <ToggleSwitch on={settings.wifiOnly} change={() => { settings.wifiOnly = !settings.wifiOnly; }} ariaLabel="Sync only on Wi-Fi" />
     </div>
     <div class="flex items-center gap-2">
       <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">Background sync</span>
-      <ToggleSwitch on={settings.backgroundSync} change={() => { settings.backgroundSync = !settings.backgroundSync; }} />
+      <ToggleSwitch on={settings.backgroundSync} change={() => { settings.backgroundSync = !settings.backgroundSync; }} ariaLabel="Background sync" />
     </div>
   </div>
 </SettingsSection>
@@ -174,11 +174,11 @@
   <div class="flex flex-col gap-2.5">
     <div class="flex items-center gap-2">
       <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">High-signal items</span>
-      <ToggleSwitch on={settings.notifyHighSignal} change={() => { settings.notifyHighSignal = !settings.notifyHighSignal; }} />
+      <ToggleSwitch on={settings.notifyHighSignal} change={() => { settings.notifyHighSignal = !settings.notifyHighSignal; }} ariaLabel="Notify on high-signal items" />
     </div>
     <div class="flex items-center gap-2">
       <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">Saved item updates</span>
-      <ToggleSwitch on={settings.notifySaved} change={() => { settings.notifySaved = !settings.notifySaved; }} />
+      <ToggleSwitch on={settings.notifySaved} change={() => { settings.notifySaved = !settings.notifySaved; }} ariaLabel="Notify when items are saved" />
     </div>
   </div>
 </SettingsSection>
@@ -187,7 +187,7 @@
 {#if showShortcuts}
   <SettingsSection label="keyboard shortcuts">
     <div class="flex flex-col gap-1.5">
-      {#each [['j / k', 'navigate items'], ['m', 'toggle read'], ['s', 'save / unsave'], ['o', 'open link'], ['h', 'hide item'], ['a', 'toggle ai panel'], ['/', 'focus search'], ['Esc', 'clear / close']] as [k, label]}
+      {#each [['j / k', 'navigate items'], ['m', 'toggle read'], ['s', 'save / unsave'], ['o', 'open link'], ['x', 'hide item'], ['/', 'focus search'], ['Esc', 'clear / close']] as [k, label]}
         <div class="flex items-center gap-2 text-ink-2 text-[10px] leading-none font-mono">
           <KeyCap {k} dim />
           <span>{label}</span>
@@ -214,7 +214,7 @@
         <div class="text-ink-1 text-[11px] leading-none font-mono">Verbose logging</div>
         <div class="mt-0.75 text-ink-3 text-[10px] leading-[1.4] font-mono">Logs per-item tagging, sync steps, and inference calls. Enable before reproducing a bug.</div>
       </div>
-      <ToggleSwitch on={settings.verboseLogging} change={() => { settings.verboseLogging = !settings.verboseLogging; }} />
+      <ToggleSwitch on={settings.verboseLogging} change={() => { settings.verboseLogging = !settings.verboseLogging; }} ariaLabel="Verbose logging" />
     </div>
 
     <!-- Desktop: show log path + open folder -->
