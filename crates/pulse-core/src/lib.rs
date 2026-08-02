@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod config;
+pub mod onboarding;
 pub mod error;
 pub mod feeds;
 pub mod search;
@@ -332,6 +333,73 @@ impl PulseCore {
             .map_err(PulseError::Storage)?;
         self.scheduler.add_feed(feed_id).await;
         Ok(())
+    }
+
+    /// Bulk-add curated feeds, auto-creating (or reusing) their category group.
+    /// Returns the number of feeds added.
+    pub async fn add_onboard_feeds(
+        &self,
+        selections: &[crate::onboarding::OnboardSelection],
+    ) -> Result<usize, PulseError> {
+        use std::collections::HashMap;
+        let existing = self.get_feed_groups().await?;
+        let mut group_ids: HashMap<String, String> =
+            existing.into_iter().map(|g| (g.name.clone(), g.id)).collect();
+        let mut added = 0usize;
+        for sel in selections {
+            let group_id = if let Some(id) = group_ids.get(&sel.category) {
+                id.clone()
+            } else {
+                let gid = uuid::Uuid::new_v4().to_string();
+                let now = chrono::Utc::now().timestamp();
+                let group = crate::types::FeedGroup {
+                    id: gid.clone(),
+                    name: sel.category.clone(),
+                    description: None,
+                    color: None,
+                    sort_order: 0,
+                    created_at: now,
+                    updated_at: now,
+                };
+                self.db
+                    .insert_feed_group(group)
+                    .await
+                    .map_err(PulseError::Storage)?;
+                group_ids.insert(sel.category.clone(), gid.clone());
+                gid
+            };
+            let now = chrono::Utc::now().timestamp();
+            let feed = crate::types::Feed {
+                id: uuid::Uuid::new_v4().to_string(),
+                url: sel.url.clone(),
+                feed_type: sel.kind.clone(),
+                title: Some(sel.name.clone()),
+                description: None,
+                site_url: None,
+                icon_url: None,
+                group_id: Some(group_id),
+                poll_interval_secs: 3600,
+                is_enabled: true,
+                etag: None,
+                last_modified: None,
+                last_fetched_at: None,
+                last_success_at: None,
+                last_item_at: None,
+                failure_streak: 0,
+                total_fetches: 0,
+                total_failures: 0,
+                avg_latency_ms: None,
+                next_fetch_at: Some(now),
+                source_config: serde_json::json!({}),
+                language: None,
+                hue: None,
+                created_at: now,
+                updated_at: now,
+            };
+            self.add_feed(feed).await?;
+            added += 1;
+        }
+        Ok(added)
     }
 
     pub async fn delete_feed(&self, feed_id: &FeedId) -> Result<(), PulseError> {

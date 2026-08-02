@@ -20,6 +20,7 @@
   import ReaderPane from '$lib/components/ReaderPane.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import Modal from '$lib/components/Modal.svelte';
+  import Onboarding from '$lib/components/Onboarding.svelte';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import MobileSaved from './MobileSaved.svelte';
   import SearchView from '$lib/components/SearchView.svelte';
@@ -129,6 +130,12 @@
   let showSourcesAccordion = $derived(accValue.includes('sources'));
   let popoverOpen   = $state(false);
   let showCheatsheet = $state(false);
+  let showOnboarding = $state(false);
+
+  // First-run onboarding: auto-show once cold-start finishes with no sources.
+  $effect(() => {
+    if (!storeReady.loading && sources.length === 0) showOnboarding = true;
+  });
 
   // FTS backend search — debounced 300ms, only in Tauri context.
   $effect(() => {
@@ -222,201 +229,214 @@
   });
 </script>
 
-{#if storeReady.error}
-  <div class="flex items-center justify-center w-full h-full bg-bg-0 text-red text-[11px] leading-[1.6] font-mono">
-    failed to load data — check console for details
-  </div>
-{:else if isWide}
-  <div class="flex flex-col w-full h-full bg-bg-0 text-ink-0 overflow-hidden">
-    <!-- App toolbar (window controls are handled by the native OS title bar) -->
-    <div class="h-8 flex items-center pl-3 pr-2 bg-bg-0 border-b border-bd-0 shrink-0 gap-2.5">
-      <span class="text-ink-2 text-[11px] leading-none font-mono">{activeGroupLabel} · {displayItems.length} items</span>
-      <span class="flex-1"></span>
-      <button onclick={() => searchInputEl?.focus()} aria-label="Search" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" title="Search (/)">
-        <Icon name="search" size={13} color={T.ink1} />
-      </button>
-      <button onclick={doSync} aria-label="Sync feeds" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" title="Sync">
-        <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={13} color={syncState.syncing ? T.cyan : T.ink1} /></span>
-      </button>
-      <button onclick={() => showCheatsheet = !showCheatsheet} aria-label="Keyboard shortcuts (?)" class="bg-transparent border-none cursor-pointer text-ink-3 px-1 text-[10px] leading-none font-mono" title="Keyboard shortcuts (?)">?</button>
+<div class="relative w-full h-full overflow-hidden">
+  {#if storeReady.error}
+    <div class="flex items-center justify-center w-full h-full bg-bg-0 text-red text-[11px] leading-[1.6] font-mono">
+      failed to load data — check console for details
     </div>
-
-    <!-- Main body -->
-    <div class="flex-1 flex overflow-hidden relative" role="presentation" onmousemove={onMouseMove} onmouseup={stopDrag} onmouseleave={stopDrag}>
-      {#if leftRailCollapsed}
-        <div class="w-8 shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col items-center pt-1 overflow-hidden gap-1.5">
-          <button onclick={toggleLeftRail} aria-label="Expand sidebar" title="Expand sidebar" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-            <Icon name="chev-r" size={13} color={T.ink2} />
-          </button>
-          {#each groups as g}
-            <button onclick={() => selectGroup(g.id)} onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} items`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px]" style="background:{g.id===activeGroup?'rgba(78,205,214,0.12)':'transparent'}">
-              <span class="font-bold text-[10px] leading-none font-mono text-cyan={g.id===activeGroup} text-ink-2={g.id!==activeGroup}">{g.name.slice(0, 2).toUpperCase()}</span>
-              {#if g.n > 0}<span class="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-cyan"></span>{/if}
-            </button>
-          {/each}
-          <div class="flex-1"></div>
-          <button onclick={() => { showSources = !showSources; }} aria-label="Sources" title="Sources" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-            <Icon name="rss" size={13} color={showSources ? T.cyan : T.ink2} />
-          </button>
-          <button onclick={() => { showSettings = !showSettings; }} aria-label="Settings" title="Settings" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer mb-1.5 rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-            <Icon name="cog" size={13} color={showSettings ? T.cyan : T.ink2} />
-          </button>
-        </div>
-      {:else}
-        <div class="shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col overflow-hidden" style="width:{leftRailWidth}px">
-          <div class="flex justify-end pt-0.5 px-1">
-            <button onclick={toggleLeftRail} aria-label="Collapse sidebar" title="Collapse sidebar" class="flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-              <Icon name="chev-l" size={12} color={T.ink3} />
-            </button>
-          </div>
-          <div class="px-2 pt-2 pb-1">
-            <div class="flex items-center gap-1.5 bg-bg-0 border border-bd-1 p-1.25 px-2 rounded">
-              <Icon name="search" size={11} color={T.ink3} />
-              <input bind:this={searchInputEl} bind:value={searchQuery} placeholder="search {dbStats.totalItems} items" class="flex-1 text-[11px] leading-none font-mono" aria-label="Search items" />
-              <KeyCap k="/" dim />
-            </div>
-          </div>
-          <FilterPills active={desktopFilter} onChange={handleFilterChange} />
-          <div class="border-b border-bd-0 pt-0.5 pb-1">
-            <div class="uppercase text-ink-3 px-3 pt-1.5 pb-0.5 tracking-[0.6px] text-[10px] leading-none font-mono">groups</div>
-            <GroupTabs {groups} active={activeGroup} onSelect={(id) => selectGroup(id)} orientation="vertical" />
-          </div>
-          <Accordion.Root type="multiple" bind:value={accValue} class="border-b border-bd-0">
-            <Accordion.Item value="sources">
-              <Accordion.Header>
-                <Accordion.Trigger onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3" aria-label={`Sources for ${activeGroupLabel}`}>
-                  <span class="uppercase flex-1 text-ink-3 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
-                  <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
-                  <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
-                </Accordion.Trigger>
-              </Accordion.Header>
-              <Accordion.Content class="p-[0_8px_6px]">
-                {#each groupSources as s}
-                  <button onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }} oncontextmenu={(e) => { e.preventDefault(); showSources = !showSources; }} onmouseenter={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = 'transparent'; }} onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }} onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }} class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1" style="background:{activeSource===s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border-left:2px solid {activeSource===s.id ? T.cyan : 'transparent'}" aria-current={activeSource===s.id ? 'true' : undefined}>
-                    <StatusDot status={s.status} size={5} />
-                    <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-[11px] leading-[1.2] font-mono" style="color:{activeSource===s.id ? T.ink0 : T.ink1};">{s.name}</span>
-                    {#if s.unread > 0}<span class="text-cyan text-[10px] leading-none font-mono">{s.unread}</span>{/if}
-                  </button>
-                {/each}
-                <button onclick={() => { showSources = !showSources; }} onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} class="flex items-center gap-1 w-full bg-transparent border-none text-ink-3 cursor-pointer text-left px-1.5 py-1 mt-0.5 text-[10px] leading-none font-mono">
-                  <Icon name="plus" size={10} color={T.ink3} />
-                  <span>Manage Sources</span>
-                </button>
-              </Accordion.Content>
-            </Accordion.Item>
-          </Accordion.Root>
-          <div class="flex-1"></div>
-          <BottomTools {showSources} {showSettings} syncing={syncState.syncing} {syncState} onToggleSources={() => { showSources = !showSources; }} onToggleSettings={() => { showSettings = !showSettings; }} />
-        </div>
-      {/if}
-
-      <DragHandle edge="left" {onDragStart} {dragging} />
-
-      <!-- Timeline pane -->
-      <div class="shrink-0 flex flex-col border-r border-bd-0 overflow-hidden bg-bg-0" style="width:{timelineWidth}px">
-        <TimelinePane mode="wide" items={displayItems} {searchQuery} {openId} onOpen={(id, ids) => openItemAndRead(id, ids)} />
+  {:else if isWide}
+    <div class="flex flex-col w-full h-full bg-bg-0 text-ink-0 overflow-hidden">
+      <!-- App toolbar (window controls are handled by the native OS title bar) -->
+      <div class="h-8 flex items-center pl-3 pr-2 bg-bg-0 border-b border-bd-0 shrink-0 gap-2.5">
+        <span class="text-ink-2 text-[11px] leading-none font-mono">{activeGroupLabel} · {displayItems.length} items</span>
+        <span class="flex-1"></span>
+        <button onclick={() => searchInputEl?.focus()} aria-label="Search" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" title="Search (/)">
+          <Icon name="search" size={13} color={T.ink1} />
+        </button>
+        <button onclick={doSync} aria-label="Sync feeds" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" title="Sync">
+          <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={13} color={syncState.syncing ? T.cyan : T.ink1} /></span>
+        </button>
+        <button onclick={() => showCheatsheet = !showCheatsheet} aria-label="Keyboard shortcuts (?)" class="bg-transparent border-none cursor-pointer text-ink-3 px-1 text-[10px] leading-none font-mono" title="Keyboard shortcuts (?)">?</button>
       </div>
 
-      <DragHandle edge="timeline" {onDragStart} {dragging} />
-
-      <!-- Reader pane -->
-      {#if openItemObj}
-        <div class="flex-1 min-w-0 flex flex-col bg-bg-0 overflow-hidden">
-          <ReaderPane mode="wide" itemId={openItemObj.id} allIds={timelineIds} onBack={closeReader} onNavigate={(id) => openItemAndRead(id, timelineIds)} />
-        </div>
-      {/if}
-
-      <!-- Settings modal -->
-      <Modal open={showSettings} title="Settings" onClose={() => { showSettings = false; }} width="420px">
-        <SettingsPanelContent showShortcuts />
-      </Modal>
-
-      <!-- Sources modal -->
-      <Modal open={showSources} title="Sources" onClose={() => { showSources = false; }} width="480px">
-        <SourceExplorer onSourceSelect={(id) => { setFeedFilter(id); showSources = false; }} compact={true} isDesktop={true} />
-      </Modal>
-
-      <!-- Keyboard shortcut cheatsheet -->
-      <Modal open={showCheatsheet} title="Keyboard Shortcuts" onClose={() => showCheatsheet = false} width="440px">
-        <div class="grid grid-cols-2 gap-x-6">
-          {#each [
-            { k: '/',       desc: 'focus search'      },
-            { k: 'j / ↓',  desc: 'next item'         },
-            { k: 'k / ↑',  desc: 'prev item'         },
-            { k: 'm',       desc: 'toggle read'       },
-            { k: 's',       desc: 'save / unsave'     },
-            { k: 'o',       desc: 'open in browser'   },
-            { k: 'x',       desc: 'hide item'         },
-            { k: 'r',       desc: 'sources'           },
-            { k: 'Esc',     desc: 'clear / close'     },
-          ] as sc}
-            <div class="flex items-center gap-2.5 border-b border-bd-0 py-1.5">
-              <KeyCap k={sc.k} />
-              <span class="text-ink-2 text-[11px] leading-none font-mono">{sc.desc}</span>
+      <!-- Main body -->
+      <div class="flex-1 flex overflow-hidden relative" role="presentation" onmousemove={onMouseMove} onmouseup={stopDrag} onmouseleave={stopDrag}>
+        {#if leftRailCollapsed}
+          <div class="w-8 shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col items-center pt-1 overflow-hidden gap-1.5">
+            <button onclick={toggleLeftRail} aria-label="Expand sidebar" title="Expand sidebar" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+              <Icon name="chev-r" size={13} color={T.ink2} />
+            </button>
+            {#each groups as g}
+              <button onclick={() => selectGroup(g.id)} onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} items`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px]" style="background:{g.id===activeGroup?'rgba(78,205,214,0.12)':'transparent'}">
+                <span class="font-bold text-[10px] leading-none font-mono text-cyan={g.id===activeGroup} text-ink-2={g.id!==activeGroup}">{g.name.slice(0, 2).toUpperCase()}</span>
+                {#if g.n > 0}<span class="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-cyan"></span>{/if}
+              </button>
+            {/each}
+            <div class="flex-1"></div>
+            <button onclick={() => { showSources = !showSources; }} aria-label="Sources" title="Sources" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+              <Icon name="rss" size={13} color={showSources ? T.cyan : T.ink2} />
+            </button>
+            <button onclick={() => { showSettings = !showSettings; }} aria-label="Settings" title="Settings" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer mb-1.5 rounded" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+              <Icon name="cog" size={13} color={showSettings ? T.cyan : T.ink2} />
+            </button>
+          </div>
+        {:else}
+          <div class="shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col overflow-hidden" style="width:{leftRailWidth}px">
+            <div class="flex justify-end pt-0.5 px-1">
+              <button onclick={toggleLeftRail} aria-label="Collapse sidebar" title="Collapse sidebar" class="flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                <Icon name="chev-l" size={12} color={T.ink3} />
+              </button>
             </div>
-          {/each}
-        </div>
-        <div class="mt-3 text-ink-3 text-center text-[10px] leading-none font-mono">press ? or Esc to close</div>
-      </Modal>
-    </div>
+            <div class="px-2 pt-2 pb-1">
+              <div class="flex items-center gap-1.5 bg-bg-0 border border-bd-1 p-1.25 px-2 rounded">
+                <Icon name="search" size={11} color={T.ink3} />
+                <input bind:this={searchInputEl} bind:value={searchQuery} placeholder="search {dbStats.totalItems} items" class="flex-1 text-[11px] leading-none font-mono" aria-label="Search items" />
+                <KeyCap k="/" dim />
+              </div>
+            </div>
+            <FilterPills active={desktopFilter} onChange={handleFilterChange} />
+            <div class="border-b border-bd-0 pt-0.5 pb-1">
+              <div class="uppercase text-ink-3 px-3 pt-1.5 pb-0.5 tracking-[0.6px] text-[10px] leading-none font-mono">groups</div>
+              <GroupTabs {groups} active={activeGroup} onSelect={(id) => selectGroup(id)} orientation="vertical" />
+            </div>
+            <Accordion.Root type="multiple" bind:value={accValue} class="border-b border-bd-0">
+              <Accordion.Item value="sources">
+                <Accordion.Header>
+                  <Accordion.Trigger onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3" aria-label={`Sources for ${activeGroupLabel}`}>
+                    <span class="uppercase flex-1 text-ink-3 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
+                    <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
+                    <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
+                  </Accordion.Trigger>
+                </Accordion.Header>
+                <Accordion.Content class="p-[0_8px_6px]">
+                  {#each groupSources as s}
+                    <button onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }} oncontextmenu={(e) => { e.preventDefault(); showSources = !showSources; }} onmouseenter={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = 'transparent'; }} onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }} onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }} class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1" style="background:{activeSource===s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border-left:2px solid {activeSource===s.id ? T.cyan : 'transparent'}" aria-current={activeSource===s.id ? 'true' : undefined}>
+                      <StatusDot status={s.status} size={5} />
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-[11px] leading-[1.2] font-mono" style="color:{activeSource===s.id ? T.ink0 : T.ink1};">{s.name}</span>
+                      {#if s.unread > 0}<span class="text-cyan text-[10px] leading-none font-mono">{s.unread}</span>{/if}
+                    </button>
+                  {/each}
+                  <div class="flex items-center gap-1 mt-0.5">
+                    <button onclick={() => { showSources = !showSources; }} onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer text-left px-1.5 py-1 text-[10px] leading-none font-mono">
+                      <Icon name="plus" size={10} color={T.ink3} />
+                      <span>Manage Sources</span>
+                    </button>
+                    <button onclick={() => { showOnboarding = true; }} onmouseenter={(e) => { (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer justify-center px-1.5 py-1 text-[10px] leading-none font-mono" title="Discover feeds" aria-label="Discover feeds">
+                      <Icon name="list" size={10} color={T.ink3} />
+                      <span>discover</span>
+                    </button>
+                  </div>
+                </Accordion.Content>
+              </Accordion.Item>
+            </Accordion.Root>
+            <div class="flex-1"></div>
+            <BottomTools {showSources} {showSettings} syncing={syncState.syncing} {syncState} onToggleSources={() => { showSources = !showSources; }} onToggleSettings={() => { showSettings = !showSettings; }} />
+          </div>
+        {/if}
 
-    <!-- Status bar -->
-    <StatusBar
-      density={settings.density}
-      {activeGroupLabel} {activeSource}
-      activeSourceName={activeSource ? sources.find(s => s.id === activeSource)?.name : undefined}
-      itemCount={displayItems.length}
-      totalCount={pageCounts.total}
-      {unreadCount} {taggedCount}
-      {searchQuery} syncing={syncState.syncing} {syncState}
-      onToggleCheatsheet={() => showCheatsheet = !showCheatsheet}
-    />
-  </div>
-{:else}
-  <div class="flex flex-col w-full h-full bg-bg-1 overflow-hidden">
-    <div class="shrink-0 h-[var(--sat)]"></div>
-    <div class="flex-1 overflow-hidden flex flex-col relative">
-      {#if activeTab === 'feed'}
-        <TimelinePane mode="narrow" items={items} openId={openId ?? ''} onOpen={openItem} onSearch={goToSearch} />
-      {:else if activeTab === 'sources'}
-        <div class="flex flex-col h-full bg-bg-0 text-ink-0">
-          <div class="h-[44px] flex items-center px-[10px] border-b border-b-bd-0 bg-bg-1 shrink-0 gap-2">
-            <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px] flex-1">sources <span class="text-ink-3">· {sources.length}</span></span>
-            <button onclick={doSync} aria-label="Sync feeds" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11">
-              <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1} /></span>
-            </button>
-            <button onclick={() => { document.querySelector('.add-source-target')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11" title="Add source" aria-label="Add source">
-              <Icon name="plus" size={16} color={T.cyan} />
-            </button>
-          </div>
-          <div class="flex-1 overflow-auto">
-            <SourceExplorer onSourceSelect={openSourceFeed} onSync={doSync} />
-          </div>
-        </div>
-      {:else if activeTab === 'search'}
-        <SearchView onItemOpen={(id, ids) => openItem(id, ids)} />
-      {:else if activeTab === 'saved'}
-        <MobileSaved tab={activeTab} onTabChange={changeTab} onOpen={openItem} />
-      {:else if activeTab === 'settings'}
-        <div class="flex flex-col h-full bg-bg-0 text-ink-0">
-          <div class="h-[44px] flex items-center px-3.5 border-b border-b-bd-0 bg-bg-1 shrink-0">
-            <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px]">settings</span>
-          </div>
-          <div class="flex-1 overflow-y-auto flex flex-col gap-2.5 p-3 px-2.5">
-            <SettingsPanelContent showShortcuts={false} />
-            <div class="h-3"></div>
-          </div>
-        </div>
-      {:else}
-        <div class="flex-1 flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">{activeTab}</div>
-      {/if}
+        <DragHandle edge="left" {onDragStart} {dragging} />
 
-      {#if openId}
-        <div class="absolute inset-0 z-10 flex flex-col">
-          <ReaderPane mode="narrow" itemId={openId} allIds={timelineIds} onBack={goBack} onNavigate={(id) => { openId = id; }} />
+        <!-- Timeline pane -->
+        <div class="shrink-0 flex flex-col border-r border-bd-0 overflow-hidden bg-bg-0" style="width:{timelineWidth}px">
+          <TimelinePane mode="wide" items={displayItems} {searchQuery} {openId} onOpen={(id, ids) => openItemAndRead(id, ids)} />
         </div>
-      {/if}
+
+        <DragHandle edge="timeline" {onDragStart} {dragging} />
+
+        <!-- Reader pane -->
+        {#if openItemObj}
+          <div class="flex-1 min-w-0 flex flex-col bg-bg-0 overflow-hidden">
+            <ReaderPane mode="wide" itemId={openItemObj.id} allIds={timelineIds} onBack={closeReader} onNavigate={(id) => openItemAndRead(id, timelineIds)} />
+          </div>
+        {/if}
+
+        <!-- Settings modal -->
+        <Modal open={showSettings} title="Settings" onClose={() => { showSettings = false; }} width="420px">
+          <SettingsPanelContent showShortcuts />
+        </Modal>
+
+        <!-- Sources modal -->
+        <Modal open={showSources} title="Sources" onClose={() => { showSources = false; }} width="480px">
+          <SourceExplorer onSourceSelect={(id) => { setFeedFilter(id); showSources = false; }} compact={true} isDesktop={true} />
+        </Modal>
+
+        <!-- Keyboard shortcut cheatsheet -->
+        <Modal open={showCheatsheet} title="Keyboard Shortcuts" onClose={() => showCheatsheet = false} width="440px">
+          <div class="grid grid-cols-2 gap-x-6">
+            {#each [
+              { k: '/',       desc: 'focus search'      },
+              { k: 'j / ↓',  desc: 'next item'         },
+              { k: 'k / ↑',  desc: 'prev item'         },
+              { k: 'm',       desc: 'toggle read'       },
+              { k: 's',       desc: 'save / unsave'     },
+              { k: 'o',       desc: 'open in browser'   },
+              { k: 'x',       desc: 'hide item'         },
+              { k: 'r',       desc: 'sources'           },
+              { k: 'Esc',     desc: 'clear / close'     },
+            ] as sc}
+              <div class="flex items-center gap-2.5 border-b border-bd-0 py-1.5">
+                <KeyCap k={sc.k} />
+                <span class="text-ink-2 text-[11px] leading-none font-mono">{sc.desc}</span>
+              </div>
+            {/each}
+          </div>
+          <div class="mt-3 text-ink-3 text-center text-[10px] leading-none font-mono">press ? or Esc to close</div>
+        </Modal>
+      </div>
+
+      <!-- Status bar -->
+      <StatusBar
+        density={settings.density}
+        {activeGroupLabel} {activeSource}
+        activeSourceName={activeSource ? sources.find(s => s.id === activeSource)?.name : undefined}
+        itemCount={displayItems.length}
+        totalCount={pageCounts.total}
+        {unreadCount} {taggedCount}
+        {searchQuery} syncing={syncState.syncing} {syncState}
+        onToggleCheatsheet={() => showCheatsheet = !showCheatsheet}
+      />
     </div>
-    <PulseBottomNav active={activeTab} onChange={changeTab} />
-  </div>
-{/if}
+  {:else}
+    <div class="flex flex-col w-full h-full bg-bg-1 overflow-hidden">
+      <div class="shrink-0 h-[var(--sat)]"></div>
+      <div class="flex-1 overflow-hidden flex flex-col relative">
+        {#if activeTab === 'feed'}
+          <TimelinePane mode="narrow" items={items} openId={openId ?? ''} onOpen={openItem} onSearch={goToSearch} />
+        {:else if activeTab === 'sources'}
+          <div class="flex flex-col h-full bg-bg-0 text-ink-0">
+            <div class="h-[44px] flex items-center px-[10px] border-b border-b-bd-0 bg-bg-1 shrink-0 gap-2">
+              <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px] flex-1">sources <span class="text-ink-3">· {sources.length}</span></span>
+              <button onclick={doSync} aria-label="Sync feeds" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11">
+                <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1} /></span>
+              </button>
+              <button onclick={() => { document.querySelector('.add-source-target')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11" title="Add source" aria-label="Add source">
+                <Icon name="plus" size={16} color={T.cyan} />
+              </button>
+              <button onclick={() => { showOnboarding = true; }} class="bg-transparent border-none cursor-pointer text-ink-2 min-h-11 px-1 text-[10px] leading-none font-mono tracking-[0.4px]" title="Discover feeds" aria-label="Discover feeds">discover</button>
+            </div>
+            <div class="flex-1 overflow-auto">
+              <SourceExplorer onSourceSelect={openSourceFeed} onSync={doSync} />
+            </div>
+          </div>
+        {:else if activeTab === 'search'}
+          <SearchView onItemOpen={(id, ids) => openItem(id, ids)} />
+        {:else if activeTab === 'saved'}
+          <MobileSaved tab={activeTab} onTabChange={changeTab} onOpen={openItem} />
+        {:else if activeTab === 'settings'}
+          <div class="flex flex-col h-full bg-bg-0 text-ink-0">
+            <div class="h-[44px] flex items-center px-3.5 border-b border-b-bd-0 bg-bg-1 shrink-0">
+              <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px]">settings</span>
+            </div>
+            <div class="flex-1 overflow-y-auto flex flex-col gap-2.5 p-3 px-2.5">
+              <SettingsPanelContent showShortcuts={false} />
+              <div class="h-3"></div>
+            </div>
+          </div>
+        {:else}
+          <div class="flex-1 flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">{activeTab}</div>
+        {/if}
+
+        {#if openId}
+          <div class="absolute inset-0 z-10 flex flex-col">
+            <ReaderPane mode="narrow" itemId={openId} allIds={timelineIds} onBack={goBack} onNavigate={(id) => { openId = id; }} />
+          </div>
+        {/if}
+      </div>
+      <PulseBottomNav active={activeTab} onChange={changeTab} />
+    </div>
+  {/if}
+
+  {#if showOnboarding}
+    <Onboarding onDone={() => { showOnboarding = false; }} />
+  {/if}
+</div>

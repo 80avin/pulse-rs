@@ -250,6 +250,8 @@ pub fn run() {
             commands::hide_item,
             commands::get_user_tags,
             commands::set_user_tags,
+            commands::get_popular_feeds,
+            commands::add_onboard_feeds,
             commands::get_groups,
             commands::add_group,
             commands::rename_group,

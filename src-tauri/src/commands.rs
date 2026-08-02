@@ -385,6 +385,46 @@ pub async fn hide_item(state: State<'_, AppState>, id: String) -> Result<(), Str
     core.hide_item(&id).await.map_err(|e| e.to_string())
 }
 
+
+#[tauri::command]
+pub async fn get_popular_feeds() -> Result<Vec<PopularCategoryDto>, String> {
+    use std::collections::HashMap;
+    let mut cats: Vec<PopularCategoryDto> = Vec::new();
+    let mut by_cat: HashMap<&'static str, Vec<PopularFeedDto>> = HashMap::new();
+    for f in pulse_core::onboarding::POPULAR_FEEDS {
+        by_cat.entry(f.category).or_default().push(PopularFeedDto {
+            name: f.name.to_string(),
+            url: f.url.to_string(),
+            kind: f.kind.as_str().to_string(),
+        });
+    }
+    for (cat, mut feeds) in by_cat {
+        cats.push(PopularCategoryDto { category: cat.to_string(), feeds: std::mem::take(&mut feeds) });
+    }
+    Ok(cats)
+}
+
+#[tauri::command]
+pub async fn add_onboard_feeds(
+    state: State<'_, AppState>,
+    selections: Vec<OnboardSelectionDto>,
+) -> Result<usize, String> {
+    let core = state.core().await?;
+    let sels: Vec<pulse_core::onboarding::OnboardSelection> = selections
+        .into_iter()
+        .map(|s| pulse_core::onboarding::OnboardSelection {
+            name: s.name,
+            url: s.url,
+            kind: match s.kind.as_str() {
+                "reddit" => FeedType::Reddit,
+                "hn" => FeedType::Hn,
+                _ => FeedType::Rss,
+            },
+            category: s.category,
+        })
+        .collect();
+    core.add_onboard_feeds(&sels).await.map_err(|e| e.to_string())
+}
 // ── Group commands ─────────────────────────────────────────────────────────────
 
 #[tauri::command]

@@ -145,6 +145,33 @@ pub struct SyncResultDto {
     pub error: Option<String>,
 }
 
+/// A curated feed in the onboarding catalog.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PopularFeedDto {
+    pub name: String,
+    pub url: String,
+    pub kind: String,
+}
+
+/// One category in the onboarding catalog (feeds are auto-grouped into it).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PopularCategoryDto {
+    pub category: String,
+    pub feeds: Vec<PopularFeedDto>,
+}
+
+/// A feed the user selected during onboarding.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnboardSelectionDto {
+    pub name: String,
+    pub url: String,
+    pub kind: String,
+    pub category: String,
+}
+
 /// Pagination cursor for timeline pages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
