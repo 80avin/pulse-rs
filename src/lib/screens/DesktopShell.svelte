@@ -2,7 +2,6 @@
   import { T, TAG_COLORS } from '$lib/tokens';
   import { items, sources, groups, storeReady, markRead, toggleSaved, markAllRead, hideItem, dbStats } from '$lib/stores/data.svelte';
   import { doSync as storeSync, syncState } from '$lib/stores/sync.svelte';
-  import { tagStats } from '$lib/stores/ai.svelte';
   import { searchItems } from '$lib/stores/search.svelte';
   import { timelineFilter, applyFilter, setFeedFilter, setGroupFilter, setTagFilter, pageCounts } from '$lib/stores/timeline.svelte';
   import { settings } from '$lib/settings.svelte';
@@ -17,7 +16,7 @@
   import StatusDot from '$lib/components/StatusDot.svelte';
   import SettingsPanelContent from '$lib/components/SettingsPanelContent.svelte';
   import SourceExplorer from '$lib/components/SourceExplorer.svelte';
-  import TimelineList from '$lib/components/TimelineList.svelte';
+  import TimelinePane from '$lib/components/TimelinePane.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import ReaderView from '$lib/components/ReaderView.svelte';
   import Modal from '$lib/components/Modal.svelte';
@@ -119,11 +118,6 @@
   const groupSources = $derived(activeGroup === 'all' ? sources : sources.filter(s=>s.group===activeGroup));
   const unreadCount = $derived(pageCounts.unread);
   const taggedCount = $derived(dbStats.tagCount);
-
-  // Top 5 tags from global AI stats.
-  const topTags = $derived(
-    tagStats.tagCounts.slice(0, 5).map(([tag]) => tag)
-  );
 
   function selectGroup(id: string) { searchQuery = ''; setGroupFilter(id === 'all' ? null : id); }
   function setActiveTag(tag: string) {
@@ -370,43 +364,7 @@
 
     <!-- Timeline pane -->
     <div class="shrink-0 flex flex-col border-r border-bd-0 overflow-hidden bg-bg-0" style="width:{timelineWidth}px">
-      <div class="flex flex-col border-b border-bd-0 bg-bg-1 shrink-0">
-        <div class="flex items-center gap-2.5 text-ink-2 px-2.5 py-1.5 text-[10px] leading-none font-mono">
-          <span class="text-ink-0">{activeSource ? (sources.find(s => s.id === activeSource)?.name ?? activeGroupLabel) : activeGroupLabel}</span>
-          <span class="text-ink-3">·</span>
-          <span><span class="text-cyan">{unreadCount}</span><span class="text-ink-3"> unread</span></span>
-          {#if searchQuery}<span class="text-ink-3">·</span><span class="text-amber">"{searchQuery}"</span>{/if}
-          <span class="flex-1"></span>
-          {#if unreadCount > 0}
-            <button onclick={() => markAllRead(displayItems.map(i => i.id))} class="bg-transparent border-none cursor-pointer text-ink-2 text-[10px] leading-none font-mono">mark all read</button>
-          {/if}
-        </div>
-        {#if activeTag || topTags.length > 0}
-          <div class="flex items-center gap-1.5 overflow-x-auto flex-nowrap px-2 pb-1.5" style="scrollbar-width:none">
-            {#if activeTag}
-              {@const tc = TAG_COLORS[activeTag] ?? { fg: T.cyan, bg: 'rgba(78,205,214,0.10)', bd: 'rgba(78,205,214,0.30)' }}
-              <button onclick={() => setTagFilter(null)} class="shrink-0 inline-flex items-center whitespace-nowrap cursor-pointer gap-1 px-1.75 py-0.5 rounded tracking-[0.2px] text-[10px] leading-none font-mono" style="background:{tc.bg};border:1px solid {tc.bd};color:{tc.fg}">
-                <span class="text-ink-3">tag:</span>{activeTag} ×
-              </button>
-              {#if topTags.length > 0}<span class="shrink-0 text-ink-3 text-[10px] leading-none font-mono">·</span>{/if}
-            {/if}
-            {#each topTags as tag}
-              {#if tag !== activeTag}
-                {@const tc = TAG_COLORS[tag] ?? { fg: T.ink2, bg: 'transparent', bd: T.bd1 }}
-                <button onclick={() => setActiveTag(tag)} class="shrink-0 inline-flex items-center bg-transparent whitespace-nowrap cursor-pointer px-1.75 py-0.5 rounded text-[10px] leading-none font-mono border border-bd-1" style="color:{tc.fg}">{tag}</button>
-              {/if}
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <TimelineList
-        items={displayItems}
-        {searchQuery}
-        {openId}
-        onItemClick={(id) => openItemAndRead(id)}
-        onTagClick={setActiveTag}
-      />
+      <TimelinePane mode="wide" items={displayItems} {searchQuery} {openId} onOpen={openItemAndRead} />
     </div>
 
     <!-- Drag handle: timeline ↔ reader -->

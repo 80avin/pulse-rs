@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { T } from '$lib/tokens';
-  import { storeReady } from '$lib/stores/data.svelte';
+  import { storeReady, items } from '$lib/stores/data.svelte';
   import { setFeedFilter, setTagFilter } from '$lib/stores/timeline.svelte';
-  import MobileTimeline from './MobileTimeline.svelte';
   import MobileReader from './MobileReader.svelte';
   import MobileSources from './MobileSources.svelte';
   import MobileSearch from './MobileSearch.svelte';
   import MobileSaved from './MobileSaved.svelte';
+  import TimelinePane from '$lib/components/TimelinePane.svelte';
   import MobileSettings from './MobileSettings.svelte';
 
   let tab = $state('timeline');
@@ -87,10 +87,12 @@
     {:else}
       <!-- Tab content — always rendered when its tab is active, stays mounted behind reader for scroll preservation -->
       {#if tab === 'timeline'}
-        <MobileTimeline
-          {tab}
-          onTabChange={changeTab}
+        <TimelinePane
+          mode="narrow"
+          items={items}
+          openId={openItemId ?? ''}
           onOpen={openItem}
+          onSearch={() => changeTab('search')}
         />
       {:else if tab === 'sources'}
         <MobileSources
