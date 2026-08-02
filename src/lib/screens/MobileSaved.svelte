@@ -1,8 +1,8 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { T } from '$lib/tokens';
   import { sources, toggleSaved, tauriInvoke, adaptItem } from '$lib/stores/data.svelte';
   import ItemRow from '$lib/components/ItemRow.svelte';
-  import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import type { FeedItem } from '$lib/types';
 
@@ -20,9 +20,8 @@
     counts: { total: number; unread: number; saved: number; signal: number };
   }
 
-  let { tab, onTabChange, onOpen }: {
-    tab: string;
-    onTabChange: (id: string) => void;
+  // The bottom nav is rendered by AppShell; this pane only provides content.
+  let { onOpen }: {
     onOpen: (id: string, ids: string[]) => void;
   } = $props();
 
@@ -32,7 +31,9 @@
   let scrollEl: HTMLElement | null = $state(null);
 
   async function fetchMore() {
-    if (loading) return;
+    // Terminal guard: once we've loaded a page and there's no further cursor,
+    // stop. (A null cursor means "no more items".)
+    if (loading || (!cursor && saved.length > 0)) return;
     loading = true;
     try {
       const page = await tauriInvoke<BackendPage>('get_items_page', {
@@ -49,7 +50,9 @@
     }
   }
 
-  $effect(() => { fetchMore(); });
+  // Load the first page exactly once on mount. (An $effect here would re-run on
+  // every cursor/saved change and re-fetch from the start — the infinite loop.)
+  onMount(() => { fetchMore(); });
 
   function onScroll() {
     const el = scrollEl;
@@ -107,6 +110,4 @@
       {/if}
     {/if}
   </div>
-
-  <PulseBottomNav active={tab} onChange={onTabChange} />
 </div>

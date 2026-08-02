@@ -420,7 +420,7 @@
         {:else if activeTab === 'search'}
           <SearchView onItemOpen={(id, ids) => openItem(id, ids)} />
         {:else if activeTab === 'saved'}
-          <MobileSaved tab={activeTab} onTabChange={changeTab} onOpen={openItem} />
+          <MobileSaved onOpen={openItem} />
         {:else if activeTab === 'settings'}
           <div class="flex flex-col h-full bg-bg-0 text-ink-0">
             <div class="h-[44px] flex items-center px-3.5 border-b border-b-bd-0 bg-bg-1 shrink-0">
