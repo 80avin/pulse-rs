@@ -5,7 +5,7 @@
   import { tauriInvoke, reloadSources, reloadGroups, reloadDbStats } from '$lib/stores/data.svelte';
 
   interface PopularFeedDto { name: string; url: string; kind: string; }
-  interface PopularCategoryDto { category: string; feeds: PopularFeedDto[]; }
+  interface PopularCategoryDto { category: string; experimental?: boolean; feeds: PopularFeedDto[]; }
   interface OnboardSelectionDto { name: string; url: string; kind: string; category: string; }
 
   let { onDone }: { onDone: () => void } = $props();
@@ -86,7 +86,12 @@
       {#each cats as cat}
         <section class="border-b border-bd-0">
           <div class="flex items-center gap-2 px-4 py-2 sticky top-0 bg-bg-0">
-            <span class="flex-1 uppercase tracking-[0.6px] text-[10px] leading-none font-mono text-ink-3">{cat.category}</span>
+            <span class="flex-1 min-w-0 flex items-center gap-2">
+              <span class="uppercase tracking-[0.6px] text-[10px] leading-none font-mono text-ink-3 truncate">{cat.category}</span>
+              {#if cat.experimental}
+                <span class="shrink-0 inline-flex items-center rounded-sm border border-dashed border-bd-1 px-[4px] py-[2px] text-[9px] leading-none font-mono uppercase tracking-[0.5px] text-ink-2" title="Experimental category — feed quality may vary">experimental</span>
+              {/if}
+            </span>
             <button
               onclick={() => toggleCategory(cat)}
               class="bg-transparent border-none cursor-pointer text-[9px] leading-none font-mono uppercase tracking-[0.5px]"

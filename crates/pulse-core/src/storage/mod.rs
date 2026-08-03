@@ -3,5 +3,5 @@ pub mod connection;
 pub mod migrations;
 pub mod queries;
 
-pub use actor::DbHandle;
+pub use actor::{DbHandle, FeedHealthUpdate};
 pub use migrations::run_migrations;

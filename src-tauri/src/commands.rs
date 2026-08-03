@@ -401,6 +401,7 @@ pub async fn get_popular_feeds() -> Result<Vec<PopularCategoryDto>, String> {
         } else {
             cats.push(PopularCategoryDto {
                 category: f.category.to_string(),
+                experimental: f.category == "Mailing Lists",
                 feeds: vec![PopularFeedDto {
                     name: f.name.to_string(),
                     url: f.url.to_string(),

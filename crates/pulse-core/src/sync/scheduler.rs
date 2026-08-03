@@ -7,8 +7,8 @@ use tokio::task::JoinHandle;
 use crate::ai::TaggerHandle;
 use crate::error::SyncError;
 use crate::feeds::RedditAuth;
-use crate::storage::DbHandle;
 use crate::storage::queries::{get_feed, get_feeds};
+use crate::storage::{DbHandle, FeedHealthUpdate};
 use crate::sync::health::compute_next_fetch;
 use crate::types::{FeedId, FeedType};
 
@@ -307,15 +307,15 @@ pub(crate) async fn perform_sync(
             }
 
             if let Err(e) = db
-                .update_feed_health(
-                    feed_id.clone(),
-                    true,
-                    Some(elapsed_ms),
-                    new_items,
+                .update_feed_health(FeedHealthUpdate {
+                    feed_id: feed_id.clone(),
+                    success: true,
+                    latency_ms: Some(elapsed_ms),
+                    new_item_count: new_items,
                     etag,
                     last_modified,
                     last_item_at,
-                )
+                })
                 .await
             {
                 tracing::warn!(feed_id = %feed_id, error = %e, "Failed to update health after successful sync");
@@ -343,7 +343,15 @@ pub(crate) async fn perform_sync(
         Err(e) => {
             tracing::warn!(feed_id = %feed_id, error = %e, "Sync failed");
             if let Err(e2) = db
-                .update_feed_health(feed_id.clone(), false, None, 0, None, None, None)
+                .update_feed_health(FeedHealthUpdate {
+                    feed_id: feed_id.clone(),
+                    success: false,
+                    latency_ms: None,
+                    new_item_count: 0,
+                    etag: None,
+                    last_modified: None,
+                    last_item_at: None,
+                })
                 .await
             {
                 tracing::warn!(feed_id = %feed_id, error = %e2, "Failed to update health after sync failure");

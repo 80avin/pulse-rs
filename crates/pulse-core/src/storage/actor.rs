@@ -6,6 +6,19 @@ use uuid::Uuid;
 
 type DbResult<T> = Result<T, StorageError>;
 
+/// Health metrics recorded after a sync attempt. Carried through the
+/// `DbCommand::UpdateFeedHealth` message and consumed by `update_feed_health`.
+#[derive(Debug, Clone)]
+pub struct FeedHealthUpdate {
+    pub feed_id: FeedId,
+    pub success: bool,
+    pub latency_ms: Option<u64>,
+    pub new_item_count: usize,
+    pub etag: Option<String>,
+    pub last_modified: Option<String>,
+    pub last_item_at: Option<i64>,
+}
+
 /// Commands sent to the DB writer actor
 pub enum DbCommand {
     /// Upsert a batch of feed items (INSERT OR IGNORE + item_states + FTS)
@@ -23,7 +36,7 @@ pub enum DbCommand {
 
     /// Insert or update a feed
     UpsertFeed {
-        feed: Feed,
+        feed: Box<Feed>,
         reply: oneshot::Sender<DbResult<()>>,
     },
 
@@ -35,13 +48,7 @@ pub enum DbCommand {
 
     /// Update feed health after a sync
     UpdateFeedHealth {
-        feed_id: FeedId,
-        success: bool,
-        latency_ms: Option<u64>,
-        new_item_count: usize,
-        etag: Option<String>,
-        last_modified: Option<String>,
-        last_item_at: Option<i64>,
+        update: FeedHealthUpdate,
         reply: oneshot::Sender<DbResult<()>>,
     },
 
@@ -142,27 +149,8 @@ pub async fn db_writer_task(mut rx: mpsc::Receiver<DbCommand>, pool: SqlitePool)
                 let _ = reply.send(result);
             }
 
-            DbCommand::UpdateFeedHealth {
-                feed_id,
-                success,
-                latency_ms,
-                new_item_count,
-                etag,
-                last_modified,
-                last_item_at,
-                reply,
-            } => {
-                let result = update_feed_health(
-                    &pool,
-                    &feed_id,
-                    success,
-                    latency_ms,
-                    new_item_count,
-                    etag,
-                    last_modified,
-                    last_item_at,
-                )
-                .await;
+            DbCommand::UpdateFeedHealth { update, reply } => {
+                let result = update_feed_health(&pool, &update).await;
                 let _ = reply.send(result);
             }
 
@@ -501,21 +489,12 @@ async fn insert_feed_group(pool: &SqlitePool, group: &FeedGroup) -> DbResult<()>
     Ok(())
 }
 
-async fn update_feed_health(
-    pool: &SqlitePool,
-    feed_id: &FeedId,
-    success: bool,
-    latency_ms: Option<u64>,
-    _new_item_count: usize,
-    etag: Option<String>,
-    last_modified: Option<String>,
-    last_item_at: Option<i64>,
-) -> DbResult<()> {
+async fn update_feed_health(pool: &SqlitePool, update: &FeedHealthUpdate) -> DbResult<()> {
     let now = chrono::Utc::now().timestamp();
 
-    if success {
+    if update.success {
         // EMA update for latency: new_avg = 0.2 * new + 0.8 * old
-        if let Some(ms) = latency_ms {
+        if let Some(ms) = update.latency_ms {
             sqlx::query(
                 "UPDATE feeds SET
                  last_fetched_at = ?,
@@ -533,13 +512,13 @@ async fn update_feed_health(
             .bind(now)
             .bind(ms as f64)
             .bind(ms as f64)
-            .bind(last_item_at)
-            .bind(last_item_at)
-            .bind(last_item_at)
-            .bind(&etag)
-            .bind(&last_modified)
+            .bind(update.last_item_at)
+            .bind(update.last_item_at)
+            .bind(update.last_item_at)
+            .bind(&update.etag)
+            .bind(&update.last_modified)
             .bind(now)
-            .bind(feed_id)
+            .bind(&update.feed_id)
             .execute(pool)
             .await
             .map_err(StorageError::Sqlite)?;
@@ -558,13 +537,13 @@ async fn update_feed_health(
             )
             .bind(now)
             .bind(now)
-            .bind(last_item_at)
-            .bind(last_item_at)
-            .bind(last_item_at)
-            .bind(&etag)
-            .bind(&last_modified)
+            .bind(update.last_item_at)
+            .bind(update.last_item_at)
+            .bind(update.last_item_at)
+            .bind(&update.etag)
+            .bind(&update.last_modified)
             .bind(now)
-            .bind(feed_id)
+            .bind(&update.feed_id)
             .execute(pool)
             .await
             .map_err(StorageError::Sqlite)?;
@@ -581,14 +560,14 @@ async fn update_feed_health(
         )
         .bind(now)
         .bind(now)
-        .bind(feed_id)
+        .bind(&update.feed_id)
         .execute(pool)
         .await
         .map_err(StorageError::Sqlite)?;
 
         // Check if streak >= max and disable the feed
         let streak: i64 = sqlx::query_scalar("SELECT failure_streak FROM feeds WHERE id = ?")
-            .bind(feed_id)
+            .bind(&update.feed_id)
             .fetch_one(pool)
             .await
             .unwrap_or(0);
@@ -597,11 +576,11 @@ async fn update_feed_health(
         if streak >= 10 {
             sqlx::query("UPDATE feeds SET is_enabled = 0, updated_at = ? WHERE id = ?")
                 .bind(now)
-                .bind(feed_id)
+                .bind(&update.feed_id)
                 .execute(pool)
                 .await
                 .map_err(StorageError::Sqlite)?;
-            tracing::warn!(feed_id = %feed_id, "Feed disabled after {} consecutive failures", streak);
+            tracing::warn!(feed_id = %update.feed_id, "Feed disabled after {} consecutive failures", streak);
         }
     }
 
@@ -847,8 +826,11 @@ impl DbHandle {
 
     /// Upsert a feed record
     pub async fn upsert_feed(&self, feed: Feed) -> DbResult<()> {
-        self.send(|reply| DbCommand::UpsertFeed { feed, reply })
-            .await
+        self.send(|reply| DbCommand::UpsertFeed {
+            feed: Box::new(feed),
+            reply,
+        })
+        .await
     }
 
     /// Insert or update a feed group
@@ -858,27 +840,9 @@ impl DbHandle {
     }
 
     /// Update feed health metrics after a sync attempt
-    pub async fn update_feed_health(
-        &self,
-        feed_id: FeedId,
-        success: bool,
-        latency_ms: Option<u64>,
-        new_item_count: usize,
-        etag: Option<String>,
-        last_modified: Option<String>,
-        last_item_at: Option<i64>,
-    ) -> DbResult<()> {
-        self.send(|reply| DbCommand::UpdateFeedHealth {
-            feed_id,
-            success,
-            latency_ms,
-            new_item_count,
-            etag,
-            last_modified,
-            last_item_at,
-            reply,
-        })
-        .await
+    pub async fn update_feed_health(&self, update: FeedHealthUpdate) -> DbResult<()> {
+        self.send(|reply| DbCommand::UpdateFeedHealth { update, reply })
+            .await
     }
 
     /// Store AI tags for an item

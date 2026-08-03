@@ -19,6 +19,10 @@
   let searchInputEl: HTMLInputElement | null = $state(null);
 
   $effect(() => {
+    searchInputEl?.focus();
+  });
+
+  $effect(() => {
     const q = query.trim();
     if (q.length < 2) { results = []; searching = false; return; }
     searching = true;
@@ -31,7 +35,7 @@
   <div class="shrink-0 border-b border-bd-0 bg-bg-1 p-2 px-2.5">
     <div class="flex items-center gap-2 bg-bg-0 border border-bd-1 rounded p-2 px-2.5">
       <Icon name="search" size={15} color={T.ink3} />
-      <input bind:this={searchInputEl} bind:value={query} placeholder="search all items…" autofocus class="flex-1 bg-transparent border-none outline-none text-ink-0 text-[13px] leading-none font-mono" />
+      <input bind:this={searchInputEl} bind:value={query} placeholder="search all items…" class="flex-1 bg-transparent border-none outline-none text-ink-0 text-[13px] leading-none font-mono" />
       {#if searching}<span class="text-ink-3 text-[10px] leading-none font-mono">…</span>
       {:else if query}<button onclick={() => { query = ''; results = []; searchInputEl?.focus(); }} class="bg-transparent border-none cursor-pointer flex p-0.5"><Icon name="x" size={14} color={T.ink3} /></button>{/if}
     </div>

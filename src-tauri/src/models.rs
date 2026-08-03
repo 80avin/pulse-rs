@@ -159,6 +159,7 @@ pub struct PopularFeedDto {
 #[serde(rename_all = "camelCase")]
 pub struct PopularCategoryDto {
     pub category: String,
+    pub experimental: bool,
     pub feeds: Vec<PopularFeedDto>,
 }
 

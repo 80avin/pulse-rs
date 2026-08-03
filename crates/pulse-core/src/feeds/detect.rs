@@ -263,7 +263,7 @@ fn detect_well_known(host: &str, path: &str, query: &str) -> Option<FeedCandidat
                     ],
                 });
             }
-            [user] if !user.starts_with('.') && !NON_USER.contains(&user) => {
+            [user] if !user.starts_with('.') && !NON_USER.contains(user) => {
                 return Some(make(
                     format!("https://github.com/{user}.atom"),
                     format!("{user} (GitHub)"),
