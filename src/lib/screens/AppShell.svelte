@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { T } from '$lib/tokens';
-  import { items, sources, groups, storeReady, markRead, toggleSaved, hideItem, dbStats } from '$lib/stores/data.svelte';
+  import { items, sources, groups, storeReady, markRead, toggleSaved, hideItem, dbStats, markSourceRead, removeSource, syncSource as storeSyncSource } from '$lib/stores/data.svelte';
   import { doSync as storeSync, syncState } from '$lib/stores/sync.svelte';
   import { searchItems } from '$lib/stores/search.svelte';
   import { timelineFilter, applyFilter, setFeedFilter, setGroupFilter, setTagFilter, pageCounts } from '$lib/stores/timeline.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal } from '$lib/utils';
+  import { Portal } from 'bits-ui';
   import Icon from '$lib/components/Icon.svelte';
   import KeyCap from '$lib/components/KeyCap.svelte';
   import DragHandle from '$lib/components/DragHandle.svelte';
@@ -188,6 +189,22 @@
   }
   async function doSync() { await storeSync(); }
 
+  // Right-click source context menu
+  let sourceMenu = $state<{ source: import('$lib/types').Source; x: number; y: number } | null>(null);
+  function openSourceMenu(e: MouseEvent, s: import('$lib/types').Source) {
+    e.preventDefault();
+    sourceMenu = { source: s, x: e.clientX, y: e.clientY };
+  }
+  function closeSourceMenu() { sourceMenu = null; }
+  function sourceMenuView(id: string) {
+    setFeedFilter(activeSource === id ? null : id);
+    closeSourceMenu();
+  }
+  async function sourceMenuRefresh(id: string) { await storeSyncSource(id); closeSourceMenu(); }
+  async function sourceMenuMarkRead(id: string) { await markSourceRead(id); closeSourceMenu(); }
+  async function sourceMenuRemove(id: string) { await removeSource(id); closeSourceMenu(); }
+  function sourceMenuEdit() { closeSourceMenu(); showSources = true; }
+
   // Wide keyboard shortcuts
   $effect(() => {
     function onKey(e: KeyboardEvent) {
@@ -296,39 +313,40 @@
               </div>
             </div>
             <FilterPills active={desktopFilter} onChange={handleFilterChange} />
-            <div class="border-b border-bd-0 pt-0.5 pb-1">
+            <div class="border-b border-bd-0 pt-0.5 pb-1 shrink-0">
               <div class="uppercase text-ink-3 px-3 pt-1.5 pb-0.5 tracking-[0.6px] text-[10px] leading-none font-mono">groups</div>
-              <GroupTabs {groups} active={activeGroup} onSelect={(id) => selectGroup(id)} orientation="vertical" />
+              <div class="max-h-40 overflow-y-auto">
+                <GroupTabs {groups} active={activeGroup} onSelect={(id) => selectGroup(id)} orientation="vertical" />
+              </div>
             </div>
-            <div class="border-b border-bd-0">
-              <button onclick={() => showSourcesAccordion = !showSourcesAccordion} aria-label={`Sources for ${activeGroupLabel}`} aria-expanded={showSourcesAccordion} class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3">
+            <div class="flex-1 min-h-0 flex flex-col border-b border-bd-0">
+              <button onclick={() => showSourcesAccordion = !showSourcesAccordion} aria-label={`Sources for ${activeGroupLabel}`} aria-expanded={showSourcesAccordion} class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3 shrink-0">
                 <span class="uppercase flex-1 text-ink-3 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
                 <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
                 <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
               </button>
               {#if showSourcesAccordion}
-                <div class="p-[0_8px_6px]">
+                <div class="flex-1 min-h-0 overflow-y-auto px-2">
                   {#each groupSources as s}
-                    <button onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }} oncontextmenu={(e) => { e.preventDefault(); }} class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1 hover:bg-bg-2 focus-visible:outline-1 focus-visible:outline-[var(--color-cyan)]" style={activeSource===s.id ? `background:rgba(78,205,214,0.06);border-left:2px solid ${T.cyan}` : 'border-left:2px solid transparent'} aria-current={activeSource===s.id ? 'true' : undefined}>
+                    <button onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }} oncontextmenu={(e) => openSourceMenu(e, s)} class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1 hover:bg-bg-2 focus-visible:outline-1 focus-visible:outline-[var(--color-cyan)]" style={activeSource===s.id ? `background:rgba(78,205,214,0.06);border-left:2px solid ${T.cyan}` : 'border-left:2px solid transparent'} aria-current={activeSource===s.id ? 'true' : undefined}>
                       <StatusDot status={s.status} size={5} />
-                      <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-[11px] leading-[1.2] font-mono" style="color:{activeSource===s.id ? T.ink0 : T.ink1};">{s.name}</span>
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-[12px] leading-[1.2] font-mono" style="color:{activeSource===s.id ? T.ink0 : T.ink1};">{s.name}</span>
                       {#if s.unread > 0}<span class="text-cyan text-[10px] leading-none font-mono">{s.unread}</span>{/if}
                     </button>
                   {/each}
-                  <div class="flex items-center gap-1 mt-0.5">
-                    <button onclick={() => { showSources = !showSources; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer text-left px-1.5 py-1 text-[10px] leading-none font-mono">
-                      <Icon name="plus" size={10} color={T.ink3} />
-                      <span>Manage Sources</span>
-                    </button>
-                    <button onclick={() => { showOnboarding = true; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer justify-center px-1.5 py-1 text-[10px] leading-none font-mono" title="Discover feeds" aria-label="Discover feeds">
-                      <Icon name="list" size={10} color={T.ink3} />
-                      <span>discover</span>
-                    </button>
-                  </div>
+                </div>
+                <div class="shrink-0 flex items-center gap-1 px-2 pb-1.5 pt-1">
+                  <button onclick={() => { showSources = !showSources; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer text-left px-1.5 py-1 text-[10px] leading-none font-mono">
+                    <Icon name="plus" size={10} color={T.ink3} />
+                    <span>Manage Sources</span>
+                  </button>
+                  <button onclick={() => { showOnboarding = true; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer justify-center px-1.5 py-1 text-[10px] leading-none font-mono" title="Discover feeds" aria-label="Discover feeds">
+                    <Icon name="list" size={10} color={T.ink3} />
+                    <span>discover</span>
+                  </button>
                 </div>
               {/if}
             </div>
-            <div class="flex-1"></div>
             <BottomTools {showSources} {showSettings} syncing={syncState.syncing} {syncState} onToggleSources={() => { showSources = !showSources; }} onToggleSettings={() => { showSettings = !showSettings; }} />
           </div>
         {/if}
@@ -447,6 +465,34 @@
 
   {#if showOnboarding}
     <Onboarding onDone={finishOnboarding} />
+  {/if}
+
+  {#if sourceMenu}
+    <Portal>
+      <div class="fixed inset-0 z-[100] anim-sheet-overlay-in" onclick={closeSourceMenu} aria-hidden="true"></div>
+      <div class="fixed z-[101] bg-bg-1 border border-bd-1 rounded overflow-hidden w-48 shadow-[0_8px_32px_rgba(0,0,0,0.6)] anim-pop-in" style="left:{Math.max(4, Math.min(sourceMenu.x, window.innerWidth - 200))}px;top:{Math.max(4, Math.min(sourceMenu.y, window.innerHeight - 230))}px;">
+        <button onclick={() => sourceMenuView(sourceMenu!.source.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[11px_14px] text-[12px] leading-none font-mono" style="color:{T.ink2};">
+          <Icon name="list" size={12} color={T.ink2} />
+          <span>View feed</span>
+        </button>
+        <button onclick={() => sourceMenuRefresh(sourceMenu!.source.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[11px_14px] text-[12px] leading-none font-mono" style="color:{T.ink2};">
+          <Icon name="sync" size={12} color={T.ink2} />
+          <span>Refresh now</span>
+        </button>
+        <button onclick={() => sourceMenuMarkRead(sourceMenu!.source.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[11px_14px] text-[12px] leading-none font-mono" style="color:{T.ink2};">
+          <Icon name="star" size={12} color={T.ink2} />
+          <span>Mark all read</span>
+        </button>
+        <button onclick={sourceMenuEdit} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[11px_14px] text-[12px] leading-none font-mono" style="color:{T.cyan};">
+          <Icon name="edit" size={12} color={T.cyan} />
+          <span>Edit</span>
+        </button>
+        <button onclick={() => sourceMenuRemove(sourceMenu!.source.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left p-[11px_14px] text-[12px] leading-none font-mono" style="color:{T.red};">
+          <Icon name="trash" size={12} color={T.red} />
+          <span>Remove</span>
+        </button>
+      </div>
+    </Portal>
   {/if}
 
   <ItemActionsMenu />

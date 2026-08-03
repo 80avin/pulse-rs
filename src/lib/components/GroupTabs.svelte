@@ -3,6 +3,7 @@
   import type { Group } from '$lib/types';
   import { createGroup, renameGroup, deleteGroup } from '$lib/stores/data.svelte';
   import Icon from './Icon.svelte';
+  import Modal from './Modal.svelte';
   import { longpress } from './longpress.svelte';
 
   let { groups, active, onSelect, counts = {}, orientation = 'horizontal' }: {
@@ -104,78 +105,65 @@
   </div>
 {/if}
 
-{#if editing}
-  <div class="bg-bg-1 border-b border-bd-0">
-    <div class="flex items-center justify-between text-cyan uppercase px-2.5 py-1.5 text-[10px] leading-none font-mono tracking-[0.6px] bg-[rgba(78,205,214,0.06)]">
-      <span class="inline-flex items-center gap-1.5">
-        <Icon name="edit" size={11} />
-        edit groups
-      </span>
-      <button
-        onclick={() => { editing = false; showNewInput = false; renamingId = null; }}
-        class="bg-transparent text-cyan cursor-pointer rounded-sm border border-cyan-dim p-[3px_8px] text-[10px] leading-none font-mono tracking-[0.4px]"
-      >DONE</button>
-    </div>
-
-    {#each groups as g}
-      {#if g.id === 'all'}
-        <div class="grid items-center gap-2 border-t border-bd-0 grid-cols-[20px_1fr_auto] p-2 px-2.5 opacity-40">
-          <Icon name="grip" size={14} color={T.ink3} />
-          <span class="text-ink-0 text-[13px] leading-[1.2] font-mono">{g.name}</span>
-          <span class="text-ink-2 text-[10px] leading-none font-mono">{counts[g.id] ?? g.n}</span>
-        </div>
-      {:else}
-        <div class="grid items-center gap-2 border-t border-bd-0 grid-cols-[20px_1fr_auto_auto_auto] p-2 px-2.5">
-          <Icon name="grip" size={14} color={T.ink3} />
-          {#if renamingId === g.id}
-            <input
-              value={renameVal}
-              oninput={(e) => renameVal = (e.target as HTMLInputElement).value}
-              onkeydown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') renamingId = null; }}
-              onblur={commitRename}
-              class="text-ink-0 bg-bg-0 border border-cyan outline-none w-full px-1.5 py-1 rounded-sm text-[13px] leading-[1.2] font-mono"
-            />
-          {:else}
-            <span class="text-ink-0 bg-bg-0 border border-bd-1 px-1.5 py-1 rounded-sm text-[13px] leading-[1.2] font-mono">{g.name}</span>
-          {/if}
-          <span class="text-ink-2 tabular-nums text-[10px] leading-none font-mono">{counts[g.id] ?? g.n}</span>
-          <button
-            onclick={() => startRename(g)}
-            aria-label={`Rename group ${g.name}`}
-            class="p-0 bg-transparent border border-bd-1 text-ink-1 flex items-center justify-center cursor-pointer rounded-sm min-w-11 min-h-11"
-          >
-            <Icon name="edit" size={13} />
-          </button>
-          <button
-            onclick={() => handleDelete(g.id)}
-            aria-label={`Delete group ${g.name}`}
-            class="p-0 bg-transparent text-red flex items-center justify-center cursor-pointer rounded-sm min-w-11 min-h-11 border border-red-dim"
-          >
-            <Icon name="trash" size={13} />
-          </button>
-        </div>
-      {/if}
-    {/each}
-
-    {#if showNewInput}
-      <div class="flex items-center gap-2 border-t border-bd-0 p-2 px-2.5">
-        <Icon name="plus" size={13} color={T.cyan} />
-        <input
-          bind:value={newName}
-          placeholder="group name"
-          onkeydown={(e) => { if (e.key === 'Enter') commitNewGroup(); if (e.key === 'Escape') { showNewInput = false; newName = ''; } }}
-          onblur={commitNewGroup}
-          class="flex-1 text-ink-0 bg-bg-0 border border-cyan outline-none rounded-sm px-2 py-1.5 text-[12px] leading-none font-mono"
-        />
+<Modal open={editing} title="Edit Groups" onClose={() => { editing = false; showNewInput = false; renamingId = null; }} width="360px">
+  {#each groups as g}
+    {#if g.id === 'all'}
+      <div class="grid items-center gap-2 border-b border-bd-0 grid-cols-[20px_1fr_auto] p-2 px-2.5 opacity-40">
+        <Icon name="grip" size={14} color={T.ink3} />
+        <span class="text-ink-0 text-[13px] leading-[1.2] font-mono">{g.name}</span>
+        <span class="text-ink-2 text-[10px] leading-none font-mono">{counts[g.id] ?? g.n}</span>
       </div>
     {:else}
-      <button
-        onclick={() => { showNewInput = true; }}
-        class="w-full bg-transparent border-none border-t border-bd-0 text-cyan text-left cursor-pointer flex items-center gap-2 px-3 py-2.5 text-[11px] leading-none font-mono tracking-[0.4px]"
-      >
-        <Icon name="plus" size={13} />
-        NEW GROUP
-      </button>
+      <div class="grid items-center gap-2 border-b border-bd-0 grid-cols-[20px_1fr_auto_auto_auto] p-2 px-2.5">
+        <Icon name="grip" size={14} color={T.ink3} />
+        {#if renamingId === g.id}
+          <input
+            value={renameVal}
+            oninput={(e) => renameVal = (e.target as HTMLInputElement).value}
+            onkeydown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') renamingId = null; }}
+            onblur={commitRename}
+            class="text-ink-0 bg-bg-0 border border-cyan outline-none w-full px-1.5 py-1 rounded-sm text-[13px] leading-[1.2] font-mono"
+          />
+        {:else}
+          <span class="text-ink-0 bg-bg-0 border border-bd-1 px-1.5 py-1 rounded-sm text-[13px] leading-[1.2] font-mono">{g.name}</span>
+        {/if}
+        <span class="text-ink-2 tabular-nums text-[10px] leading-none font-mono">{counts[g.id] ?? g.n}</span>
+        <button
+          onclick={() => startRename(g)}
+          aria-label={`Rename group ${g.name}`}
+          class="p-0 bg-transparent border border-bd-1 text-ink-1 flex items-center justify-center cursor-pointer rounded-sm min-w-11 min-h-11"
+        >
+          <Icon name="edit" size={13} />
+        </button>
+        <button
+          onclick={() => handleDelete(g.id)}
+          aria-label={`Delete group ${g.name}`}
+          class="p-0 bg-transparent text-red flex items-center justify-center cursor-pointer rounded-sm min-w-11 min-h-11 border border-red-dim"
+        >
+          <Icon name="trash" size={13} />
+        </button>
+      </div>
     {/if}
-  </div>
-{/if}
+  {/each}
+
+  {#if showNewInput}
+    <div class="flex items-center gap-2 p-2 px-2.5">
+      <Icon name="plus" size={13} color={T.cyan} />
+      <input
+        bind:value={newName}
+        placeholder="group name"
+        onkeydown={(e) => { if (e.key === 'Enter') commitNewGroup(); if (e.key === 'Escape') { showNewInput = false; newName = ''; } }}
+        onblur={commitNewGroup}
+        class="flex-1 text-ink-0 bg-bg-0 border border-cyan outline-none rounded-sm px-2 py-1.5 text-[12px] leading-none font-mono"
+      />
+    </div>
+  {:else}
+    <button
+      onclick={() => { showNewInput = true; }}
+      class="w-full bg-transparent border-none text-cyan text-left cursor-pointer flex items-center gap-2 px-3 py-2.5 text-[11px] leading-none font-mono tracking-[0.4px]"
+    >
+      <Icon name="plus" size={13} />
+      NEW GROUP
+    </button>
+  {/if}
+</Modal>
