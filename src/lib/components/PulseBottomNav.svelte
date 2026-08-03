@@ -3,7 +3,6 @@
   import { groups, dbStats } from '$lib/stores/data.svelte';
   import { TABS, type TabId } from '$lib/nav';
   import Icon from './Icon.svelte';
-  import { Toolbar } from 'bits-ui';
 
   let { active, onChange }: {
     active: TabId | string;
@@ -21,13 +20,15 @@
   };
 </script>
 
-<Toolbar.Root loop={false} orientation="horizontal" class="flex flex-col shrink-0 border-t border-t-bd-1 bg-bg-1" style="padding-bottom:env(safe-area-inset-bottom,0px);">
+<nav class="flex flex-col shrink-0 border-t border-t-bd-1 bg-bg-1" style="padding-bottom:env(safe-area-inset-bottom,0px);">
   <div class="flex">
   {#each TABS as tab}
     {@const m = META[tab]}
     {@const a = tab === active}
-    <Toolbar.Button
+    <button
+      type="button"
       onclick={() => onChange(tab)}
+      aria-current={a ? 'page' : undefined}
       class="flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer tracking-[0.5px] relative min-h-13 pt-[10px] pb-[12px] text-[9px] leading-none font-mono"
       style="
         border-top:2px solid {a ? T.cyan : 'transparent'};
@@ -42,7 +43,7 @@
         {/if}
       </div>
       <span>{m.label}</span>
-    </Toolbar.Button>
+    </button>
   {/each}
   </div>
-</Toolbar.Root>
+</nav>

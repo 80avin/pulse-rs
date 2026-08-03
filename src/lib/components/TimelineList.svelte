@@ -1,6 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import type { FeedItem } from '$lib/types';
+  import type { Snippet } from 'svelte';
   import { sources, storeReady } from '$lib/stores/data.svelte';
   import { loadingMore, fetchNextPage } from '$lib/stores/timeline.svelte';
   import { settings } from '$lib/settings.svelte';
@@ -15,6 +16,9 @@
     openId = '',
     onItemClick,
     onTagClick,
+    hasMore,
+    onLoadMore,
+    renderAction,
   }: {
     items: FeedItem[];
     searchQuery?: string;
@@ -22,10 +26,19 @@
     openId?: string;
     onItemClick: (id: string, allIds: string[]) => void;
     onTagClick?: (tag: string) => void;
+    hasMore?: boolean;
+    onLoadMore?: () => void;
+    renderAction?: Snippet<[FeedItem]>;
   } = $props();
 
   const density = $derived(settings.density);
   const allIds = $derived(items.map(i => i.id));
+  // Custom pagination override: when `hasMore`/`onLoadMore` are supplied they
+  // drive the near-bottom / auto-fill checks instead of the global timeline
+  // store (used by MobileSaved). Default = existing timeline-store behavior.
+  const more = $derived(hasMore ?? !!loadingMore.cursor);
+  const loadMore = $derived(onLoadMore ?? fetchNextPage);
+  const busy = $derived(onLoadMore !== undefined ? false : loadingMore.active);
 
   let listScrollEl: HTMLElement | null = $state(null);
   const listVirtualizer = createVirtualizer({
@@ -46,10 +59,10 @@
     const el = listScrollEl;
     if (!el) return;
     function onScroll() {
-      if (!loadingMore.cursor || loadingMore.active) return;
+      if (!more || busy) return;
       const e = el as HTMLElement;
       const d = e.scrollHeight - e.scrollTop - e.clientHeight;
-      if (d < 300) fetchNextPage();
+      if (d < 300) loadMore();
     }
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
@@ -57,11 +70,11 @@
 
   $effect(() => {
     if (items.length === 0) return;
-    if (!listScrollEl || !loadingMore.cursor || loadingMore.active) return;
+    if (!listScrollEl || !more || busy) return;
     requestAnimationFrame(() => {
-      if (!listScrollEl || !loadingMore.cursor || loadingMore.active) return;
+      if (!listScrollEl || !more || busy) return;
       if (listScrollEl.scrollHeight <= listScrollEl.clientHeight + 100) {
-        fetchNextPage();
+        loadMore();
       }
     });
   });
@@ -69,7 +82,7 @@
 
 <div bind:this={listScrollEl} class="flex-1 overflow-y-auto overflow-x-hidden relative">
   {#if items.length === 0 && !storeReady.loading}
-    <div class="p-8 text-center text-[11px] leading-[1.6] font-mono text-ink-3">
+    <div class="p-8 text-center whitespace-pre-line text-[11px] leading-[1.6] font-mono text-ink-3">
       {emptyMessage || (searchQuery ? `no results for "${searchQuery}"` : 'no items in this view')}
     </div>
   {:else}
@@ -91,11 +104,14 @@
               onclick={() => onItemClick(item.id, allIds)}
               {onTagClick}
             />
+            {#if renderAction}
+              {@render renderAction(item)}
+            {/if}
           </div>
         {/if}
       {/each}
     </div>
-    {#if loadingMore.cursor}
+    {#if more}
       <div class="h-9 flex items-center justify-center text-[10px] leading-none font-mono text-ink-3">
         {loadingMore.active ? 'loading…' : ''}
       </div>

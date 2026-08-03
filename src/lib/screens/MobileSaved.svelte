@@ -1,9 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { T } from '$lib/tokens';
-  import { sources, toggleSaved, tauriInvoke, adaptItem } from '$lib/stores/data.svelte';
-  import { settings } from '$lib/settings.svelte';
-  import ItemRow from '$lib/components/ItemRow.svelte';
+  import { toggleSaved, tauriInvoke, adaptItem } from '$lib/stores/data.svelte';
+  import TimelineList from '$lib/components/TimelineList.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import type { FeedItem, BackendItem } from '$lib/types';
 
@@ -22,7 +21,6 @@
   let saved = $state<FeedItem[]>([]);
   let cursor = $state<{ publishedAt: number; itemId: string } | null>(null);
   let loading = $state(false);
-  let scrollEl: HTMLElement | null = $state(null);
 
   async function fetchMore() {
     // Terminal guard: once we've loaded a page and there's no further cursor,
@@ -48,12 +46,6 @@
   // every cursor/saved change and re-fetch from the start — the infinite loop.)
   onMount(() => { fetchMore(); });
 
-  function onScroll() {
-    const el = scrollEl;
-    if (!el || !cursor || loading) return;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) fetchMore();
-  }
-
   async function onUnsave(item: FeedItem) {
     await toggleSaved(item.id);
     saved = saved.filter(i => i.id !== item.id);
@@ -69,39 +61,23 @@
     <span class="text-[10px] leading-none font-mono text-ink-3">{saved.length} saved</span>
   </div>
 
-  <!-- Saved items -->
-  <div bind:this={scrollEl} onscroll={onScroll} class="flex-1 overflow-y-auto">
-    {#if saved.length === 0}
-      <div class="text-center text-ink-3 py-14 px-6 text-[11px] leading-[1.6] font-mono">
-        <div>no saved items yet</div>
-        <div class="mt-1.5 text-ink-4 text-[10px] leading-none font-mono">tap the bookmark on any item to save it for later</div>
-      </div>
-    {:else}
-      {#each saved as item}
-        {@const source = sources.find(s => s.id === item.src)}
-        <div class="relative">
-          <ItemRow
-            {item}
-            {source}
-            isFocused={false}
-            density={settings.density}
-            onclick={() => onOpen(item.id, saved.map(i => i.id))}
-          />
-          <button
-            onclick={() => onUnsave(item)}
-            title="Remove from saved"
-            aria-label="Remove from saved"
-            class="absolute top-1 right-1 bg-transparent border-none cursor-pointer p-1 opacity-70 hover:opacity-100"
-          >
-            <Icon name="x" size={12} color={T.amber} />
-          </button>
-        </div>
-      {/each}
-      {#if cursor}
-        <div class="h-9 flex items-center justify-center text-[10px] leading-none font-mono text-ink-3">
-          {loading ? 'loading…' : ''}
-        </div>
-      {/if}
-    {/if}
-  </div>
+  <!-- Saved items (virtualized list with scroll-to-load-more; unsave overlay per row) -->
+  <TimelineList
+    items={saved}
+    hasMore={!!cursor}
+    onLoadMore={fetchMore}
+    emptyMessage={'no saved items yet\ntap the bookmark on any item to save it for later'}
+    onItemClick={(id, allIds) => onOpen(id, allIds)}
+  >
+    {#snippet renderAction(item)}
+      <button
+        onclick={() => onUnsave(item)}
+        title="Remove from saved"
+        aria-label="Remove from saved"
+        class="absolute top-1 right-1 bg-transparent border-none cursor-pointer p-1 opacity-70 hover:opacity-100"
+      >
+        <Icon name="x" size={12} color={T.amber} />
+      </button>
+    {/snippet}
+  </TimelineList>
 </div>

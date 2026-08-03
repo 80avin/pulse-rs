@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { T, TAG_COLORS } from '$lib/tokens';
+  import { T } from '$lib/tokens';
   import { groups, sources, markAllRead } from '$lib/stores/data.svelte';
   import { doSync as storeSync, syncState } from '$lib/stores/sync.svelte';
   import { timelineFilter, applyFilter, setFeedFilter, setTagFilter, pageCounts } from '$lib/stores/timeline.svelte';
@@ -7,6 +7,7 @@
   import GroupTabs from './GroupTabs.svelte';
   import FilterStrip from './FilterStrip.svelte';
   import Icon from './Icon.svelte';
+  import TagFilterRow from './TagFilterRow.svelte';
   import TimelineList from './TimelineList.svelte';
   import type { FeedItem } from '$lib/types';
 
@@ -74,21 +75,12 @@
         {/if}
       </div>
       {#if timelineFilter.tag || topTags.length > 0}
-        <div class="flex items-center gap-1.5 overflow-x-auto flex-nowrap px-2 pb-1.5" style="scrollbar-width:none">
-          {#if timelineFilter.tag}
-            {@const tc = TAG_COLORS[timelineFilter.tag] ?? { fg: T.cyan, bg: 'rgba(78,205,214,0.10)', bd: 'rgba(78,205,214,0.30)' }}
-            <button onclick={() => setTagFilter(null)} class="shrink-0 inline-flex items-center whitespace-nowrap cursor-pointer gap-1 px-1.75 py-0.5 rounded tracking-[0.2px] text-[10px] leading-none font-mono" style="background:{tc.bg};border:1px solid {tc.bd};color:{tc.fg}">
-              <span class="text-ink-3">tag:</span>{timelineFilter.tag} ×
-            </button>
-            {#if topTags.length > 0}<span class="shrink-0 text-ink-3 text-[10px] leading-none font-mono">·</span>{/if}
-          {/if}
-          {#each topTags as tag}
-            {#if tag !== timelineFilter.tag}
-              {@const tc = TAG_COLORS[tag] ?? { fg: T.ink2, bg: 'transparent', bd: T.bd1 }}
-              <button onclick={() => handleTagClick(tag)} class="shrink-0 inline-flex items-center bg-transparent whitespace-nowrap cursor-pointer px-1.75 py-0.5 rounded text-[10px] leading-none font-mono border border-bd-1" style="color:{tc.fg}">{tag}</button>
-            {/if}
-          {/each}
-        </div>
+        <TagFilterRow
+          activeTag={timelineFilter.tag}
+          {topTags}
+          onSelectTag={handleTagClick}
+          onClearTag={() => setTagFilter(null)}
+        />
       {/if}
     </div>
   {:else}
