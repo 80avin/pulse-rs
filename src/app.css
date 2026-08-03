@@ -266,6 +266,12 @@ button:not(:disabled) { cursor: pointer; }
     -webkit-user-select: none;
     transition: filter 0.1s ease, transform 0.06s ease;
   }
+  /* Article-body links must stay selectable/copyable in the reader. */
+  .item-body a {
+    -webkit-touch-callout: default;
+    user-select: text;
+    -webkit-user-select: text;
+  }
   @media (hover: hover) {
     button:not(:disabled):hover,
     [role='button']:hover {
