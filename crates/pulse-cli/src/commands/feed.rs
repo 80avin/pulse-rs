@@ -1,6 +1,7 @@
 use clap::{Args, Subcommand};
 use pulse_core::{
     PulseCore,
+    onboarding::OnboardSelection,
     types::{Feed, FeedGroup, FeedType},
 };
 use uuid::Uuid;
@@ -31,6 +32,8 @@ pub enum FeedCommand {
     Edit(FeedEditArgs),
     /// Show health metrics for feeds
     Health(FeedHealthArgs),
+    /// Import feeds from a JSON export file
+    ImportJson(FeedImportJsonArgs),
 }
 
 #[derive(Debug, Args)]
@@ -112,6 +115,12 @@ pub struct FeedHealthArgs {
     pub json: bool,
 }
 
+#[derive(Debug, Args)]
+pub struct FeedImportJsonArgs {
+    /// Path to a JSON file: an array of { name, url, kind, group }
+    pub path: String,
+}
+
 /// Auto-detect feed type from URL or input string.
 fn detect_feed_type(url: &str) -> FeedType {
     let lower = url.to_lowercase();
@@ -172,6 +181,7 @@ pub async fn run(args: FeedArgs, core: &PulseCore, global_json: bool) -> anyhow:
         FeedCommand::Disable(a) => cmd_enable(a, core, false).await,
         FeedCommand::Edit(a) => cmd_edit(a, core).await,
         FeedCommand::Health(a) => cmd_health(a, core, global_json).await,
+        FeedCommand::ImportJson(a) => cmd_import_json(a, core).await,
     }
 }
 
@@ -533,4 +543,194 @@ async fn cmd_health(
         );
     }
     Ok(())
+}
+
+// ── JSON import ─────────────────────────────────────────────────────────────────
+
+/// A single entry in a feeds-export JSON file. Unknown fields are ignored and
+/// optional fields default to None.
+#[derive(Debug, serde::Deserialize)]
+struct ExportFeed {
+    name: Option<String>,
+    url: Option<String>,
+    kind: Option<String>,
+    group: Option<String>,
+}
+
+/// Map an export `kind` string to a `FeedType`: "hn" → Hn, "reddit" → Reddit,
+/// anything else (including a missing/unknown kind) → Rss.
+fn kind_to_feed_type(kind: &str) -> FeedType {
+    match kind {
+        "hn" => FeedType::Hn,
+        "reddit" => FeedType::Reddit,
+        _ => FeedType::Rss,
+    }
+}
+
+/// True when `url` looks like a usable http(s) feed URL.
+fn is_http_url(url: &str) -> bool {
+    let lower = url.to_lowercase();
+    lower.starts_with("http://") || lower.starts_with("https://")
+}
+
+/// Normalize an HN entry's URL: a bare section name like "topstories" (no
+/// scheme) collapses to the HN home feed.
+fn normalize_hn_url(url: &str) -> String {
+    if is_http_url(url) {
+        url.to_string()
+    } else {
+        "https://news.ycombinator.com".to_string()
+    }
+}
+
+/// Map a raw JSON entry to an `OnboardSelection`, normalizing kind and HN URL
+/// and mapping `group` → `category`. Returns None for entries missing a name or
+/// url (callers skip and count those).
+fn entry_to_selection(entry: &ExportFeed) -> Option<OnboardSelection> {
+    let name = entry.name.as_deref().unwrap_or("").trim();
+    let url = entry.url.as_deref().unwrap_or("").trim();
+    if name.is_empty() || url.is_empty() {
+        return None;
+    }
+    let kind = kind_to_feed_type(entry.kind.as_deref().unwrap_or("rss"));
+    let url = if kind == FeedType::Hn {
+        normalize_hn_url(url)
+    } else {
+        url.to_string()
+    };
+    let category = entry.group.as_deref().unwrap_or("Imported").trim();
+    Some(OnboardSelection {
+        name: name.to_string(),
+        url,
+        kind,
+        category: if category.is_empty() {
+            "Imported".to_string()
+        } else {
+            category.to_string()
+        },
+    })
+}
+
+async fn cmd_import_json(args: FeedImportJsonArgs, core: &PulseCore) -> anyhow::Result<()> {
+    let text = std::fs::read_to_string(&args.path)
+        .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", args.path))?;
+    let entries: Vec<ExportFeed> = serde_json::from_str(&text)
+        .map_err(|e| anyhow::anyhow!("failed to parse {} as a JSON array: {e}", args.path))?;
+
+    let mut sels = Vec::new();
+    let mut skipped = 0;
+    for entry in entries {
+        match entry_to_selection(&entry) {
+            Some(sel) => sels.push(sel),
+            None => {
+                skipped += 1;
+                eprintln!("warning: skipping entry with empty name/url: {entry:?}");
+            }
+        }
+    }
+
+    let added = core.add_onboard_feeds(&sels).await?;
+    if skipped > 0 {
+        println!("skipped {skipped} entry(ies) with empty name/url");
+    }
+    println!("added {added} feed(s) from {}", args.path);
+    if added == 0 {
+        anyhow::bail!("no feeds were added");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn entry(
+        name: Option<&str>,
+        url: Option<&str>,
+        kind: Option<&str>,
+        group: Option<&str>,
+    ) -> ExportFeed {
+        ExportFeed {
+            name: name.map(str::to_string),
+            url: url.map(str::to_string),
+            kind: kind.map(str::to_string),
+            group: group.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn kind_mapping_handles_all_export_kinds() {
+        assert_eq!(kind_to_feed_type("hn"), FeedType::Hn);
+        assert_eq!(kind_to_feed_type("reddit"), FeedType::Reddit);
+        assert_eq!(kind_to_feed_type("rss"), FeedType::Rss);
+        // unknown or missing kinds fall back to RSS
+        assert_eq!(kind_to_feed_type("atom"), FeedType::Rss);
+        assert_eq!(kind_to_feed_type(""), FeedType::Rss);
+        assert_eq!(kind_to_feed_type("UNKNOWN"), FeedType::Rss);
+    }
+
+    #[test]
+    fn hn_urls_without_scheme_collapse_to_home_feed() {
+        assert_eq!(
+            normalize_hn_url("topstories"),
+            "https://news.ycombinator.com"
+        );
+        assert_eq!(normalize_hn_url("askhn"), "https://news.ycombinator.com");
+        assert_eq!(
+            normalize_hn_url("https://news.ycombinator.com"),
+            "https://news.ycombinator.com"
+        );
+        assert_eq!(
+            normalize_hn_url("http://news.ycombinator.com/newest"),
+            "http://news.ycombinator.com/newest"
+        );
+    }
+
+    #[test]
+    fn entry_to_selection_maps_group_to_category_and_normalizes_hn() {
+        let sel = entry_to_selection(&entry(
+            Some("Lobsters"),
+            Some("https://lobste.rs/rss"),
+            Some("rss"),
+            Some("prog"),
+        ))
+        .expect("valid rss entry");
+        assert_eq!(sel.kind, FeedType::Rss);
+        assert_eq!(sel.url, "https://lobste.rs/rss");
+        assert_eq!(sel.category, "prog");
+
+        let sel = entry_to_selection(&entry(
+            Some("HN Top"),
+            Some("topstories"),
+            Some("hn"),
+            Some("all"),
+        ))
+        .expect("valid hn entry");
+        assert_eq!(sel.kind, FeedType::Hn);
+        assert_eq!(sel.url, "https://news.ycombinator.com");
+        assert_eq!(sel.category, "all");
+    }
+
+    #[test]
+    fn entry_to_selection_defaults_missing_kind_and_group() {
+        let sel = entry_to_selection(&entry(
+            Some("Blog"),
+            Some("https://example.com/feed"),
+            None,
+            None,
+        ))
+        .expect("valid entry");
+        assert_eq!(sel.kind, FeedType::Rss);
+        assert_eq!(sel.category, "Imported");
+    }
+
+    #[test]
+    fn entry_to_selection_skips_empty_name_or_url() {
+        assert!(
+            entry_to_selection(&entry(None, Some("https://example.com/feed"), None, None))
+                .is_none()
+        );
+        assert!(entry_to_selection(&entry(Some("X"), None, None, None)).is_none());
+        assert!(entry_to_selection(&entry(Some(" "), Some(" "), None, None)).is_none());
+    }
 }

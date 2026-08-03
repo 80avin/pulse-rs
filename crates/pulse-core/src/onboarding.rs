@@ -45,6 +45,11 @@ pub const POPULAR_FEEDS: &[PopularFeed] = &[
     // ── Privacy & Self-hosted ──
     PopularFeed { name: "r/selfhosted", url: "https://www.reddit.com/r/selfhosted", kind: FeedType::Reddit, category: "Privacy & Self-hosted" },
     PopularFeed { name: "r/PrivacyGuides", url: "https://www.reddit.com/r/PrivacyGuides", kind: FeedType::Reddit, category: "Privacy & Self-hosted" },
+    // ── Engineering & Research ──
+    PopularFeed { name: "danluu", url: "https://danluu.com/atom.xml", kind: FeedType::Rss, category: "Engineering & Research" },
+    PopularFeed { name: "Lobsters", url: "https://lobste.rs/rss", kind: FeedType::Rss, category: "Engineering & Research" },
+    PopularFeed { name: "The LLVM Project Blog", url: "https://blog.llvm.org/index.xml", kind: FeedType::Rss, category: "Engineering & Research" },
+    PopularFeed { name: "kernel-recipes", url: "https://kernel-recipes.org/en/2026/feed/", kind: FeedType::Rss, category: "Engineering & Research" },
     // ── Mailing Lists ──
     PopularFeed { name: "LKML (Linux Kernel)", url: "https://lore.kernel.org/lkml/new.atom", kind: FeedType::Rss, category: "Mailing Lists" },
     PopularFeed { name: "Git Developers", url: "https://lore.kernel.org/git/new.atom", kind: FeedType::Rss, category: "Mailing Lists" },

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import { Dialog } from 'bits-ui';
-  import { sources, groups, items, markSourceRead, removeSource as storeRemoveSource, syncSource as storeSyncSource } from '$lib/stores/data.svelte';
+  import { sources, groups, items, markSourceRead, removeSource as storeRemoveSource, syncSource as storeSyncSource, tauriInvoke, reloadSources, reloadGroups, reloadDbStats, IS_TAURI } from '$lib/stores/data.svelte';
   import StatusDot from '$lib/components/StatusDot.svelte';
   import SourceGlyph from '$lib/components/SourceGlyph.svelte';
   import Sparkline from '$lib/components/Sparkline.svelte';
@@ -56,6 +56,12 @@
 
   let editingSourceId = $state<string | null>(null);
 
+  let importOpen = $state(false);
+  let importText = $state('');
+  let importBusy = $state(false);
+  let importResult = $state<string | null>(null);
+  let importError = $state<string | null>(null);
+
   function openEditSheet(id: string) {
     const s = sources.find(s => s.id === id);
     if (!s) return;
@@ -93,6 +99,55 @@
     await storeRemoveSource(id);
   }
 
+  interface ImportEntry { name?: string; url?: string; kind?: string; group?: string; }
+
+  async function runImport() {
+    importError = null;
+    importResult = null;
+    if (!IS_TAURI) {
+      importError = 'import is available in the desktop app';
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(importText);
+    } catch (e) {
+      importError = `invalid JSON: ${(e as Error).message}`;
+      return;
+    }
+    if (!Array.isArray(parsed)) {
+      importError = 'expected a JSON array of { name, url, kind, group }';
+      return;
+    }
+    const selections: { name: string; url: string; kind: string; category: string }[] = [];
+    let skipped = 0;
+    for (const raw of parsed) {
+      const entry = raw as ImportEntry;
+      const name = (entry?.name ?? '').toString().trim();
+      const url = (entry?.url ?? '').toString().trim();
+      if (!name || !url) { skipped++; continue; }
+      const kind = (entry?.kind ?? 'rss').toLowerCase();
+      const normUrl = kind === 'hn' && !/^https?:\/\//i.test(url) ? 'https://news.ycombinator.com' : url;
+      const category = (entry?.group ?? 'Imported').toString().trim() || 'Imported';
+      selections.push({ name, url: normUrl, kind, category });
+    }
+    if (selections.length === 0) {
+      importError = 'no valid feed entries found';
+      return;
+    }
+    importBusy = true;
+    try {
+      const n = await tauriInvoke<number>('add_onboard_feeds', { selections });
+      await Promise.all([reloadSources(), reloadGroups(), reloadDbStats()]);
+      importResult = `imported ${n} feed${n === 1 ? '' : 's'}${skipped > 0 ? ` · skipped ${skipped}` : ''}`;
+      importText = '';
+    } catch (e) {
+      importError = `import failed: ${(e as Error).message}`;
+    } finally {
+      importBusy = false;
+    }
+  }
+
   const sourceActions = [
     { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
     { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
@@ -117,6 +172,50 @@
   <div class="flex-1 overflow-y-auto">
     <!-- Add source card -->
     <SourceForm mode="add" initial={addInitial} groups={groups} />
+
+    <!-- Import feeds -->
+    <div class="mx-2.5 mb-3 flex flex-col gap-2">
+      <div class="flex justify-end">
+        <button
+          onclick={() => { importOpen = !importOpen; }}
+          class="flex items-center gap-1.5 bg-transparent border border-bd-1 rounded px-2.5 py-1.5 cursor-pointer text-[10px] leading-none font-mono"
+          style="color:{importOpen ? T.cyan : T.ink2};"
+        >
+          <Icon name="import" size={11} color={importOpen ? T.cyan : T.ink2} />
+          {importOpen ? 'hide' : 'import'}
+        </button>
+      </div>
+      {#if importOpen}
+        <div class="p-2.5 px-3 bg-bg-1 border border-dashed border-bd-2 rounded text-ink-1 text-[11px] leading-[1.4] font-mono">
+          <div class="flex items-center gap-2 mb-2">
+            <Icon name="import" size={13} color={T.cyan} />
+            <span class="text-ink-0 tracking-[0.4px]">IMPORT FEEDS</span>
+          </div>
+          <textarea
+            bind:value={importText}
+            rows={6}
+            spellcheck={false}
+            placeholder={'[{"name":"Lobsters","url":"https://lobste.rs/rss","kind":"rss","group":"prog"}]'}
+            class="w-full bg-bg-0 border border-bd-1 rounded p-2 text-ink-0 text-[11px] leading-[1.4] font-mono resize-y box-border outline-none"
+          ></textarea>
+          <div class="flex items-center gap-2 mt-2 min-h-[18px]">
+            <button
+              onclick={runImport}
+              disabled={importBusy}
+              class="shrink-0 px-3.5 bg-cyan text-bg-0 border-none rounded cursor-pointer font-semibold tracking-[0.4px] text-[11px] leading-none font-mono"
+              style="opacity:{importBusy ? '0.5' : '1'};"
+            >IMPORT</button>
+            {#if importBusy}
+              <span class="text-ink-3 text-[10px] leading-none font-mono">adding…</span>
+            {:else if importError}
+              <span class="text-red text-[10px] leading-none font-mono truncate">{importError}</span>
+            {:else if importResult}
+              <span class="text-green text-[10px] leading-none font-mono">{importResult}</span>
+            {/if}
+          </div>
+        </div>
+      {/if}
+    </div>
 
     <!-- Hint -->
     {#if !compact}

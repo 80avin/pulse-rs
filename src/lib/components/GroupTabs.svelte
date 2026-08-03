@@ -105,7 +105,7 @@
   </div>
 {/if}
 
-<Modal open={editing} title="Edit Groups" onClose={() => { editing = false; showNewInput = false; renamingId = null; }} width="360px">
+<Modal open={editing} title="Edit Groups" onClose={() => { editing = false; showNewInput = false; renamingId = null; }} width="420px">
   {#each groups as g}
     {#if g.id === 'all'}
       <div class="grid items-center gap-2 border-b border-bd-0 grid-cols-[20px_1fr_auto] p-2 px-2.5 opacity-40">

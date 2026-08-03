@@ -368,17 +368,17 @@
         {/if}
 
         <!-- Settings modal -->
-        <Modal open={showSettings} title="Settings" onClose={() => { showSettings = false; }} width="420px">
+        <Modal open={showSettings} title="Settings" onClose={() => { showSettings = false; }} width="560px">
           <SettingsPanelContent showShortcuts />
         </Modal>
 
         <!-- Sources modal -->
-        <Modal open={showSources} title="Sources" onClose={() => { showSources = false; }} width="480px">
+        <Modal open={showSources} title="Sources" onClose={() => { showSources = false; }} width="640px">
           <SourceExplorer onSourceSelect={(id) => { setFeedFilter(id); showSources = false; }} compact={true} isDesktop={true} />
         </Modal>
 
         <!-- Keyboard shortcut cheatsheet -->
-        <Modal open={showCheatsheet} title="Keyboard Shortcuts" onClose={() => showCheatsheet = false} width="440px">
+        <Modal open={showCheatsheet} title="Keyboard Shortcuts" onClose={() => showCheatsheet = false} width="520px">
           <div class="grid grid-cols-2 gap-x-6">
             {#each [
               { k: '/',       desc: 'focus search'      },
