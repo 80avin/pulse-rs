@@ -45,6 +45,11 @@ pub const POPULAR_FEEDS: &[PopularFeed] = &[
     // ── Privacy & Self-hosted ──
     PopularFeed { name: "r/selfhosted", url: "https://www.reddit.com/r/selfhosted", kind: FeedType::Reddit, category: "Privacy & Self-hosted" },
     PopularFeed { name: "r/PrivacyGuides", url: "https://www.reddit.com/r/PrivacyGuides", kind: FeedType::Reddit, category: "Privacy & Self-hosted" },
+    // ── Mailing Lists ──
+    PopularFeed { name: "LKML (Linux Kernel)", url: "https://lore.kernel.org/lkml/new.atom", kind: FeedType::Rss, category: "Mailing Lists" },
+    PopularFeed { name: "Git Developers", url: "https://lore.kernel.org/git/new.atom", kind: FeedType::Rss, category: "Mailing Lists" },
+    PopularFeed { name: "Linux Networking (netdev)", url: "https://lore.kernel.org/netdev/new.atom", kind: FeedType::Rss, category: "Mailing Lists" },
+    PopularFeed { name: "LWN.net", url: "https://lwn.net/headlines/rss", kind: FeedType::Rss, category: "Mailing Lists" },
 ];
 
 #[cfg(test)]
@@ -69,6 +74,23 @@ mod tests {
         }
         for (cat, n) in &counts {
             assert!(n >= &2, "category '{}' has only {} feed(s)", cat, n);
+        }
+    }
+
+    #[test]
+    fn mailing_lists_category_exists_with_distinct_feeds() {
+        let feeds: Vec<&PopularFeed> = POPULAR_FEEDS
+            .iter()
+            .filter(|f| f.category == "Mailing Lists")
+            .collect();
+        assert!(
+            feeds.len() >= 2,
+            "Mailing Lists must have at least 2 feeds (got {})",
+            feeds.len()
+        );
+        let mut urls = std::collections::HashSet::new();
+        for f in &feeds {
+            assert!(urls.insert(f.url), "duplicate feed URL: {}", f.url);
         }
     }
 }

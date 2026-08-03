@@ -344,6 +344,27 @@ fn detect_well_known(host: &str, path: &str, query: &str) -> Option<FeedCandidat
         }
     }
 
+    // ── lore.kernel.org (public-inbox mailing-list archives) ───────────────────
+    // Any /<list>/ path (inbox index, message, search) maps to the list's
+    // newest-messages Atom feed. The HTML pages sit behind a bot-protection
+    // challenge, so the generic scraper can't discover feeds from them — this
+    // deterministic mapping is required for a shared lore URL to resolve.
+    if host == "lore.kernel.org"
+        && let Some(list) = path
+            .trim_start_matches('/')
+            .split('/')
+            .next()
+            .map(|s| s.trim_end_matches('/'))
+        && !list.is_empty()
+        && !list.starts_with('.')
+    {
+        return Some(make(
+            format!("https://lore.kernel.org/{list}/new.atom"),
+            format!("{list} (lore.kernel.org)"),
+            vec![],
+        ));
+    }
+
     None
 }
 
@@ -414,5 +435,20 @@ mod tests {
         // A real publication still matches.
         let cand = detect_well_known("medium.com", "/pragmatic-engineer", "").expect("medium pub");
         assert!(cand.feed_url.ends_with("/feed/pragmatic-engineer"));
+    }
+
+    #[test]
+    fn lore_kernel_list_urls_map_to_atom_feed() {
+        let cand = detect_well_known("lore.kernel.org", "/lkml/", "").expect("lkml feed");
+        assert_eq!(cand.feed_url, "https://lore.kernel.org/lkml/new.atom");
+
+        // Message-level URLs map to the same list feed.
+        let cand = detect_well_known("lore.kernel.org", "/git/20260801.msgid@example.com/", "")
+            .expect("git list feed");
+        assert_eq!(cand.feed_url, "https://lore.kernel.org/git/new.atom");
+
+        // Non-list paths (root, bot-protection challenge) must not match.
+        assert!(detect_well_known("lore.kernel.org", "/", "").is_none());
+        assert!(detect_well_known("lore.kernel.org", "/.within.website/x/", "").is_none());
     }
 }
