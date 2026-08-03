@@ -4,7 +4,6 @@
   import { createGroup, renameGroup, deleteGroup } from '$lib/stores/data.svelte';
   import Icon from './Icon.svelte';
   import { longpress } from './longpress.svelte';
-  import { Tabs } from 'bits-ui';
 
   let { groups, active, onSelect, counts = {}, orientation = 'horizontal' }: {
     groups: Group[];
@@ -43,10 +42,67 @@
     if (active === id) onSelect('all');
   }
 
-  let activeTab = $state<string>("");
-  $effect(() => { activeTab = active; });
   let suppressClick = false;
 </script>
+
+{#if orientation === 'vertical'}
+  <div class="flex flex-col shrink-0 bg-bg-1 py-1">
+    <div class="flex flex-col">
+      {#each groups as g}
+        <button
+          onclick={() => { if (suppressClick) { suppressClick = false; return; } onSelect(g.id); }}
+          oncontextmenu={(e: MouseEvent) => { e.preventDefault(); editing = true; }}
+          onfocus={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
+          onblur={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
+          class="flex items-center gap-2 cursor-pointer text-left w-full border-none px-3 py-1.5 shrink-0" style="
+            background:{active === g.id ? 'rgba(78,205,214,0.06)' : 'transparent'};
+            border-left:2px solid {active === g.id ? T.cyan : 'transparent'};
+            color:{active === g.id ? T.ink0 : T.ink1};
+            font:{active === g.id ? '600' : '400'} 13px/1.2 {T.mono};
+          "
+        >
+          <span use:longpress={{ onLongpress: () => { suppressClick = true; editing = true; } }} class="flex-1">{g.name}</span>
+          <span use:longpress={{ onLongpress: () => { suppressClick = true; editing = true; } }} class="tabular-nums text-[10px] leading-none font-mono" style="color:{active === g.id ? T.cyan : T.ink3};">{counts[g.id] ?? g.n}</span>
+        </button>
+      {/each}
+    </div>
+    <button
+      onclick={() => { editing = true; }}
+      aria-label="Edit groups"
+      class="flex items-center gap-1.5 bg-transparent border-none text-ink-3 cursor-pointer text-left w-full mt-0.5 p-[5px_12px] text-[10px] leading-none font-mono"
+    >
+      <Icon name="edit" size={10} color={T.ink3} />
+      <span>Edit Groups</span>
+    </button>
+  </div>
+{:else}
+  <div class="flex shrink-0 border-b border-bd-0 bg-bg-1">
+    <div class="flex-1 min-w-0 overflow-x-auto flex" style="scrollbar-width:none;">
+      {#each groups as g}
+        <button
+          onclick={() => { if (suppressClick) { suppressClick = false; return; } onSelect(g.id); }}
+          class="shrink-0 bg-transparent border-none cursor-pointer flex items-center gap-1.5" style="
+            padding:13px 14px;min-height:44px;
+            border-bottom:2px solid {active === g.id ? T.cyan : 'transparent'};
+            color:{active === g.id ? T.ink0 : T.ink2};
+            font:{active === g.id ? '600' : '400'} 13px/1.2 {T.mono};
+            letter-spacing:0.3px;
+          "
+        >
+          <span use:longpress={{ onLongpress: () => { suppressClick = true; editing = true; } }}>{g.name}</span>
+          <span use:longpress={{ onLongpress: () => { suppressClick = true; editing = true; } }} class="tabular-nums text-[10px] leading-none font-mono" style="color:{active === g.id ? T.cyan : T.ink3};">{counts[g.id] ?? g.n}</span>
+        </button>
+      {/each}
+    </div>
+    <button
+      onclick={() => { editing = true; }}
+      aria-label="Edit groups"
+      class="shrink-0 bg-transparent border-none border-l border-bd-0 text-ink-2 flex items-center cursor-pointer px-3"
+    >
+      <Icon name="edit" size={14} />
+    </button>
+  </div>
+{/if}
 
 {#if editing}
   <div class="bg-bg-1 border-b border-bd-0">
@@ -122,63 +178,4 @@
       </button>
     {/if}
   </div>
-{:else if orientation === 'vertical'}
-  <Tabs.Root bind:value={activeTab} orientation="vertical" class="flex flex-col shrink-0 bg-bg-1 py-1">
-    <Tabs.List class="flex flex-col">
-      {#each groups as g}
-        <Tabs.Trigger value={g.id}
-          onclick={() => onSelect(g.id)}
-          oncontextmenu={(e: MouseEvent) => { e.preventDefault(); editing = true; }}
-          onfocus={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
-          onblur={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
-          class="flex items-center gap-2 cursor-pointer text-left w-full border-none px-3 py-1.5" style="
-            background:{activeTab === g.id ? 'rgba(78,205,214,0.06)' : 'transparent'};
-            border-left:2px solid {activeTab === g.id ? T.cyan : 'transparent'};
-            color:{activeTab === g.id ? T.ink0 : T.ink1};
-            font:{activeTab === g.id ? '600' : '400'} 13px/1.2 {T.mono};
-          "
-        >
-          <span class="flex-1">{g.name}</span>
-          <span class="tabular-nums text-[10px] leading-none font-mono" style="color:{activeTab === g.id ? T.cyan : T.ink3};">{counts[g.id] ?? g.n}</span>
-        </Tabs.Trigger>
-      {/each}
-    </Tabs.List>
-    <button
-      onclick={() => { editing = true; }}
-      class="flex items-center gap-1.5 bg-transparent border-none text-ink-3 cursor-pointer text-left w-full mt-0.5 p-[5px_12px] text-[10px] leading-none font-mono"
-    >
-      <Icon name="plus" size={10} color={T.ink3} />
-      <span>New Group</span>
-    </button>
-  </Tabs.Root>
-{:else}
-  <Tabs.Root bind:value={activeTab} orientation="horizontal" class="flex overflow-x-auto shrink-0 border-b border-bd-0 bg-bg-1" style="scrollbar-width:none;">
-    <Tabs.List class="flex">
-      {#each groups as g}
-        <Tabs.Trigger value={g.id}
-          onclick={() => { if (suppressClick) { suppressClick = false; return; } onSelect(g.id); }}
-          // onpointerdown={() => startPress(g.id)}
-          // onpointerup={cancelPress}
-          // onpointercancel={cancelPress}
-          class="shrink-0 bg-transparent border-none cursor-pointer flex items-center gap-1.5" style="
-            padding:13px 14px;min-height:44px;
-            border-bottom:2px solid {activeTab === g.id ? T.cyan : 'transparent'};
-            color:{activeTab === g.id ? T.ink0 : T.ink2};
-            font:{activeTab === g.id ? '600' : '400'} 13px/1.2 {T.mono};
-            letter-spacing:0.3px;
-          "
-        >
-          <span use:longpress={{ onLongpress: () => { suppressClick = true; editing=true;}}}>{g.name}</span>
-          <span use:longpress={{ onLongpress: () => { suppressClick = true; editing=true;}}} class="tabular-nums text-[10px] leading-none font-mono" style="color:{activeTab === g.id ? T.cyan : T.ink3};">{counts[g.id] ?? g.n}</span>
-        </Tabs.Trigger>
-      {/each}
-    </Tabs.List>
-    <div class="flex-1 min-w-2"></div>
-    <button
-      onclick={() => { editing = true; }}
-      class="shrink-0 bg-transparent border-none border-l border-bd-0 text-ink-2 flex items-center cursor-pointer px-3"
-    >
-      <Icon name="edit" size={14} />
-    </button>
-  </Tabs.Root>
 {/if}

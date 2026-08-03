@@ -259,9 +259,11 @@ button:not(:disabled) { cursor: pointer; }
    Wrapped in @layer components so Tailwind utility transitions (e.g.
    ToggleSwitch's transition-[background_0.15s]) still win per the cascade. */
 @layer components {
-  button, [role='button'] {
+  button, [role='button'], a, [data-contextmenu] {
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
     transition: filter 0.1s ease, transform 0.06s ease;
   }
   @media (hover: hover) {
@@ -273,7 +275,7 @@ button:not(:disabled) { cursor: pointer; }
   button:not(:disabled):active,
   [role='button']:active {
     filter: brightness(0.92);
-    transform: translateY(0.5px);
+    transform: translateY(0.5px) scale(0.99);
   }
 }
 
@@ -308,6 +310,19 @@ input::placeholder { color: var(--color-ink-3); }
 
 @keyframes reader-slide-in-next { from { transform: translateX(30px); opacity: 0.6; } }
 @keyframes reader-slide-in-prev { from { transform: translateX(-30px); opacity: 0.6; } }
+
+/* ── Overlay entrance animations ─────────────────────────────────────────── */
+/* Shared, subtle entrances for sheets / modals / popovers. Short + ease-out —
+   this is a dense tool, not a flashy app. Applied via classes on real markup. */
+@keyframes sheet-in { from { transform: translateY(100%); opacity: 0; } }
+@keyframes sheet-overlay-in { from { opacity: 0; } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.98); } }
+
+.anim-sheet-in         { animation: sheet-in 0.15s ease-out; }
+.anim-sheet-overlay-in { animation: sheet-overlay-in 0.15s ease-out; }
+.anim-modal-in         { animation: modal-in 0.15s ease-out; }
+.anim-pop-in           { animation: pop-in 0.13s ease-out; }
 
 /* ── Article body links ───────────────────────────────────────────────────── */
 .item-body a { color: var(--color-cyan); }

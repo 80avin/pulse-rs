@@ -55,8 +55,8 @@
   <Portal>
     {#if mode === 'sheet'}
       <!-- Bottom sheet -->
-      <div class="fixed inset-0 z-[100] bg-black/40" role="presentation" onclick={closeItemMenu} aria-label="Close actions"></div>
-      <div class="fixed inset-x-0 bottom-0 z-[101] bg-bg-1 border-t border-bd-1 rounded-t-xl p-2 pb-[max(8px,env(safe-area-inset-bottom))]">
+      <div class="fixed inset-0 z-[100] bg-black/40 anim-sheet-overlay-in" role="presentation" onclick={closeItemMenu} aria-label="Close actions"></div>
+      <div class="fixed inset-x-0 bottom-0 z-[101] bg-bg-1 border-t border-bd-1 rounded-t-xl p-2 pb-[max(8px,env(safe-area-inset-bottom))] anim-sheet-in">
         <div class="flex justify-center mb-1.5"><span class="inline-block w-9 h-1 rounded-full bg-bd-2"></span></div>
         <div class="flex items-center gap-2.5 px-3 py-2 border-b border-bd-0 mb-1">
           <span class="text-ink-0 flex-1 truncate text-[12px] leading-[1.3] font-mono">{item.title}</span>
@@ -79,8 +79,8 @@
       </div>
     {:else}
       <!-- Floating popup (desktop right-click) -->
-      <div class="fixed inset-0 z-[100]" onclick={closeItemMenu} aria-hidden="true"></div>
-      <div class="fixed z-[101] bg-bg-1 border border-bd-1 rounded overflow-hidden w-64 shadow-[0_8px_32px_rgba(0,0,0,0.6)]" style="left:{Math.max(4, Math.min(x, window.innerWidth - 260))}px;top:{Math.max(4, Math.min(y, window.innerHeight - 360))}px;">
+      <div class="fixed inset-0 z-[100] anim-sheet-overlay-in" onclick={closeItemMenu} aria-hidden="true"></div>
+      <div class="fixed z-[101] bg-bg-1 border border-bd-1 rounded overflow-hidden w-64 shadow-[0_8px_32px_rgba(0,0,0,0.6)] anim-pop-in" style="left:{Math.max(4, Math.min(x, window.innerWidth - 260))}px;top:{Math.max(4, Math.min(y, window.innerHeight - 360))}px;">
         {@render tagEditor()}
         {#if item.url && !isHnSelf}
           <button class={rowCls} onclick={() => act(() => openExternal(item.url!))}><Icon name="ext" size={11} color={T.ink2} /><span>Open in browser</span></button>

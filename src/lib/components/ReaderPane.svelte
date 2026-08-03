@@ -276,8 +276,8 @@
       <!-- Note input sheet -->
       <Dialog.Root open={noteSheetOpen} onOpenChange={(open) => { if (!open) noteSheetOpen = false; }}>
         <Dialog.Portal>
-          <Dialog.Overlay class="fixed inset-0 bg-black/55 z-20" />
-          <Dialog.Content preventScroll={false} class="fixed bg-bg-2 text-ink-0 bottom-0 left-0 right-0 w-full p-[14px_14px_24px] z-20 border-t border-t-bd-1 text-[12px] leading-[1.4] font-sans">
+          <Dialog.Overlay class="fixed inset-0 bg-black/55 z-20 anim-sheet-overlay-in" />
+          <Dialog.Content preventScroll={false} class="fixed bg-bg-2 text-ink-0 bottom-0 left-0 right-0 w-full p-[14px_14px_24px] z-20 border-t border-t-bd-1 text-[12px] leading-[1.4] font-sans anim-sheet-in">
             <div class="flex items-center justify-between mb-2.5">
               <span class="uppercase tracking-[0.5px] text-[10px] leading-none font-mono text-ink-3">note</span>
               <Dialog.Close class="bg-transparent border-none text-ink-2 cursor-pointer flex"><Icon name="x" size={14} /></Dialog.Close>

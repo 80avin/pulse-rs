@@ -259,10 +259,10 @@
     <Dialog.Root open={actionSheet !== null && actionSource !== undefined} onOpenChange={(open) => { if (!open) { actionSheet = null; ctxMenuPos = null; } }}>
       <Dialog.Portal>
         {#if isDesktop && ctxMenuPos}
-          <Dialog.Overlay class="fixed inset-0 z-210" />
+          <Dialog.Overlay class="fixed inset-0 z-210 anim-sheet-overlay-in" />
           <Dialog.Content
             preventScroll={false}
-            class="fixed overflow-hidden bg-bg-2 border border-bd-1 rounded w-55 shadow-[0_8px_32px_rgba(0,0,0,0.6)] z-210"
+            class="fixed overflow-hidden bg-bg-2 border border-bd-1 rounded w-55 shadow-[0_8px_32px_rgba(0,0,0,0.6)] z-210 anim-pop-in"
             style="
               top:{Math.min(ctxMenuPos.y, (typeof window !== 'undefined' ? window.innerHeight : 600) - 280)}px;
               left:{Math.min(ctxMenuPos.x, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 220)}px;
@@ -297,10 +297,10 @@
             {/if}
           </Dialog.Content>
         {:else}
-          <Dialog.Overlay class="fixed inset-0 z-210 bg-black/60" />
+          <Dialog.Overlay class="fixed inset-0 z-210 bg-black/60 anim-sheet-overlay-in" />
           <Dialog.Content
             preventScroll={false}
-            class="fixed bottom-0 left-0 right-0 w-full bg-bg-2 border-t border-bd-1 pb-6 z-210"
+            class="fixed bottom-0 left-0 right-0 w-full bg-bg-2 border-t border-bd-1 pb-6 z-210 anim-sheet-in"
           >
             {#if actionSource}
             <div class="flex items-center gap-2.5 px-4 py-3.5 border-b border-bd-0">
@@ -343,13 +343,13 @@
     <Dialog.Root open={editingSourceId !== null} onOpenChange={(open) => { if (!open) editingSourceId = null; }}>
       <Dialog.Portal>
         {#if isDesktop}
-          <Dialog.Overlay class="fixed inset-0 z-210 bg-black/50" />
-          <Dialog.Content preventScroll={false} class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-210 bg-bg-1 rounded-lg p-5 flex flex-col gap-3 w-100 max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <Dialog.Overlay class="fixed inset-0 z-210 bg-black/50 anim-sheet-overlay-in" />
+          <Dialog.Content preventScroll={false} class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-210 bg-bg-1 rounded-lg p-5 flex flex-col gap-3 w-100 max-w-[90vw] max-h-[90vh] overflow-y-auto anim-modal-in">
             {@render editForm()}
           </Dialog.Content>
         {:else}
-          <Dialog.Overlay class="fixed inset-0 z-210 flex flex-col justify-end bg-black/50" />
-          <Dialog.Content preventScroll={false} class="fixed bottom-0 left-0 right-0 z-210 bg-bg-1 rounded-t-xl p-4 flex flex-col gap-3" style="padding-bottom:max(16px, env(safe-area-inset-bottom));">
+          <Dialog.Overlay class="fixed inset-0 z-210 flex flex-col justify-end bg-black/50 anim-sheet-overlay-in" />
+          <Dialog.Content preventScroll={false} class="fixed bottom-0 left-0 right-0 z-210 bg-bg-1 rounded-t-xl p-4 flex flex-col gap-3 anim-sheet-in" style="padding-bottom:max(16px, env(safe-area-inset-bottom));">
             {@render editForm()}
           </Dialog.Content>
         {/if}
