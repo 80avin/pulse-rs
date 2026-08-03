@@ -150,6 +150,14 @@
   async function removeSource(id: string) {
     await storeRemoveSource(id);
   }
+
+  const sourceActions = [
+    { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
+    { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
+    { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
+    { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
+    { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
+  ];
 </script>
 
 <div class="flex flex-col flex-1 min-h-0 bg-bg-0 text-ink-0">
@@ -278,22 +286,7 @@
                 <div class="text-ink-3 truncate text-[9px] leading-none font-mono">{actionSource.host}</div>
               </div>
             </div>
-            {#each [
-              { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
-              { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
-              { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
-              { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
-              { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
-            ] as act}
-              <button
-                onclick={act.action}
-                class="flex items-center gap-2.5 w-full px-3 bg-transparent border-none border-b border-bd-0 cursor-pointer text-left pt-2.25 pb-2.25 text-[11px] leading-none font-mono"
-                style="color:{act.label === 'Remove source' ? T.red : T.ink0};"
-              >
-                <Icon name={act.icon} size={13} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
-                {act.label}
-              </button>
-            {/each}
+            {@render actions(13, 'gap-2.5 px-3 pt-2.25 pb-2.25 text-[11px] leading-none')}
             {/if}
           </Dialog.Content>
         {:else}
@@ -314,22 +307,7 @@
               <span class="flex-1"></span>
               <StatusDot status={actionSource.status} />
             </div>
-            {#each [
-              { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
-              { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
-              { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
-              { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
-              { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
-            ] as act}
-              <button
-                onclick={act.action}
-                class="flex items-center gap-3.5 w-full px-4 bg-transparent border-none border-b border-bd-0 cursor-pointer text-left pt-3.5 pb-3.5 text-[13px] leading-none font-mono"
-                style="color:{act.label === 'Remove source' ? T.red : T.ink0};-webkit-tap-highlight-color:transparent;"
-              >
-                <Icon name={act.icon} size={16} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
-                {act.label}
-              </button>
-            {/each}
+            {@render actions(16, 'gap-3.5 px-4 pt-3.5 pb-3.5 text-[13px] leading-none')}
             <Dialog.Close
               class="flex items-center justify-center w-full px-4 bg-transparent border-none text-ink-2 cursor-pointer pt-3.5 pb-3.5 text-[12px] leading-none font-mono"
             >cancel</Dialog.Close>
@@ -356,6 +334,19 @@
       </Dialog.Portal>
     </Dialog.Root>
 </div>
+
+{#snippet actions(iconSize: number, padCls: string)}
+  {#each sourceActions as act}
+    <button
+      onclick={act.action}
+      class="flex items-center w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left font-mono {padCls}"
+      style="color:{act.label === 'Remove source' ? T.red : T.ink0};-webkit-tap-highlight-color:transparent;"
+    >
+      <Icon name={act.icon} size={iconSize} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
+      {act.label}
+    </button>
+  {/each}
+{/snippet}
 
 {#snippet editForm()}
   <div class="text-ink-2 uppercase mb-1 tracking-[0.5px] text-[11px] leading-none font-mono">edit source</div>

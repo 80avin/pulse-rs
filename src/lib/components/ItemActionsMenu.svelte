@@ -29,7 +29,33 @@
   }
   function removeTag(tag: string) { if (item) setItemTags(item.id, item.userTags.filter(t => t !== tag)); }
 
-  const rowCls = 'flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[11px_14px] text-[11px] leading-none font-mono';
+  type MenuAction =
+    | { kind: 'action'; icon: string; label: string; style: string; iconColor: string; action: () => void }
+    | { kind: 'divider' };
+
+  const actions = $derived<MenuAction[]>(
+    item
+      ? [
+          ...(item.url && !isHnSelf
+            ? [{ kind: 'action' as const, icon: 'ext', label: 'Open in browser', style: `color:${T.ink2}`, iconColor: T.ink2, action: () => openExternal(item.url!) }]
+            : []),
+          ...(item.url
+            ? [{ kind: 'action' as const, icon: 'link', label: 'Copy URL', style: `color:${T.ink2}`, iconColor: T.ink2, action: () => copyUrl(item.url!) }]
+            : []),
+          { kind: 'action' as const, icon: 'edit', label: 'Copy title', style: `color:${T.ink2}`, iconColor: T.ink2, action: () => copyTitle(item.title) },
+          ...(item.title && (item.url || item.externalUrl)
+            ? [{ kind: 'action' as const, icon: 'share', label: 'Share', style: `color:${T.ink2}`, iconColor: T.ink2, action: () => shareItem(item.title, item.url ?? item.externalUrl) }]
+            : []),
+          { kind: 'divider' as const },
+          { kind: 'action' as const, icon: 'check', label: item.read ? 'Mark as unread' : 'Mark as read', style: `color:${item.read ? T.ink1 : T.cyan}`, iconColor: item.read ? T.ink2 : T.cyan, action: () => markRead(item.id, !item.read) },
+          { kind: 'action' as const, icon: 'bookmark', label: item.saved ? 'Unsave' : 'Save', style: `color:${item.saved ? T.amber : T.ink1}`, iconColor: item.saved ? T.amber : T.ink2, action: () => toggleSaved(item.id) },
+          { kind: 'action' as const, icon: 'eye-off', label: 'Hide', style: `border-bottom:none;color:${T.red}`, iconColor: T.red, action: () => hideItem(item.id) },
+        ]
+      : []
+  );
+
+  const pad = { sheet: 'p-[11px_14px]', popup: 'p-[11px_14px]' } as const;
+  const rowCls = $derived(`flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left ${pad[mode]} text-[11px] leading-none font-mono`);
 </script>
 
 {#snippet tagEditor()}
@@ -62,41 +88,27 @@
           <span class="text-ink-0 flex-1 truncate text-[12px] leading-[1.3] font-mono">{item.title}</span>
         </div>
         {@render tagEditor()}
-        {#if item.url && !isHnSelf}
-          <button class={rowCls} onclick={() => act(() => openExternal(item.url!))}><Icon name="ext" size={11} color={T.ink2} /><span>Open in browser</span></button>
-        {/if}
-        {#if item.url}
-          <button class={rowCls} onclick={() => act(() => copyUrl(item.url!))}><Icon name="link" size={11} color={T.ink2} /><span>Copy URL</span></button>
-        {/if}
-        <button class={rowCls} onclick={() => act(() => copyTitle(item.title))}><Icon name="edit" size={11} color={T.ink2} /><span>Copy title</span></button>
-        {#if item.title && (item.url || item.externalUrl)}
-          <button class={rowCls} onclick={() => act(() => shareItem(item.title, item.url ?? item.externalUrl))}><Icon name="share" size={11} color={T.ink2} /><span>Share</span></button>
-        {/if}
-        <div class="bg-bd-0 h-px my-1"></div>
-        <button class={rowCls} style="color:{item.read ? T.ink1 : T.cyan};" onclick={() => act(() => markRead(item.id, !item.read))}><Icon name="check" size={11} color={item.read ? T.ink2 : T.cyan} /><span>{item.read ? 'Mark as unread' : 'Mark as read'}</span></button>
-        <button class={rowCls} style="color:{item.saved ? T.amber : T.ink1};" onclick={() => act(() => toggleSaved(item.id))}><Icon name="bookmark" size={11} color={item.saved ? T.amber : T.ink2} /><span>{item.saved ? 'Unsave' : 'Save'}</span></button>
-        <button class={rowCls} style="border-bottom:none;color:{T.red};" onclick={() => act(() => hideItem(item.id))}><Icon name="eye-off" size={11} color={T.red} /><span>Hide</span></button>
+        {#each actions as a}
+          {#if a.kind === 'divider'}
+            <div class="bg-bd-0 h-px my-1"></div>
+          {:else}
+            <button class={rowCls} style={a.style} onclick={() => act(a.action)}><Icon name={a.icon} size={11} color={a.iconColor} /><span>{a.label}</span></button>
+          {/if}
+        {/each}
       </div>
     {:else}
       <!-- Floating popup (desktop right-click) -->
       <div class="fixed inset-0 z-[100] anim-sheet-overlay-in" onclick={closeItemMenu} aria-hidden="true"></div>
       <div class="fixed z-[101] bg-bg-1 border border-bd-1 rounded overflow-hidden w-64 shadow-[0_8px_32px_rgba(0,0,0,0.6)] anim-pop-in" style="left:{Math.max(4, Math.min(x, window.innerWidth - 260))}px;top:{Math.max(4, Math.min(y, window.innerHeight - 360))}px;">
-        {@render tagEditor()}
-        {#if item.url && !isHnSelf}
-          <button class={rowCls} onclick={() => act(() => openExternal(item.url!))}><Icon name="ext" size={11} color={T.ink2} /><span>Open in browser</span></button>
-        {/if}
-        {#if item.url}
-          <button class={rowCls} onclick={() => act(() => copyUrl(item.url!))}><Icon name="link" size={11} color={T.ink2} /><span>Copy URL</span></button>
-        {/if}
-        <button class={rowCls} onclick={() => act(() => copyTitle(item.title))}><Icon name="edit" size={11} color={T.ink2} /><span>Copy title</span></button>
-        {#if item.title && (item.url || item.externalUrl)}
-          <button class={rowCls} onclick={() => act(() => shareItem(item.title, item.url ?? item.externalUrl))}><Icon name="share" size={11} color={T.ink2} /><span>Share</span></button>
-        {/if}
-        <div class="bg-bd-0 h-px my-1"></div>
-        <button class={rowCls} style="color:{item.read ? T.ink1 : T.cyan};" onclick={() => act(() => markRead(item.id, !item.read))}><Icon name="check" size={11} color={item.read ? T.ink2 : T.cyan} /><span>{item.read ? 'Mark as unread' : 'Mark as read'}</span></button>
-        <button class={rowCls} style="color:{item.saved ? T.amber : T.ink1};" onclick={() => act(() => toggleSaved(item.id))}><Icon name="bookmark" size={11} color={item.saved ? T.amber : T.ink2} /><span>{item.saved ? 'Unsave' : 'Save'}</span></button>
-        <button class={rowCls} style="border-bottom:none;color:{T.red};" onclick={() => act(() => hideItem(item.id))}><Icon name="eye-off" size={11} color={T.red} /><span>Hide</span></button>
-      </div>
+          {@render tagEditor()}
+          {#each actions as a}
+            {#if a.kind === 'divider'}
+              <div class="bg-bd-0 h-px my-1"></div>
+            {:else}
+              <button class={rowCls} style={a.style} onclick={() => act(a.action)}><Icon name={a.icon} size={11} color={a.iconColor} /><span>{a.label}</span></button>
+            {/if}
+          {/each}
+        </div>
     {/if}
   </Portal>
 {/if}
