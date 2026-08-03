@@ -25,7 +25,6 @@
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import MobileSaved from './MobileSaved.svelte';
   import SearchView from '$lib/components/SearchView.svelte';
-  import { Accordion } from 'bits-ui';
   import { TABS, isTabId, type TabId } from '$lib/nav';
 
   // ── Shared navigation state (one shell, both breakpoints) ───────────────
@@ -132,8 +131,7 @@
   let searchInputEl: HTMLInputElement | null = $state(null);
   let showSettings  = $state(false);
   let showSources   = $state(false);
-  let accValue = $state<string[]>(['sources']);
-  let showSourcesAccordion = $derived(accValue.includes('sources'));
+  let showSourcesAccordion = $state(true);
   let showCheatsheet = $state(false);
   let showOnboarding = $state(false);
   const ONBOARDING_DONE_KEY = 'pulse:onboarding-done';
@@ -270,7 +268,7 @@
               <Icon name="chev-r" size={13} color={T.ink2} />
             </button>
             {#each groups as g}
-              <button onclick={() => selectGroup(g.id)} onmouseenter={(e) => { if (g.id !== activeGroup) (e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { if (g.id !== activeGroup) (e.currentTarget as HTMLElement).style.background = 'transparent'; }} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} unread`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px]" style="background:{g.id===activeGroup?'rgba(78,205,214,0.12)':'transparent'}">
+              <button onclick={() => selectGroup(g.id)} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} unread`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px] hover:bg-bg-2" style={g.id===activeGroup?'background:rgba(78,205,214,0.12)':undefined}>
                 <span class="font-bold text-[10px] leading-none font-mono text-cyan={g.id===activeGroup} text-ink-2={g.id!==activeGroup}">{g.name.slice(0, 2).toUpperCase()}</span>
                 {#if g.n > 0}<span class="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-cyan"></span>{/if}
               </button>
@@ -302,18 +300,16 @@
               <div class="uppercase text-ink-3 px-3 pt-1.5 pb-0.5 tracking-[0.6px] text-[10px] leading-none font-mono">groups</div>
               <GroupTabs {groups} active={activeGroup} onSelect={(id) => selectGroup(id)} orientation="vertical" />
             </div>
-            <Accordion.Root type="multiple" bind:value={accValue} class="border-b border-bd-0">
-              <Accordion.Item value="sources">
-                <Accordion.Header>
-                  <Accordion.Trigger class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3" aria-label={`Sources for ${activeGroupLabel}`}>
-                    <span class="uppercase flex-1 text-ink-3 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
-                    <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
-                    <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
-                  </Accordion.Trigger>
-                </Accordion.Header>
-                <Accordion.Content class="p-[0_8px_6px]">
+            <div class="border-b border-bd-0">
+              <button onclick={() => showSourcesAccordion = !showSourcesAccordion} aria-label={`Sources for ${activeGroupLabel}`} aria-expanded={showSourcesAccordion} class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3">
+                <span class="uppercase flex-1 text-ink-3 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
+                <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
+                <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
+              </button>
+              {#if showSourcesAccordion}
+                <div class="p-[0_8px_6px]">
                   {#each groupSources as s}
-                    <button onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }} oncontextmenu={(e) => { e.preventDefault(); }} onmouseenter={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = T.bg2; }} onmouseleave={(e) => { if (activeSource!==s.id)(e.currentTarget as HTMLElement).style.background = 'transparent'; }} onfocus={(e) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }} onblur={(e) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }} class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1" style="background:{activeSource===s.id ? 'rgba(78,205,214,0.06)' : 'transparent'};border-left:2px solid {activeSource===s.id ? T.cyan : 'transparent'}" aria-current={activeSource===s.id ? 'true' : undefined}>
+                    <button onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }} oncontextmenu={(e) => { e.preventDefault(); }} class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1 hover:bg-bg-2 focus-visible:outline-1 focus-visible:outline-[var(--color-cyan)]" style={activeSource===s.id ? `background:rgba(78,205,214,0.06);border-left:2px solid ${T.cyan}` : 'border-left:2px solid transparent'} aria-current={activeSource===s.id ? 'true' : undefined}>
                       <StatusDot status={s.status} size={5} />
                       <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-[11px] leading-[1.2] font-mono" style="color:{activeSource===s.id ? T.ink0 : T.ink1};">{s.name}</span>
                       {#if s.unread > 0}<span class="text-cyan text-[10px] leading-none font-mono">{s.unread}</span>{/if}
@@ -329,9 +325,9 @@
                       <span>discover</span>
                     </button>
                   </div>
-                </Accordion.Content>
-              </Accordion.Item>
-            </Accordion.Root>
+                </div>
+              {/if}
+            </div>
             <div class="flex-1"></div>
             <BottomTools {showSources} {showSettings} syncing={syncState.syncing} {syncState} onToggleSources={() => { showSources = !showSources; }} onToggleSettings={() => { showSettings = !showSettings; }} />
           </div>

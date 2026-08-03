@@ -1,13 +1,12 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
   import { Dialog } from 'bits-ui';
-  import { sources, groups, items, markSourceRead, addSource as storeAddSource, removeSource as storeRemoveSource, updateSource as storeUpdateSource, syncSource as storeSyncSource, createGroup, detectFeed } from '$lib/stores/data.svelte';
-  import { logger } from '$lib/logger';
+  import { sources, groups, items, markSourceRead, removeSource as storeRemoveSource, syncSource as storeSyncSource } from '$lib/stores/data.svelte';
   import StatusDot from '$lib/components/StatusDot.svelte';
   import SourceGlyph from '$lib/components/SourceGlyph.svelte';
   import Sparkline from '$lib/components/Sparkline.svelte';
   import Icon from '$lib/components/Icon.svelte';
-  import SegmentedControl from '$lib/components/SegmentedControl.svelte';
+  import SourceForm, { type SourceFormValues } from '$lib/components/SourceForm.svelte';
   import { longpress } from '$lib/components/longpress.svelte';
 
   let {
@@ -51,51 +50,20 @@
     return buckets;
   }
 
-  let addUrl = $state('');
-  let addGroup = $state(groups[0]?.id ?? '');
-  let newGroupName = $state('');
-  let addInputEl: HTMLInputElement | null = $state(null);
   let actionSheet = $state<string | null>(null);
   let suppressClick = false;
   let ctxMenuPos = $state<{ x: number; y: number } | null>(null);
 
   let editingSourceId = $state<string | null>(null);
-  let editUrl  = $state('');
-  let editName = $state('');
-  let editKind = $state<'rss'|'hn'|'reddit'>('rss');
-  let editGroup = $state('all');
-  let editHue  = $state<number | undefined>(undefined);
-  let fetchingTitle = $state(false);
 
   function openEditSheet(id: string) {
     const s = sources.find(s => s.id === id);
     if (!s) return;
     editingSourceId = id;
-    editUrl   = s.url ?? s.host ?? '';
-    editName  = s.name;
-    editKind  = s.kind;
-    editGroup = s.group;
-    editHue   = s.hue;
     actionSheet = null;
   }
 
-  async function fetchTitleForUrl(url: string) {
-    if (!url) return;
-    fetchingTitle = true;
-    try {
-      const preview = await detectFeed(url);
-      if (preview?.name) {
-        editName = preview.name;
-      }
-    } finally {
-      fetchingTitle = false;
-    }
-  }
-
-  async function submitEditSource() {
-    if (!editingSourceId) return;
-    const { url: normUrl } = inferSourceMeta(editUrl.trim());
-    await storeUpdateSource(editingSourceId, editName.trim() || normUrl, normUrl, editKind, editGroup, editHue);
+  function closeEdit() {
     editingSourceId = null;
   }
 
@@ -107,45 +75,19 @@
 
   const actionSource = $derived(actionSheet ? sources.find(s => s.id === actionSheet) : null);
 
-  function inferSourceMeta(rawUrl: string): { kind: 'rss' | 'reddit' | 'hn'; name: string; url: string } {
-    const normalised = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
-    let parsed: URL | null = null;
-    try { parsed = new URL(normalised); } catch {}
-    const host = parsed?.hostname ?? '';
-    if (host.includes('reddit.com')) {
-      const m = (parsed?.pathname ?? '').match(/^\/r\/([^/]+)/i);
-      return { kind: 'reddit', name: m ? `r/${m[1]}` : 'Reddit', url: normalised };
-    }
-    if (host.includes('ycombinator.com')) {
-      return { kind: 'hn', name: 'Hacker News', url: normalised };
-    }
-    const domain = host.replace(/^www\./, '');
-    const baseName = domain.split('.')[0];
-    return { kind: 'rss', name: baseName || domain || rawUrl, url: normalised };
-  }
+  const addInitial = { name: '', url: '', kind: 'rss' as const, group: groups[0]?.id ?? '', hue: undefined as number | undefined };
 
-  async function submitAddSource() {
-    const url = addUrl.trim();
-    if (!url) return;
-    const { kind, name, url: normUrl } = inferSourceMeta(url);
-
-    let groupId: string;
-    if (addGroup === '__new__') {
-      const trimmed = newGroupName.trim();
-      if (!trimmed) return;
-      await createGroup(trimmed);
-      const newId = trimmed.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      groupId = newId || (groups[0]?.id ?? 'all');
-      newGroupName = '';
-      addGroup = groupId;
-    } else {
-      groupId = addGroup || (groups[0]?.id ?? 'all');
+  let lastEditInitial: SourceFormValues = { id: '', name: '', url: '', kind: 'rss', group: '', hue: undefined };
+  const editInitial = $derived.by(() => {
+    if (editingSourceId) {
+      const s = sources.find(s => s.id === editingSourceId);
+      if (s) {
+        lastEditInitial = { id: s.id, name: s.name, url: s.url ?? s.host ?? '', kind: s.kind, group: s.group, hue: s.hue };
+        return lastEditInitial;
+      }
     }
-
-    addUrl = '';
-    const newSourceId = await storeAddSource(name, normUrl, kind, groupId);
-    storeSyncSource(newSourceId).catch(e => logger.warn('sync after source add failed', e));
-  }
+    return lastEditInitial;
+  });
 
   async function removeSource(id: string) {
     await storeRemoveSource(id);
@@ -174,44 +116,7 @@
 
   <div class="flex-1 overflow-y-auto">
     <!-- Add source card -->
-    <div class="add-source-target mx-2.5 my-3 p-2.5 px-3 bg-bg-1 border border-dashed border-bd-2 rounded text-ink-1 text-[11px] leading-[1.4] font-mono">
-      <div class="flex items-center gap-2 mb-2">
-        <Icon name="plus" size={13} color={T.cyan} />
-        <span class="text-ink-0 tracking-[0.4px]">ADD SOURCE</span>
-      </div>
-      <div class="flex bg-bg-0 border border-bd-1 rounded mb-2">
-        <div class="px-2 py-1.5 text-cyan border-r border-bd-1 text-[11px] leading-none font-mono">$</div>
-        <input
-          bind:this={addInputEl}
-          bind:value={addUrl}
-          placeholder="https://example.com/feed.xml"
-          onkeydown={(e) => { if (e.key === 'Enter') submitAddSource(); }}
-          class="flex-1 px-2 py-1.5 text-ink-0 text-[11px] leading-none font-mono"
-        />
-      </div>
-      <div class="flex gap-1.5">
-        <select bind:value={addGroup} class="flex-1 bg-bg-0 text-ink-1 border border-bd-1 rounded px-2 py-1.5 text-[11px] leading-none font-mono">
-          {#each groups as g}
-            <option value={g.id}>group: {g.name}</option>
-          {/each}
-          <option value="__new__">+ create new group</option>
-        </select>
-        <button
-          onclick={submitAddSource}
-          class="px-3.5 bg-cyan text-bg-0 border-none rounded cursor-pointer font-semibold tracking-[0.4px] text-[11px] leading-none font-mono"
-        >+ ADD</button>
-      </div>
-      {#if addGroup === '__new__'}
-        <div class="mt-1">
-          <input
-            bind:value={newGroupName}
-            placeholder="new group name"
-            onkeydown={(e) => { if (e.key === 'Enter') submitAddSource(); }}
-            class="w-full px-2 py-1.5 bg-bg-0 text-ink-0 border border-cyan rounded box-border outline-none text-[11px] leading-none font-mono"
-          />
-        </div>
-      {/if}
-    </div>
+    <SourceForm mode="add" initial={addInitial} groups={groups} />
 
     <!-- Hint -->
     {#if !compact}
@@ -323,12 +228,16 @@
         {#if isDesktop}
           <Dialog.Overlay class="fixed inset-0 z-210 bg-black/50 anim-sheet-overlay-in" />
           <Dialog.Content preventScroll={false} class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-210 bg-bg-1 rounded-lg p-5 flex flex-col gap-3 w-100 max-w-[90vw] max-h-[90vh] overflow-y-auto anim-modal-in">
-            {@render editForm()}
+            {#key editingSourceId}
+              <SourceForm mode="edit" initial={editInitial} groups={groups} onSubmit={closeEdit} onCancel={closeEdit} />
+            {/key}
           </Dialog.Content>
         {:else}
           <Dialog.Overlay class="fixed inset-0 z-210 flex flex-col justify-end bg-black/50 anim-sheet-overlay-in" />
           <Dialog.Content preventScroll={false} class="fixed bottom-0 left-0 right-0 z-210 bg-bg-1 rounded-t-xl p-4 flex flex-col gap-3 anim-sheet-in" style="padding-bottom:max(16px, env(safe-area-inset-bottom));">
-            {@render editForm()}
+            {#key editingSourceId}
+              <SourceForm mode="edit" initial={editInitial} groups={groups} onSubmit={closeEdit} onCancel={closeEdit} />
+            {/key}
           </Dialog.Content>
         {/if}
       </Dialog.Portal>
@@ -346,86 +255,4 @@
       {act.label}
     </button>
   {/each}
-{/snippet}
-
-{#snippet editForm()}
-  <div class="text-ink-2 uppercase mb-1 tracking-[0.5px] text-[11px] leading-none font-mono">edit source</div>
-
-  <div class="flex flex-col gap-1.5">
-    <label for="edit-url" class="text-ink-3 text-[10px] leading-none font-mono">URL</label>
-    <input
-      id="edit-url"
-      bind:value={editUrl}
-      placeholder="https://example.com/feed.xml"
-      class="w-full p-2.5 bg-bg-0 border border-bd-1 rounded text-ink-0 outline-none box-border text-[12px] leading-none font-mono"
-      oninput={() => { editKind = inferSourceMeta(editUrl).kind; }}
-    />
-  </div>
-
-  <div class="flex flex-col gap-1.5">
-    <div class="flex items-center justify-between">
-      <label for="edit-name" class="text-ink-3 text-[10px] leading-none font-mono">NAME</label>
-      <button
-        onclick={() => fetchTitleForUrl(editUrl)}
-        disabled={fetchingTitle}
-        class="bg-transparent border border-bd-1 rounded p-[2px_8px] text-[9px] leading-none font-mono" style="color:{fetchingTitle ? T.ink3 : T.cyan};cursor:{fetchingTitle ? 'default' : 'pointer'};"
-      >{fetchingTitle ? 'fetching…' : 'fetch title'}</button>
-    </div>
-    <input
-      id="edit-name"
-      bind:value={editName}
-      placeholder="Display name"
-      class="w-full p-2.5 bg-bg-0 border border-bd-1 rounded text-ink-0 outline-none box-border text-[12px] leading-none font-mono"
-    />
-  </div>
-
-  <div class="flex gap-2">
-    <div class="flex-1 flex flex-col gap-1.5">
-      <span class="text-ink-3 text-[10px] leading-none font-mono">TYPE</span>
-        <SegmentedControl options={['rss','hn','reddit']} active={editKind} onChange={v => { editKind = v as typeof editKind; }} />
-    </div>
-    <div class="flex-1 flex flex-col gap-1.5">
-      <label for="se-group" class="text-ink-3 text-[10px] leading-none font-mono">GROUP</label>
-      <select id="se-group"
-        bind:value={editGroup}
-        class="w-full p-2 bg-bg-0 border border-bd-1 rounded text-ink-0 cursor-pointer text-[12px] leading-none font-mono"
-      >
-        {#each groups as g}<option value={g.id}>{g.name}</option>{/each}
-      </select>
-    </div>
-  </div>
-
-  <div class="flex flex-col gap-1.5">
-    <div class="flex items-center justify-between">
-      <span class="text-ink-3 text-[10px] leading-none font-mono">COLOUR</span>
-      {#if editHue != null}
-        <button
-          onclick={() => editHue = undefined}
-          class="bg-transparent border-none text-ink-3 cursor-pointer p-0 text-[9px] leading-none font-mono"
-        >reset</button>
-      {/if}
-    </div>
-    <div class="flex items-center gap-2">
-      <input
-        type="range"
-        min="0" max="360"
-        value={editHue ?? 200}
-        oninput={(e) => editHue = parseInt((e.target as HTMLInputElement).value)}
-        class="flex-1 h-1.5" style="accent-color:{T.cyan};"
-      />
-      <div class="w-7 h-7 rounded-[3px] shrink-0 border border-bd-1" style="
-        background:{editHue != null ? `oklch(0.45 0.14 ${editHue})` : T.ink4};
-      "></div>
-    </div>
-  </div>
-
-  <div class="flex gap-2 mt-1">
-    <Dialog.Close
-      class="flex-1 p-3 bg-transparent border border-bd-1 rounded text-ink-2 cursor-pointer text-[12px] leading-none font-mono"
-    >cancel</Dialog.Close>
-    <button
-      onclick={submitEditSource}
-      class="flex-2 p-3 bg-cyan border-none rounded text-bg-0 cursor-pointer font-semibold text-[12px] leading-none font-mono"
-    >save changes</button>
-  </div>
 {/snippet}
