@@ -50,6 +50,27 @@ pub const POPULAR_FEEDS: &[PopularFeed] = &[
     PopularFeed { name: "Lobsters", url: "https://lobste.rs/rss", kind: FeedType::Rss, category: "Engineering & Research" },
     PopularFeed { name: "The LLVM Project Blog", url: "https://blog.llvm.org/index.xml", kind: FeedType::Rss, category: "Engineering & Research" },
     PopularFeed { name: "kernel-recipes", url: "https://kernel-recipes.org/en/2026/feed/", kind: FeedType::Rss, category: "Engineering & Research" },
+    // ── Compilers & PL ──
+    PopularFeed { name: "SIGPLAN Blog", url: "https://blog.sigplan.org/feed", kind: FeedType::Rss, category: "Compilers & PL" },
+    PopularFeed { name: "PLDI papers (dblp)", url: "https://dblp.org/feed/streams/conf/pldi.rss", kind: FeedType::Rss, category: "Compilers & PL" },
+    PopularFeed { name: "regehr (Embedded in Academia)", url: "https://blog.regehr.org/feed", kind: FeedType::Rss, category: "Compilers & PL" },
+    PopularFeed { name: "Matt Godbolt", url: "https://xania.org/feed.atom", kind: FeedType::Rss, category: "Compilers & PL" },
+    PopularFeed { name: "cs.PL (arXiv)", url: "https://rss.arxiv.org/rss/cs.PL", kind: FeedType::Rss, category: "Compilers & PL" },
+    PopularFeed { name: "LLVM Discussion Forums", url: "https://discourse.llvm.org/latest.rss", kind: FeedType::Rss, category: "Compilers & PL" },
+    // ── Architecture & Performance ──
+    PopularFeed { name: "IEEE Micro", url: "https://csdl-api.computer.org/api/rss/periodicals/mags/mi/rss.xml", kind: FeedType::Rss, category: "Architecture & Performance" },
+    PopularFeed { name: "Chips and Cheese", url: "https://chipsandcheese.com/feed", kind: FeedType::Rss, category: "Architecture & Performance" },
+    PopularFeed { name: "fgiesen (ryg blog)", url: "https://fgiesen.wordpress.com/feed/", kind: FeedType::Rss, category: "Architecture & Performance" },
+    PopularFeed { name: "Bruce Dawson (Random ASCII)", url: "https://randomascii.wordpress.com/feed/", kind: FeedType::Rss, category: "Architecture & Performance" },
+    PopularFeed { name: "ACM TACO", url: "https://dl.acm.org/action/showFeed?type=etoc&feed=rss&jc=taco", kind: FeedType::Rss, category: "Architecture & Performance" },
+    // ── Systems Engineering ──
+    PopularFeed { name: "Mechanical Sympathy", url: "https://mechanical-sympathy.blogspot.com/feeds/posts/default", kind: FeedType::Rss, category: "Systems Engineering" },
+    PopularFeed { name: "Cloudflare Blog", url: "https://blog.cloudflare.com/rss", kind: FeedType::Rss, category: "Systems Engineering" },
+    PopularFeed { name: "Eli Bendersky", url: "https://eli.thegreenplace.net/feeds/all.atom.xml", kind: FeedType::Rss, category: "Systems Engineering" },
+    PopularFeed { name: "null program", url: "https://nullprogram.com/feed/", kind: FeedType::Rss, category: "Systems Engineering" },
+    PopularFeed { name: "Oxide Computer", url: "https://oxide.computer/blog/feed", kind: FeedType::Rss, category: "Systems Engineering" },
+    PopularFeed { name: "Brendan Gregg", url: "https://www.brendangregg.com/blog/rss.xml", kind: FeedType::Rss, category: "Systems Engineering" },
+    PopularFeed { name: "fasterthanlime", url: "https://fasterthanli.me/index.xml", kind: FeedType::Rss, category: "Systems Engineering" },
     // ── Mailing Lists ──
     PopularFeed { name: "LKML (Linux Kernel)", url: "https://lore.kernel.org/lkml/new.atom", kind: FeedType::Rss, category: "Mailing Lists" },
     PopularFeed { name: "Git Developers", url: "https://lore.kernel.org/git/new.atom", kind: FeedType::Rss, category: "Mailing Lists" },
