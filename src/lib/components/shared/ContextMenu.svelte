@@ -70,22 +70,22 @@
 {#if open}
   <Portal>
     {#if mode === 'popup'}
-      <div class="fixed inset-0 z-[100] bg-black/40 anim-sheet-overlay-in" role="presentation" aria-hidden="true" onclick={onClose}></div>
+      <div class="fixed inset-0 z-[100] bg-black/40 anim-sheet-overlay-in" role="presentation" aria-hidden="true" style="transform:translateZ(0);will-change:transform;" onclick={onClose}></div>
       <div
         bind:this={menuEl}
         tabindex="-1"
         class="fixed z-[101] bg-bg-1 border border-bd-1 rounded overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] anim-pop-in outline-none {shellClass}"
-        style="left:{pos.x}px;top:{pos.y}px;"
+        style="left:{pos.x}px;top:{pos.y}px;transform:translateZ(0);will-change:transform;"
       >
         {@render children()}
       </div>
     {:else}
-      <div class="fixed inset-0 z-[100] bg-black/40 anim-sheet-overlay-in" role="presentation" aria-hidden="true" onclick={onClose}></div>
+      <div class="fixed inset-0 z-[100] bg-black/40 anim-sheet-overlay-in" role="presentation" aria-hidden="true" style="transform:translateZ(0);will-change:transform;" onclick={onClose}></div>
       <div
         bind:this={menuEl}
         tabindex="-1"
         class="fixed inset-x-0 bottom-0 z-[101] bg-bg-1 border-t border-bd-1 rounded-t-xl anim-sheet-in outline-none"
-        style="padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));"
+        style="padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));transform:translateZ(0);will-change:transform;"
       >
         {@render children()}
       </div>
