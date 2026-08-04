@@ -5,6 +5,7 @@
   import Icon from './Icon.svelte';
   import Modal from './Modal.svelte';
   import { longpress } from './longpress.svelte';
+  import GhostButton from './shared/GhostButton.svelte';
 
   let { groups, active, onSelect, counts = {}, orientation = 'horizontal' }: {
     groups: Group[];
@@ -67,22 +68,22 @@
         </button>
       {/each}
     </div>
-    <button
+    <GhostButton
       onclick={() => { editing = true; }}
-      aria-label="Edit groups"
-      class="flex items-center gap-1.5 bg-transparent border-none text-ink-3 cursor-pointer text-left w-full mt-0.5 p-[5px_12px] text-[10px] leading-none font-mono"
+      ariaLabel="Edit groups"
+      class="flex items-center gap-1.5 text-ink-3 text-left w-full mt-0.5 p-[5px_12px] text-[10px] leading-none"
     >
       <Icon name="edit" size={10} color={T.ink3} />
       <span>Edit Groups</span>
-    </button>
+    </GhostButton>
   </div>
 {:else}
   <div class="flex shrink-0 border-b border-bd-0 bg-bg-1">
     <div class="flex-1 min-w-0 overflow-x-auto flex" style="scrollbar-width:none;">
       {#each groups as g}
-        <button
+        <GhostButton
           onclick={() => { if (suppressClick) { suppressClick = false; return; } onSelect(g.id); }}
-          class="shrink-0 bg-transparent border-none cursor-pointer flex items-center gap-1.5 hover:bg-bg-2" style="
+          class="shrink-0 flex items-center gap-1.5 hover:bg-bg-2" style="
             padding:13px 14px;min-height:44px;
             border-bottom:2px solid {active === g.id ? T.cyan : 'transparent'};
             color:{active === g.id ? T.ink0 : T.ink2};
@@ -92,7 +93,7 @@
         >
           <span use:longpress={{ onLongpress: () => { suppressClick = true; editing = true; } }}>{g.name}</span>
           <span use:longpress={{ onLongpress: () => { suppressClick = true; editing = true; } }} class="tabular-nums text-[10px] leading-none font-mono" style="color:{active === g.id ? T.cyan : T.ink3};">{counts[g.id] ?? g.n}</span>
-        </button>
+        </GhostButton>
       {/each}
     </div>
     <button
@@ -158,12 +159,12 @@
       />
     </div>
   {:else}
-    <button
+    <GhostButton
       onclick={() => { showNewInput = true; }}
-      class="w-full bg-transparent border-none text-cyan text-left cursor-pointer flex items-center gap-2 px-3 py-2.5 text-[11px] leading-none font-mono tracking-[0.4px]"
+      class="w-full text-cyan text-left flex items-center gap-2 px-3 py-2.5 text-[11px] leading-none tracking-[0.4px]"
     >
       <Icon name="plus" size={13} />
       NEW GROUP
-    </button>
+    </GhostButton>
   {/if}
 </Modal>

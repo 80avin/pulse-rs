@@ -9,6 +9,7 @@
   import SettingsSection from '$lib/components/SettingsSection.svelte';
   import ToggleSwitch from '$lib/components/ToggleSwitch.svelte';
   import SegmentedControl from '$lib/components/SegmentedControl.svelte';
+  import GhostButton from '$lib/components/shared/GhostButton.svelte';
   import { version } from '$app/environment';
   import { openExternal, shareItem } from '$lib/utils';
 
@@ -281,33 +282,33 @@
   <div class="text-ink-2 text-[11px] leading-normal font-mono">Pulse <span class="text-cyan">{version}</span></div>
   <div class="mt-0.5 text-ink-3 text-[10px] leading-normal font-mono">Tauri 2 · Svelte 5 · Rust · MIT</div>
   <div class="mt-2.5 flex flex-col gap-1.5">
-    <button
+    <GhostButton
       onclick={() => openExternal('https://github.com/80avin/pulse-rs')}
-      class="flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 text-cyan text-left text-[10px] leading-none font-mono"
+      class="flex items-center gap-1.5 p-0 text-cyan text-left text-[10px] leading-none"
     >
       <Icon name="ext" size={11} color={T.cyan} />
       github.com/80avin/pulse-rs
-    </button>
-    <button
+    </GhostButton>
+    <GhostButton
       onclick={() => openExternal('https://github.com/80avin/pulse-rs/issues')}
-      class="flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 text-ink-2 text-left text-[10px] leading-none font-mono"
+      class="flex items-center gap-1.5 p-0 text-ink-2 text-left text-[10px] leading-none"
     >
       <Icon name="ext" size={11} color={T.ink2} />
       report an issue
-    </button>
+    </GhostButton>
   </div>
   <div class="mt-2.5 text-ink-3 text-[10px] leading-[1.4] font-mono">No telemetry. All data stays on your device.</div>
 </SettingsSection>
 
 <!-- Advanced -->
 <SettingsSection label="advanced">
-  <button
+  <GhostButton
     onclick={() => { showAdvanced = !showAdvanced; if (showAdvanced) exportSources(); }}
-    class="flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 text-left"
+    class="flex items-center gap-1.5 p-0 text-left"
   >
     <Icon name={showAdvanced ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
     <span class="text-ink-3 text-[10px] leading-none font-mono">{showAdvanced ? 'hide' : 'show'} import / export</span>
-  </button>
+  </GhostButton>
 
   {#if showAdvanced}
     <div class="mt-3 flex flex-col gap-2.5">

@@ -5,6 +5,7 @@
   import { searchItems } from '$lib/stores/search.svelte';
   import Icon from './Icon.svelte';
   import ItemRow from './ItemRow.svelte';
+  import GhostButton from './shared/GhostButton.svelte';
   import type { FeedItem } from '$lib/types';
 
   let {
@@ -37,7 +38,7 @@
       <Icon name="search" size={15} color={T.ink3} />
       <input bind:this={searchInputEl} bind:value={query} placeholder="search all items…" class="flex-1 bg-transparent border-none outline-none text-ink-0 text-[13px] leading-none font-mono" />
       {#if searching}<span class="text-ink-3 text-[10px] leading-none font-mono">…</span>
-      {:else if query}<button onclick={() => { query = ''; results = []; searchInputEl?.focus(); }} class="bg-transparent border-none cursor-pointer flex p-0.5"><Icon name="x" size={14} color={T.ink3} /></button>{/if}
+      {:else if query}<GhostButton onclick={() => { query = ''; results = []; searchInputEl?.focus(); }} class="flex p-0.5"><Icon name="x" size={14} color={T.ink3} /></GhostButton>{/if}
     </div>
   </div>
   <div class="flex-1 overflow-y-auto">

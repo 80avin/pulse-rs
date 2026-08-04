@@ -10,6 +10,8 @@
   import KeyCap from './KeyCap.svelte';
   import Icon from './Icon.svelte';
   import SourceGlyph from './SourceGlyph.svelte';
+  import GhostButton from './shared/GhostButton.svelte';
+  import IconBtn from './shared/IconBtn.svelte';
   import ReaderView from './ReaderView.svelte';
 
   // One reader pane for both breakpoints. `mode` switches the chrome (metadata
@@ -121,18 +123,12 @@
     {:else}
       <!-- Narrow top bar -->
       <div class="h-11 flex items-center gap-1.5 shrink-0 bg-bg-1 border-b border-bd-0 px-2">
-        <button onclick={() => onBack?.()} aria-label="Back" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11">
-          <Icon name="arrow-l" size={18} color={T.ink1} />
-        </button>
+        <IconBtn onclick={() => onBack?.()} ariaLabel="Back" name="arrow-l" size={18} color={T.ink1} />
         <span class="text-ink-2 flex-1 text-[11px] leading-none font-mono">
           reader · {idx + 1}<span class="text-ink-3">/{allIds.length}</span>
         </span>
-        <button onclick={goPrev} disabled={!hasPrev} aria-label="Previous item" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11" style="opacity:{hasPrev ? 1 : 0.3};">
-          <Icon name="arrow-up" size={18} color={T.ink1} />
-        </button>
-        <button onclick={goNext} disabled={!hasNext} aria-label="Next item" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11" style="opacity:{hasNext ? 1 : 0.3};">
-          <Icon name="arrow-dn" size={18} color={T.ink1} />
-        </button>
+        <IconBtn onclick={goPrev} disabled={!hasPrev} ariaLabel="Previous item" name="arrow-up" size={18} color={T.ink1} style="opacity:{hasPrev ? 1 : 0.3};" />
+        <IconBtn onclick={goNext} disabled={!hasNext} ariaLabel="Next item" name="arrow-dn" size={18} color={T.ink1} style="opacity:{hasNext ? 1 : 0.3};" />
       </div>
     {/if}
 
@@ -158,27 +154,27 @@
       {#if saveToast}
         <div class="flex items-center justify-between bg-bg-1 text-ink-1 shrink-0 p-2 px-3 border-t border-t-bd-0 text-[11px] leading-none font-mono">
           <span>Saved <span class="text-amber">{source?.name ?? item.src}</span> post</span>
-          <button onclick={() => { saveToast = false; openNoteSheet(item.note ?? ''); }} class="bg-transparent border-none cursor-pointer text-cyan py-0.5 px-1.5 text-[11px] leading-none font-mono">add note</button>
+          <GhostButton onclick={() => { saveToast = false; openNoteSheet(item.note ?? ''); }} class="text-cyan py-0.5 px-1.5 text-[11px] leading-none">add note</GhostButton>
         </div>
       {/if}
     {/if}
 
     <!-- Action bar -->
     <div class="flex bg-bg-1 shrink-0 border-t border-t-bd-1">
-      <button
+      <GhostButton
         onclick={() => markRead(item.id, !item.read)}
-        class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono" style="color:{item.read ? T.green : T.ink2};"
+        class="flex-1 flex flex-col items-center gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none" style="color:{item.read ? T.green : T.ink2};"
       >
         <div class="flex items-center gap-1">
           <Icon name="check" size={16} color={item.read ? T.green : T.ink1} />
           <KeyCap k="m" dim />
         </div>
         <span class="uppercase">{item.read ? 'unread' : 'read'}</span>
-      </button>
+      </GhostButton>
       <SaveButton {item} narrow={mode === 'narrow'} onOpenNote={openNoteSheet} showToast={showSaveToast} />
-      <button
+      <GhostButton
         onclick={() => item.url && openExternal(item.url)}
-        class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer text-ink-2 gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono"
+        class="flex-1 flex flex-col items-center text-ink-2 gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none"
         title={item.domain ? `Open https://${item.domain}` : undefined}
       >
         <div class="flex items-center gap-1">
@@ -186,26 +182,26 @@
           <KeyCap k="o" dim />
         </div>
         <span class="uppercase">open</span>
-      </button>
-      <button
+      </GhostButton>
+      <GhostButton
         onclick={() => shareItem(item.title, item.url ?? item.externalUrl)}
-        class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer text-ink-2 gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono"
+        class="flex-1 flex flex-col items-center text-ink-2 gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none"
       >
         <div class="flex items-center gap-1">
           <Icon name="share" size={16} color={T.ink1} />
         </div>
         <span class="uppercase">share</span>
-      </button>
-      <button
+      </GhostButton>
+      <GhostButton
         onclick={handleHide}
-        class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer text-red gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono"
+        class="flex-1 flex flex-col items-center text-red gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none"
       >
         <div class="flex items-center gap-1">
           <Icon name="eye-off" size={16} color={T.red} />
           <KeyCap k={mode === 'wide' ? 'x' : 'h'} dim />
         </div>
         <span class="uppercase">hide</span>
-      </button>
+      </GhostButton>
     </div>
 
     {#if mode === 'narrow'}

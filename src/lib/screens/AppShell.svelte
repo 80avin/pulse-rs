@@ -26,6 +26,8 @@
   import MobileSaved from './MobileSaved.svelte';
   import SearchView from '$lib/components/SearchView.svelte';
   import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
+  import GhostButton from '$lib/components/shared/GhostButton.svelte';
+  import IconBtn from '$lib/components/shared/IconBtn.svelte';
   import { SOURCE_ACTIONS, type SourceActionKind } from '$lib/source-actions';
   import { anyOverlayOpen } from '$lib/stores/overlays.svelte';
   import { isDesktop } from '$lib/use-is-desktop.svelte';
@@ -278,22 +280,22 @@
       <div class="h-8 flex items-center pl-3 pr-2 bg-bg-0 border-b border-bd-0 shrink-0 gap-2.5">
         <span class="text-ink-2 text-[11px] leading-none font-mono">{activeGroupLabel} · {displayItems.length} items</span>
         <span class="flex-1"></span>
-        <button onclick={() => searchInputEl?.focus()} aria-label="Search" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" title="Search (/)">
+        <GhostButton onclick={() => searchInputEl?.focus()} ariaLabel="Search" title="Search (/)" class="inline-flex items-center justify-center rounded w-5.5 h-5.5">
           <Icon name="search" size={13} color={T.ink1} />
-        </button>
-        <button onclick={doSync} aria-label="Sync feeds" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5" title="Sync">
+        </GhostButton>
+        <GhostButton onclick={doSync} ariaLabel="Sync feeds" title="Sync" class="inline-flex items-center justify-center rounded w-5.5 h-5.5">
           <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={13} color={syncState.syncing ? T.cyan : T.ink1} /></span>
-        </button>
-        <button onclick={() => showCheatsheet = !showCheatsheet} aria-label="Keyboard shortcuts (?)" class="bg-transparent border-none cursor-pointer text-ink-3 px-1 text-[10px] leading-none font-mono" title="Keyboard shortcuts (?)">?</button>
+        </GhostButton>
+        <GhostButton onclick={() => showCheatsheet = !showCheatsheet} ariaLabel="Keyboard shortcuts (?)" class="text-ink-3 px-1 text-[10px] leading-none" title="Keyboard shortcuts (?)">?</GhostButton>
       </div>
 
       <!-- Main body -->
       <div class="flex-1 flex overflow-hidden relative" role="presentation" onmousemove={onMouseMove} onmouseup={stopDrag} onmouseleave={stopDrag}>
         {#if leftRailCollapsed}
           <div class="w-8 shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col items-center pt-1 overflow-hidden gap-1.5">
-            <button onclick={toggleLeftRail} aria-label="Expand sidebar" title="Expand sidebar" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded">
+            <GhostButton onclick={toggleLeftRail} ariaLabel="Expand sidebar" title="Expand sidebar" class="w-6 h-6 flex items-center justify-center rounded">
               <Icon name="chev-r" size={13} color={T.ink2} />
-            </button>
+            </GhostButton>
             {#each groups as g}
               <button onclick={() => selectGroup(g.id)} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} unread`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px] hover:bg-bg-2" style={g.id===activeGroup?'background:rgba(78,205,214,0.12)':undefined}>
                 <span class="font-bold text-[10px] leading-none font-mono text-cyan={g.id===activeGroup} text-ink-2={g.id!==activeGroup}">{g.name.slice(0, 2).toUpperCase()}</span>
@@ -301,19 +303,19 @@
               </button>
             {/each}
             <div class="flex-1"></div>
-            <button onclick={() => { showSources = !showSources; }} aria-label="Sources" title="Sources" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer rounded">
+            <GhostButton onclick={() => { showSources = !showSources; }} ariaLabel="Sources" title="Sources" class="w-6 h-6 flex items-center justify-center rounded">
               <Icon name="rss" size={13} color={showSources ? T.cyan : T.ink2} />
-            </button>
-            <button onclick={() => { showSettings = !showSettings; }} aria-label="Settings" title="Settings" class="w-6 h-6 flex items-center justify-center bg-transparent border-none cursor-pointer mb-1.5 rounded">
+            </GhostButton>
+            <GhostButton onclick={() => { showSettings = !showSettings; }} ariaLabel="Settings" title="Settings" class="w-6 h-6 flex items-center justify-center mb-1.5 rounded">
               <Icon name="cog" size={13} color={showSettings ? T.cyan : T.ink2} />
-            </button>
+            </GhostButton>
           </div>
         {:else}
           <div class="shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col overflow-hidden" style="width:{leftRailWidth}px">
             <div class="flex justify-end pt-0.5 px-1">
-              <button onclick={toggleLeftRail} aria-label="Collapse sidebar" title="Collapse sidebar" class="flex items-center justify-center bg-transparent border-none cursor-pointer rounded w-5.5 h-5.5">
+              <GhostButton onclick={toggleLeftRail} ariaLabel="Collapse sidebar" title="Collapse sidebar" class="flex items-center justify-center rounded w-5.5 h-5.5">
                 <Icon name="chev-l" size={12} color={T.ink3} />
-              </button>
+              </GhostButton>
             </div>
             <div class="px-2 pt-2 pb-1">
               <div class="flex items-center gap-1.5 bg-bg-0 border border-bd-1 p-1.25 px-2 rounded">
@@ -330,11 +332,11 @@
               </div>
             </div>
             <div class="flex-1 min-h-0 flex flex-col border-b border-bd-0">
-              <button onclick={() => showSourcesAccordion = !showSourcesAccordion} aria-label={`Sources for ${activeGroupLabel}`} aria-expanded={showSourcesAccordion} class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3 pt-2.5 shrink-0">
+              <GhostButton onclick={() => showSourcesAccordion = !showSourcesAccordion} ariaLabel={`Sources for ${activeGroupLabel}`} ariaExpanded={showSourcesAccordion} class="flex items-center gap-1 w-full text-left p-1.5 px-3 pt-2.5 shrink-0">
                 <span class="uppercase flex-1 text-ink-2 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
                 <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
                 <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
-              </button>
+              </GhostButton>
               {#if showSourcesAccordion}
                 <div class="flex-1 min-h-0 overflow-y-auto px-2">
                   {#each groupSources as s}
@@ -346,14 +348,14 @@
                   {/each}
                 </div>
                 <div class="shrink-0 flex items-center gap-1 px-2 pb-1.5 pt-1">
-                  <button onclick={() => { showSources = !showSources; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer text-left px-1.5 py-1 text-[10px] leading-none font-mono">
+                  <GhostButton onclick={() => { showSources = !showSources; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 text-left px-1.5 py-1 text-[10px] leading-none">
                     <Icon name="plus" size={10} color={T.ink3} />
                     <span>Manage Sources</span>
-                  </button>
-                  <button onclick={() => { showOnboarding = true; }} class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-none text-ink-3 cursor-pointer justify-center px-1.5 py-1 text-[10px] leading-none font-mono" title="Discover feeds" aria-label="Discover feeds">
+                  </GhostButton>
+                  <GhostButton onclick={() => { showOnboarding = true; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 justify-center px-1.5 py-1 text-[10px] leading-none" title="Discover feeds" ariaLabel="Discover feeds">
                     <Icon name="list" size={10} color={T.ink3} />
                     <span>discover</span>
-                  </button>
+                  </GhostButton>
                 </div>
               {/if}
             </div>
@@ -433,13 +435,11 @@
           <div class="flex flex-col h-full bg-bg-0 text-ink-0">
             <div class="h-[44px] flex items-center px-[10px] border-b border-b-bd-0 bg-bg-1 shrink-0 gap-2">
               <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px] flex-1">sources <span class="text-ink-3">· {sources.length}</span></span>
-              <button onclick={doSync} aria-label="Sync feeds" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11">
+              <IconBtn onclick={doSync} ariaLabel="Sync feeds" name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1}>
                 <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1} /></span>
-              </button>
-              <button onclick={() => { document.querySelector('.add-source-target')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11" title="Add source" aria-label="Add source">
-                <Icon name="plus" size={16} color={T.cyan} />
-              </button>
-              <button onclick={() => { showOnboarding = true; }} class="bg-transparent border-none cursor-pointer text-ink-2 min-h-11 px-1 text-[10px] leading-none font-mono tracking-[0.4px]" title="Discover feeds" aria-label="Discover feeds">discover</button>
+              </IconBtn>
+              <IconBtn onclick={() => { document.querySelector('.add-source-target')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} title="Add source" ariaLabel="Add source" name="plus" size={16} color={T.cyan} />
+              <GhostButton onclick={() => { showOnboarding = true; }} class="text-ink-2 min-h-11 px-1 text-[10px] leading-none tracking-[0.4px]" title="Discover feeds" ariaLabel="Discover feeds">discover</GhostButton>
             </div>
             <div class="flex-1 overflow-auto">
               <SourceExplorer onSourceSelect={openSourceFeed} onSync={doSync} />

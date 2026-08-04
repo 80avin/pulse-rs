@@ -9,6 +9,8 @@
   import Icon from './Icon.svelte';
   import TagFilterRow from './TagFilterRow.svelte';
   import TimelineList from './TimelineList.svelte';
+  import GhostButton from './shared/GhostButton.svelte';
+  import IconBtn from './shared/IconBtn.svelte';
   import type { FeedItem } from '$lib/types';
 
   // One timeline pane for both breakpoints. `mode` switches the toolbar/filter
@@ -71,7 +73,7 @@
         {#if searchQuery}<span class="text-ink-3">·</span><span class="text-amber">"{searchQuery}"</span>{/if}
         <span class="flex-1"></span>
         {#if counts.unread > 0}
-          <button onclick={() => markAllRead(displayItems.map(i => i.id))} class="bg-transparent border-none cursor-pointer text-ink-2 text-[10px] leading-none font-mono">mark all read</button>
+          <GhostButton onclick={() => markAllRead(displayItems.map(i => i.id))} class="text-ink-2 text-[10px] leading-none">mark all read</GhostButton>
         {/if}
       </div>
       {#if timelineFilter.tag || topTags.length > 0}
@@ -89,18 +91,14 @@
       <div class="flex items-center gap-1.5 flex-1">
         <span class="font-semibold text-[14px] leading-none font-mono text-ink-0 tracking-[1px]">PULSE<span class="text-cyan">.</span></span>
       </div>
-      <button onclick={doSync} aria-label="Sync feeds" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11">
+      <IconBtn onclick={doSync} ariaLabel="Sync feeds" name="sync" size={18} color={syncState.syncing ? T.cyan : T.ink1}>
         <span class={syncState.syncing ? 'syncing' : ''}>
           <Icon name="sync" size={18} color={syncState.syncing ? T.cyan : T.ink1} />
         </span>
-      </button>
-      <button onclick={() => { showFilter = !showFilter; }} aria-label={showFilter ? 'Hide filter bar' : 'Show filter bar'} class="inline-flex items-center justify-center border-none cursor-pointer rounded min-h-11 min-w-11" style="background:{showFilter ? 'rgba(78,205,214,0.06)' : 'transparent'};">
-        <Icon name="filter" size={18} color={showFilter ? T.cyan : T.ink1} />
-      </button>
+      </IconBtn>
+      <IconBtn onclick={() => { showFilter = !showFilter; }} ariaLabel={showFilter ? 'Hide filter bar' : 'Show filter bar'} name="filter" size={18} color={showFilter ? T.cyan : T.ink1} style="background:{showFilter ? 'rgba(78,205,214,0.06)' : 'transparent'};" />
       {#if onSearch}
-        <button onclick={onSearch} aria-label="Search" class="inline-flex items-center justify-center bg-transparent border-none cursor-pointer rounded min-h-11 min-w-11">
-          <Icon name="search" size={18} color={T.ink1} />
-        </button>
+        <IconBtn onclick={onSearch} ariaLabel="Search" name="search" size={18} color={T.ink1} />
       {/if}
     </div>
 
@@ -130,9 +128,9 @@
       <span class="text-ink-3">filtered by source:</span>
       <span class="text-cyan">{feedFilterName}</span>
       <span class="flex-1"></span>
-      <button onclick={() => setFeedFilter(null)} class="bg-transparent border-none cursor-pointer flex items-center gap-1 text-[10px] leading-none font-mono text-ink-2">
+      <GhostButton onclick={() => setFeedFilter(null)} class="flex items-center gap-1 text-[10px] leading-none text-ink-2">
         <Icon name="x" size={11} color={T.ink2} /> clear
-      </button>
+      </GhostButton>
     </div>
   {:else if mode === 'narrow'}
     <GroupTabs {groups} active={activeGroup} onSelect={(id) => { applyFilter({ isRead: null, isSaved: null, groupId: id === 'all' ? null : id }); }} />
@@ -144,9 +142,9 @@
       <span class="text-ink-3">tag:</span>
       <span class="text-cyan">{timelineFilter.tag}</span>
       <span class="flex-1"></span>
-      <button onclick={() => setTagFilter(null)} class="bg-transparent border-none cursor-pointer flex items-center gap-1 text-[10px] leading-none font-mono text-ink-2">
+      <GhostButton onclick={() => setTagFilter(null)} class="flex items-center gap-1 text-[10px] leading-none text-ink-2">
         <Icon name="x" size={11} color={T.ink2} /> clear
-      </button>
+      </GhostButton>
     </div>
   {/if}
 

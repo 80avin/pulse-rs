@@ -4,6 +4,7 @@
   import type { FeedItem } from '$lib/types';
   import Icon from './Icon.svelte';
   import KeyCap from './KeyCap.svelte';
+  import GhostButton from './shared/GhostButton.svelte';
 
   let { item, narrow, onOpenNote, showToast }: {
     item: FeedItem;
@@ -46,12 +47,12 @@
   }
 </script>
 
-<button
+<GhostButton
   onclick={handleSaveClick}
   ontouchstart={startSavePress}
   ontouchend={endSavePress}
   ontouchcancel={cancelSavePress}
-  class="flex-1 flex flex-col items-center bg-transparent border-none cursor-pointer gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none font-mono" style="color:{item.saved ? T.amber : T.ink2};"
+  class="flex-1 flex flex-col items-center gap-1 py-2.5 tracking-[0.4px] min-h-13 text-[10px] leading-none" style="color:{item.saved ? T.amber : T.ink2};"
 >
   <div class="flex items-center gap-1">
     <Icon name="bookmark" size={16} color={item.saved ? T.amber : T.ink1} />
@@ -59,4 +60,4 @@
     <KeyCap k="s" dim />
   </div>
   <span class="uppercase">{item.saved ? 'saved' : 'save'}</span>
-</button>
+</GhostButton>

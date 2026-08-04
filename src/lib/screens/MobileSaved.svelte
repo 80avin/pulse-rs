@@ -4,6 +4,7 @@
   import { toggleSaved, tauriInvoke, adaptItem } from '$lib/stores/data.svelte';
   import TimelineList from '$lib/components/TimelineList.svelte';
   import Icon from '$lib/components/Icon.svelte';
+  import GhostButton from '$lib/components/shared/GhostButton.svelte';
   import type { FeedItem, BackendItem } from '$lib/types';
 
   
@@ -70,14 +71,14 @@
     onItemClick={(id, allIds) => onOpen(id, allIds)}
   >
     {#snippet renderAction(item)}
-      <button
+      <GhostButton
         onclick={() => onUnsave(item)}
         title="Remove from saved"
-        aria-label="Remove from saved"
-        class="absolute top-1 right-1 bg-transparent border-none cursor-pointer p-1 opacity-70 hover:opacity-100"
+        ariaLabel="Remove from saved"
+        class="absolute top-1 right-1 p-1 opacity-70 hover:opacity-100"
       >
         <Icon name="x" size={12} color={T.amber} />
-      </button>
+      </GhostButton>
     {/snippet}
   </TimelineList>
 </div>

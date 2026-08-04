@@ -6,6 +6,7 @@
   import TagChip from './TagChip.svelte';
   import ScoreBar from './ScoreBar.svelte';
   import Icon from './Icon.svelte';
+  import GhostButton from './shared/GhostButton.svelte';
   import { isDesktop } from '$lib/use-is-desktop.svelte';
 
   let {
@@ -76,17 +77,17 @@
       <h1 class="text-ink-0 m-0 max-w-180 tracking-[-0.3px] text-[22px] leading-tight font-sans" style="font-weight:600;">{item.title}</h1>
 
       {#if item.url}
-        <button onclick={() => openExternal(item.url!)} class="inline-flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 mt-2 text-[11px] leading-none font-mono text-ink-2">
+        <GhostButton onclick={() => openExternal(item.url!)} class="inline-flex items-center gap-1.5 p-0 mt-2 text-[11px] leading-none text-ink-2">
           <Icon name="ext" size={11} color={T.ink3} />
           <span class="underline underline-offset-2" style="text-decoration-color:{T.bd2};">{primaryDomain}</span>
-        </button>
+        </GhostButton>
       {/if}
 
       {#if item.externalUrl}
-        <button onclick={() => openExternal(item.externalUrl!)} class="block bg-transparent border-none cursor-pointer p-0 text-left mt-1 text-[11px] leading-[1.4] font-mono text-cyan">
+        <GhostButton onclick={() => openExternal(item.externalUrl!)} class="block p-0 text-left mt-1 text-[11px] leading-[1.4] text-cyan">
           <Icon name="ext" size={11} color={T.cyan} />
           <span class="underline ml-1 underline-offset-2">{item.externalUrl}</span>
-        </button>
+        </GhostButton>
       {/if}
 
       <div class="flex items-center gap-2 flex-wrap mt-2.25">
@@ -113,7 +114,7 @@
           <div class="bg-bg-1 border border-bd-1 px-3 py-2.5 rounded mt-3.5">
             <div class="flex items-center justify-between mb-1">
               <span class="uppercase tracking-[0.4px] text-[10px] leading-none font-mono text-ink-3">note</span>
-              <button onclick={startNoteEdit} class="bg-transparent border-none cursor-pointer p-[2px_6px] text-[10px] leading-none font-mono text-ink-2">edit</button>
+              <GhostButton onclick={startNoteEdit} class="p-[2px_6px] text-[10px] leading-none text-ink-2">edit</GhostButton>
             </div>
             <p class="m-0 whitespace-pre-wrap text-[12px] leading-normal font-sans text-ink-1">{item.note}</p>
           </div>

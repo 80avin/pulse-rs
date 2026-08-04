@@ -1,4 +1,6 @@
 <script lang="ts">
+  import GhostButton from './shared/GhostButton.svelte';
+
   let {
     density,
     activeGroupLabel,
@@ -47,5 +49,5 @@
     {#if syncState.lastNewCount > 0}<span class="text-cyan"> +{syncState.lastNewCount}</span>{/if}
   </span>
   <span class="text-ink-4">·</span>
-  <button onclick={onToggleCheatsheet} class="bg-transparent border-none cursor-pointer text-ink-3 p-0 text-[10px] leading-none font-mono" title="keyboard shortcuts (?)" aria-label="Keyboard shortcuts (?)">?</button>
+  <GhostButton onclick={onToggleCheatsheet} class="text-ink-3 p-0 text-[10px] leading-none" title="keyboard shortcuts (?)" ariaLabel="Keyboard shortcuts (?)">?</GhostButton>
 </div>

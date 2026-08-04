@@ -10,6 +10,7 @@
   import SourceForm, { type SourceFormValues } from '$lib/components/SourceForm.svelte';
   import { longpress } from '$lib/components/longpress.svelte';
   import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
+  import GhostButton from '$lib/components/shared/GhostButton.svelte';
 
   let {
     onSourceSelect,
@@ -166,10 +167,10 @@
 <div class="flex flex-col flex-1 min-h-0 bg-bg-0 text-ink-0">
   {#if editingSourceId !== null}
     <div class="flex items-center gap-1 shrink-0 bg-bg-1 border-b border-bd-0 px-1.5 py-1">
-      <button onclick={closeEdit} class="flex items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 rounded text-ink-2 text-[11px] leading-none font-mono" aria-label="Back to sources">
+      <GhostButton onclick={closeEdit} class="flex items-center gap-1 p-1.5 rounded text-ink-2 text-[11px] leading-none" ariaLabel="Back to sources">
         <Icon name="arrow-l" size={13} color={T.ink2} />
         back
-      </button>
+      </GhostButton>
     </div>
     <div class="flex-1 overflow-y-auto p-2.5">
       {#key editingSourceId}

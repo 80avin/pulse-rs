@@ -3,6 +3,7 @@
   import { groups, dbStats } from '$lib/stores/data.svelte';
   import { TABS, type TabId } from '$lib/nav';
   import Icon from './Icon.svelte';
+  import GhostButton from './shared/GhostButton.svelte';
 
   let { active, onChange }: {
     active: TabId | string;
@@ -25,11 +26,10 @@
   {#each TABS as tab}
     {@const m = META[tab]}
     {@const a = tab === active}
-    <button
-      type="button"
+    <GhostButton
       onclick={() => onChange(tab)}
-      aria-current={a ? 'page' : undefined}
-      class="flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer tracking-[0.5px] relative min-h-13 pt-[10px] pb-[12px] text-[9px] leading-none font-mono"
+      ariaCurrent={a ? 'page' : undefined}
+      class="flex-1 flex flex-col items-center gap-1 tracking-[0.5px] relative min-h-13 pt-[10px] pb-[12px] text-[9px] leading-none"
       style="
         border-top:2px solid {a ? T.cyan : 'transparent'};
         color:{a ? T.cyan : T.ink2};
@@ -43,7 +43,7 @@
         {/if}
       </div>
       <span>{m.label}</span>
-    </button>
+    </GhostButton>
   {/each}
   </div>
 </nav>

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { T, SOURCE_KIND } from '$lib/tokens';
   import Icon from '$lib/components/Icon.svelte';
+  import GhostButton from '$lib/components/shared/GhostButton.svelte';
   import { tauriInvoke, reloadSources, reloadGroups, reloadDbStats } from '$lib/stores/data.svelte';
 
   interface PopularFeedDto { name: string; url: string; kind: string; }
@@ -78,7 +79,7 @@
     <div class="flex-1 flex flex-col items-center justify-center gap-3 p-6">
       <div class="text-red text-[11px] leading-[1.6] font-mono text-center">couldn't load the feed catalog.<br />check your connection and try again.</div>
       <button onclick={loadCatalog} class="bg-bg-1 border border-bd-1 text-ink-1 cursor-pointer rounded p-2.5 px-4 text-[11px] leading-none font-mono">retry</button>
-      <button onclick={onDone} class="bg-transparent border-none text-ink-3 cursor-pointer text-[10px] leading-none font-mono">skip for now</button>
+      <GhostButton onclick={onDone} class="text-ink-3 text-[10px] leading-none">skip for now</GhostButton>
     </div>
   {:else}
     <!-- Categories -->
@@ -92,11 +93,11 @@
                 <span class="shrink-0 inline-flex items-center rounded-sm border border-dashed border-bd-1 px-[4px] py-[2px] text-[9px] leading-none font-mono uppercase tracking-[0.5px] text-ink-2" title="Experimental category — feed quality may vary">experimental</span>
               {/if}
             </span>
-            <button
+            <GhostButton
               onclick={() => toggleCategory(cat)}
-              class="bg-transparent border-none cursor-pointer text-[9px] leading-none font-mono uppercase tracking-[0.5px]"
+              class="text-[9px] leading-none uppercase tracking-[0.5px]"
               style="color:{catAllSelected(cat) ? T.cyan : T.ink3};"
-            >{catAllSelected(cat) ? 'clear' : 'select all'}</button>
+            >{catAllSelected(cat) ? 'clear' : 'select all'}</GhostButton>
           </div>
           <div class="grid grid-cols-1 gap-1.5 px-3 pb-3 pt-1 sm:grid-cols-2">
             {#each cat.feeds as f}
