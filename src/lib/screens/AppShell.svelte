@@ -27,7 +27,8 @@
   import SearchView from '$lib/components/SearchView.svelte';
   import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
   import { SOURCE_ACTIONS, type SourceActionKind } from '$lib/source-actions';
-  import { itemMenu } from '$lib/stores/item-menu.svelte';
+  import { anyOverlayOpen } from '$lib/stores/overlays.svelte';
+  import { isDesktop } from '$lib/use-is-desktop.svelte';
   import { TABS, isTabId, type TabId } from '$lib/nav';
 
   // ── Shared navigation state (one shell, both breakpoints) ───────────────
@@ -37,13 +38,7 @@
 
   const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-  let isWide = $state(typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
-  $effect(() => {
-    const mq = window.matchMedia('(min-width: 768px)');
-    const update = () => { isWide = mq.matches; };
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  });
+  const isWide = $derived(isDesktop());
 
   function openItem(id: string, ids: string[]) {
     openId = id;
@@ -224,7 +219,7 @@
     function onKey(e: KeyboardEvent) {
       if (!isWide) return;
       if (showOnboarding) { if (e.key === 'Escape') showOnboarding = false; return; }
-      if (showSources || showSettings || showCheatsheet || itemMenu.current || sourceMenu) return;
+      if (anyOverlayOpen()) return;
       const target = e.target as HTMLElement;
       const inInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 
@@ -389,7 +384,7 @@
 
         <!-- Sources modal -->
         <Modal open={showSources} title="Sources" onClose={() => { showSources = false; }} width="640px">
-          <SourceExplorer onSourceSelect={(id) => { setFeedFilter(id); showSources = false; }} compact={true} isDesktop={true} />
+          <SourceExplorer onSourceSelect={(id) => { setFeedFilter(id); showSources = false; }} compact={true} />
         </Modal>
 
         <!-- Keyboard shortcut cheatsheet -->

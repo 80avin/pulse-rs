@@ -3,13 +3,17 @@
   import { Dialog } from 'bits-ui';
   import { groups } from '$lib/stores/data.svelte';
   import { shareSheet, dismissShare, confirmShare } from '$lib/share.svelte';
+  import { openOverlay, closeOverlay } from '$lib/stores/overlays.svelte';
+  import { isDesktop } from '$lib/use-is-desktop.svelte';
   import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 
   let submitting = $state(false);
-  let isDesktop = $state(false);
 
   $effect(() => {
-    isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+    if (shareSheet.candidate !== null) {
+      openOverlay('share-sheet');
+      return () => closeOverlay('share-sheet');
+    }
   });
 
   const noFeedFound = $derived(
@@ -38,7 +42,7 @@
     <Dialog.Overlay class="fixed inset-0 bg-black/60 z-[300]" />
     <Dialog.Content
       preventScroll={false}
-      class="bg-bg-2 flex flex-col overflow-y-auto" style="position:fixed;{isDesktop ? 'left:50%;top:50%;transform:translate(-50%,-50%);width:400px;max-width:90vw;border-radius:8px;' : 'bottom:0;left:0;right:0;width:100%;border-radius:16px 16px 0 0;'}padding:20px 16px max(20px,env(safe-area-inset-bottom));gap:14px;max-height:90vh;z-index:300;"
+      class="bg-bg-2 flex flex-col overflow-y-auto" style="position:fixed;{isDesktop() ? 'left:50%;top:50%;transform:translate(-50%,-50%);width:400px;max-width:90vw;border-radius:8px;' : 'bottom:0;left:0;right:0;width:100%;border-radius:16px 16px 0 0;'}padding:20px 16px max(20px,env(safe-area-inset-bottom));gap:14px;max-height:90vh;z-index:300;"
     >
       <!-- Header -->
       <div class="flex items-center gap-2">

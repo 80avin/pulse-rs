@@ -1,7 +1,8 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { Dialog } from 'bits-ui';
   import { sources, groups, items, markSourceRead, removeSource as storeRemoveSource, syncSource as storeSyncSource, tauriInvoke, reloadSources, reloadGroups, reloadDbStats, IS_TAURI } from '$lib/stores/data.svelte';
+  import { SOURCE_ACTIONS, type SourceActionKind } from '$lib/source-actions';
+  import { isDesktop } from '$lib/use-is-desktop.svelte';
   import StatusDot from '$lib/components/StatusDot.svelte';
   import SourceGlyph from '$lib/components/SourceGlyph.svelte';
   import Sparkline from '$lib/components/Sparkline.svelte';
@@ -14,12 +15,10 @@
     onSourceSelect,
     onSync = () => {},
     compact = false,
-    isDesktop = false,
   }: {
     onSourceSelect: (sourceId: string) => void;
     onSync?: () => void;
     compact?: boolean;
-    isDesktop?: boolean;
   } = $props();
 
   const byGroup = $derived.by(() => {
@@ -149,16 +148,35 @@
     }
   }
 
-  const sourceActions = [
-    { icon: 'list',  label: 'View feed',     action: () => { onSourceSelect(actionSheet!); actionSheet = null; } },
-    { icon: 'sync',  label: 'Refresh now',   action: () => { storeSyncSource(actionSheet!); actionSheet = null; } },
-    { icon: 'edit',  label: 'Edit source',   action: () => openEditSheet(actionSheet!) },
-    { icon: 'star',  label: 'Mark all read', action: () => { markSourceRead(actionSheet!); actionSheet = null; } },
-    { icon: 'trash', label: 'Remove source', action: () => { removeSource(actionSheet!); actionSheet = null; } },
-  ];
+  function runSourceAction(kind: SourceActionKind) {
+    if (kind === 'edit') { openEditSheet(actionSheet!); return; }
+    const id = actionSheet;
+    if (!id) return;
+    switch (kind) {
+      case 'view':      onSourceSelect(id); break;
+      case 'refresh':   storeSyncSource(id); break;
+      case 'mark-read': markSourceRead(id); break;
+      case 'remove':    removeSource(id); break;
+      default: break;
+    }
+    actionSheet = null;
+  }
 </script>
 
 <div class="flex flex-col flex-1 min-h-0 bg-bg-0 text-ink-0">
+  {#if editingSourceId !== null}
+    <div class="flex items-center gap-1 shrink-0 bg-bg-1 border-b border-bd-0 px-1.5 py-1">
+      <button onclick={closeEdit} class="flex items-center gap-1 bg-transparent border-none cursor-pointer p-1.5 rounded text-ink-2 text-[11px] leading-none font-mono" aria-label="Back to sources">
+        <Icon name="arrow-l" size={13} color={T.ink2} />
+        back
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-2.5">
+      {#key editingSourceId}
+        <SourceForm mode="edit" initial={editInitial} groups={groups} onSubmit={closeEdit} onCancel={closeEdit} />
+      {/key}
+    </div>
+  {:else}
   <!-- Status summary -->
   {#if !compact}
     <div class="flex gap-3 py-2 px-3 border-b border-bd-0 bg-bg-1 text-ink-2 shrink-0 text-[10px] leading-none font-mono">
@@ -267,11 +285,12 @@
     {/each}
     <div class="h-3"></div>
   </div>
+  {/if}
 
   <!-- Long-press action sheet / Desktop context menu -->
-  <ContextMenu open={actionSheet !== null && actionSource !== undefined} mode={isDesktop ? 'popup' : 'sheet'} x={ctxMenuPos?.x ?? 0} y={ctxMenuPos?.y ?? 0} onClose={() => { actionSheet = null; ctxMenuPos = null; }} class={isDesktop ? 'w-55' : ''}>
+  <ContextMenu open={actionSheet !== null && actionSource !== undefined} mode={isDesktop() ? 'popup' : 'sheet'} x={ctxMenuPos?.x ?? 0} y={ctxMenuPos?.y ?? 0} onClose={() => { actionSheet = null; ctxMenuPos = null; }} class={isDesktop() ? 'w-55' : ''}>
     {#if actionSource}
-      {#if isDesktop}
+      {#if isDesktop()}
         <div class="flex items-center gap-2.5 p-2.5 px-3 border-b border-bd-0">
           <div class="w-6 h-6 flex items-center justify-center bg-bg-1 border border-bd-1 rounded">
             <SourceGlyph kind={actionSource.kind} size={11} />
@@ -299,37 +318,16 @@
       {/if}
     {/if}
   </ContextMenu>
-
-  <!-- Edit source sheet / Desktop popover -->
-    <Dialog.Root open={editingSourceId !== null} onOpenChange={(open) => { if (!open) editingSourceId = null; }}>
-      <Dialog.Portal>
-        {#if isDesktop}
-          <Dialog.Overlay class="fixed inset-0 z-210 bg-black/50 anim-sheet-overlay-in" />
-          <Dialog.Content preventScroll={false} class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-210 bg-bg-1 rounded-lg p-5 flex flex-col gap-3 w-100 max-w-[90vw] max-h-[90vh] overflow-y-auto anim-modal-in">
-            {#key editingSourceId}
-              <SourceForm mode="edit" initial={editInitial} groups={groups} onSubmit={closeEdit} onCancel={closeEdit} />
-            {/key}
-          </Dialog.Content>
-        {:else}
-          <Dialog.Overlay class="fixed inset-0 z-210 flex flex-col justify-end bg-black/50 anim-sheet-overlay-in" />
-          <Dialog.Content preventScroll={false} class="fixed bottom-0 left-0 right-0 z-210 bg-bg-1 rounded-t-xl p-4 flex flex-col gap-3 anim-sheet-in" style="padding-bottom:max(16px, env(safe-area-inset-bottom));">
-            {#key editingSourceId}
-              <SourceForm mode="edit" initial={editInitial} groups={groups} onSubmit={closeEdit} onCancel={closeEdit} />
-            {/key}
-          </Dialog.Content>
-        {/if}
-      </Dialog.Portal>
-    </Dialog.Root>
 </div>
 
 {#snippet actions(iconSize: number, sizeCls: string)}
-  {#each sourceActions as act}
+  {#each SOURCE_ACTIONS as act}
     <button
-      onclick={act.action}
+      onclick={() => runSourceAction(act.kind)}
       class="menu-row {sizeCls}"
-      style="color:{act.label === 'Remove source' ? T.red : undefined};-webkit-tap-highlight-color:transparent;"
+      style="color:{act.kind === 'remove' ? T.red : act.kind === 'edit' ? T.cyan : undefined};-webkit-tap-highlight-color:transparent;"
     >
-      <Icon name={act.icon} size={iconSize} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
+      <Icon name={act.icon} size={iconSize} color={act.kind === 'remove' ? T.red : act.kind === 'edit' ? T.cyan : T.ink2} />
       {act.label}
     </button>
   {/each}

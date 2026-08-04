@@ -6,6 +6,7 @@
   import TagChip from './TagChip.svelte';
   import ScoreBar from './ScoreBar.svelte';
   import Icon from './Icon.svelte';
+  import { isDesktop } from '$lib/use-is-desktop.svelte';
 
   let {
     itemId,
@@ -13,14 +14,12 @@
     onTagClick,
     onPopoverChange,
     showMetadata = true,
-    isDesktop = false,
   }: {
     itemId: string;
     noteMode?: 'inline' | 'sheet' | 'none';
     onTagClick?: (tag: string) => void;
     onPopoverChange?: (open: boolean) => void;
     showMetadata?: boolean;
-    isDesktop?: boolean;
   } = $props();
 
   const item = $derived(items.find(i => i.id === itemId));
@@ -164,7 +163,7 @@
           <Dialog.Content
             preventScroll={false}
             class="bg-bg-2 text-ink-0"
-            style="{isDesktop ? 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:380px;max-width:90vw;border-radius:8px;' : 'position:fixed;bottom:0;left:0;right:0;width:100%;border-radius:0;'}padding:14px 14px 24px;font:12px/1.4 {T.sans};z-index:20;"
+            style="{isDesktop() ? 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:380px;max-width:90vw;border-radius:8px;' : 'position:fixed;bottom:0;left:0;right:0;width:100%;border-radius:0;'}padding:14px 14px 24px;font:12px/1.4 {T.sans};z-index:20;"
           >
             <div class="flex items-center justify-between mb-2.5">
               <div class="flex items-center gap-2">

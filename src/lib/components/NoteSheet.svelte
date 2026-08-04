@@ -1,6 +1,13 @@
+<script module lang="ts">
+  let noteSeq = 0;
+</script>
+
 <script lang="ts">
   import { Dialog } from 'bits-ui';
   import Icon from './Icon.svelte';
+  import { openOverlay, closeOverlay } from '$lib/stores/overlays.svelte';
+
+  const id = 'note-sheet-' + (++noteSeq);
 
   let { open, note, onSave, onClose }: {
     open: boolean;
@@ -8,6 +15,13 @@
     onSave: (note: string) => void;
     onClose: () => void;
   } = $props();
+
+  $effect(() => {
+    if (open) {
+      openOverlay(id);
+      return () => closeOverlay(id);
+    }
+  });
 
   // Seed the draft from the incoming note on every open transition; never
   // clobber a draft the user is actively editing if `note` changes mid-sheet.

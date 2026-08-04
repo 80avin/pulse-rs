@@ -1,8 +1,15 @@
+<script module lang="ts">
+  let modalSeq = 0;
+</script>
+
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { T } from '$lib/tokens';
   import Icon from './Icon.svelte';
   import { Dialog } from 'bits-ui';
+  import { openOverlay, closeOverlay } from '$lib/stores/overlays.svelte';
+
+  const id = 'modal-' + (++modalSeq);
 
   let {
     open = $bindable(false),
@@ -17,6 +24,13 @@
     width?: string;
     children: Snippet;
   } = $props();
+
+  $effect(() => {
+    if (open) {
+      openOverlay(id);
+      return () => closeOverlay(id);
+    }
+  });
 </script>
 
 <Dialog.Root bind:open onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>

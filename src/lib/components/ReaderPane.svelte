@@ -150,7 +150,7 @@
       }}
       role="feed"
     >
-      <ReaderView itemId={itemId} noteMode={mode === 'wide' ? 'inline' : 'sheet'} onPopoverChange={(open) => { popoverOpen = open; }} showMetadata={mode === 'wide' ? false : true} isDesktop={mode === 'wide'} />
+      <ReaderView itemId={itemId} noteMode={mode === 'wide' ? 'inline' : 'sheet'} onPopoverChange={(open) => { popoverOpen = open; }} showMetadata={mode === 'wide' ? false : true} />
     </div>
 
     {#if mode === 'narrow'}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { Portal } from 'bits-ui';
+  import { openOverlay, closeOverlay } from '$lib/stores/overlays.svelte';
 
   let {
     open = false,
@@ -36,6 +37,7 @@
 
   $effect(() => {
     if (!open || typeof window === 'undefined') return;
+    openOverlay('context-menu');
     previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const raf = requestAnimationFrame(() => menuEl?.focus());
     function onKey(e: KeyboardEvent) {
@@ -53,6 +55,7 @@
     window.addEventListener('keydown', onKey, true);
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => {
+      closeOverlay('context-menu');
       cancelAnimationFrame(raf);
       window.removeEventListener('keydown', onKey, true);
       document.removeEventListener('pointerdown', onPointerDown, true);
