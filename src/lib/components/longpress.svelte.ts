@@ -40,6 +40,7 @@ export function longpress(
 
   // Pointer handlers (for desktop mouse and GroupTabs)
   function pointerDown(e: PointerEvent) {
+    if (e.button !== 0) return;
     onDown(e.clientX, e.clientY);
   }
 

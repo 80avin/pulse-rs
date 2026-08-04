@@ -234,7 +234,7 @@
         <div
           role="button"
           tabindex="0"
-          use:longpress={{ onLongpress: () => { suppressClick = true; actionSheet = s.id; ctxMenuPos = null; } }}
+          use:longpress={{ onLongpress: () => { suppressClick = true; actionSheet = s.id; } }}
           onclick={() => { if (suppressClick) { suppressClick = false; return; } onSourceSelect?.(s.id); }}
           oncontextmenu={(e) => handleContextMenu(e, s.id)}
           onkeydown={(e) => { if (e.key === 'Enter') onSourceSelect?.(s.id); }}
