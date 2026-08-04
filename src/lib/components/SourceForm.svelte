@@ -223,7 +223,7 @@
             min="0" max="360"
             value={hueDraft ?? 200}
             oninput={(e) => hueDraft = parseInt((e.target as HTMLInputElement).value)}
-            class="w-24 h-1.5" style="accent-color:{T.cyan};"
+            class="w-24 h-1.5 accent-cyan"
           />
           {#if hueDraft != null}
             <button

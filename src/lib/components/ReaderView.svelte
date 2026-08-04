@@ -78,7 +78,7 @@
       {#if item.url}
         <GhostButton onclick={() => openExternal(item.url!)} class="inline-flex items-center gap-1.5 p-0 mt-2 text-[11px] leading-none text-ink-2">
           <Icon name="ext" size={11} color={T.ink3} />
-          <span class="underline underline-offset-2" style="text-decoration-color:{T.bd2};">{primaryDomain}</span>
+          <span class="underline underline-offset-2 decoration-bd-2">{primaryDomain}</span>
         </GhostButton>
       {/if}
 
