@@ -41,14 +41,14 @@
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         onClose();
       }
     }
-    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('keydown', onKey, true);
     return () => {
       cancelAnimationFrame(raf);
-      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('keydown', onKey, true);
       if (previouslyFocused && document.contains(previouslyFocused)) {
         previouslyFocused.focus();
       }

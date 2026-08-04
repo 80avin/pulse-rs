@@ -8,6 +8,7 @@
   import Icon from '$lib/components/Icon.svelte';
   import SourceForm, { type SourceFormValues } from '$lib/components/SourceForm.svelte';
   import { longpress } from '$lib/components/longpress.svelte';
+  import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
 
   let {
     onSourceSelect,
@@ -268,58 +269,36 @@
   </div>
 
   <!-- Long-press action sheet / Desktop context menu -->
-    <Dialog.Root open={actionSheet !== null && actionSource !== undefined} onOpenChange={(open) => { if (!open) { actionSheet = null; ctxMenuPos = null; } }}>
-      <Dialog.Portal>
-        {#if isDesktop && ctxMenuPos}
-          <Dialog.Overlay class="fixed inset-0 z-210 anim-sheet-overlay-in" />
-          <Dialog.Content
-            preventScroll={false}
-            class="fixed overflow-hidden bg-bg-2 border border-bd-1 rounded w-55 shadow-[0_8px_32px_rgba(0,0,0,0.6)] z-210 anim-pop-in"
-            style="
-              top:{Math.min(ctxMenuPos.y, (typeof window !== 'undefined' ? window.innerHeight : 600) - 280)}px;
-              left:{Math.min(ctxMenuPos.x, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 220)}px;
-            "
-          >
-            {#if actionSource}
-            <div class="flex items-center gap-2.5 p-2.5 px-3 border-b border-bd-0">
-              <div class="w-6 h-6 flex items-center justify-center bg-bg-1 border border-bd-1 rounded">
-                <SourceGlyph kind={actionSource.kind} size={11} />
-              </div>
-              <div class="min-w-0">
-                <div class="text-ink-0 truncate text-[11px] leading-none font-mono">{actionSource.name}</div>
-                <div class="text-ink-3 truncate text-[9px] leading-none font-mono">{actionSource.host}</div>
-              </div>
-            </div>
-            {@render actions(13, 'gap-2.5 px-3 pt-2.25 pb-2.25 text-[11px] leading-none')}
-            {/if}
-          </Dialog.Content>
-        {:else}
-          <Dialog.Overlay class="fixed inset-0 z-210 bg-black/60 anim-sheet-overlay-in" />
-          <Dialog.Content
-            preventScroll={false}
-            class="fixed bottom-0 left-0 right-0 w-full bg-bg-2 border-t border-bd-1 pb-6 z-210 anim-sheet-in"
-          >
-            {#if actionSource}
-            <div class="flex items-center gap-2.5 px-4 py-3.5 border-b border-bd-0">
-              <div class="w-8 h-8 flex items-center justify-center bg-bg-1 border border-bd-1 rounded">
-                <SourceGlyph kind={actionSource.kind} size={14} />
-              </div>
-              <div>
-                <div class="text-ink-0 text-[13px] leading-none font-mono">{actionSource.name}</div>
-                <div class="mt-1 text-ink-3 text-[10px] leading-none font-mono">{actionSource.host}</div>
-              </div>
-              <span class="flex-1"></span>
-              <StatusDot status={actionSource.status} />
-            </div>
-            {@render actions(16, 'gap-3.5 px-4 pt-3.5 pb-3.5 text-[13px] leading-none')}
-            <Dialog.Close
-              class="flex items-center justify-center w-full px-4 bg-transparent border-none text-ink-2 cursor-pointer pt-3.5 pb-3.5 text-[12px] leading-none font-mono"
-            >cancel</Dialog.Close>
-            {/if}
-          </Dialog.Content>
-        {/if}
-      </Dialog.Portal>
-    </Dialog.Root>
+  <ContextMenu open={actionSheet !== null && actionSource !== undefined} mode={isDesktop ? 'popup' : 'sheet'} x={ctxMenuPos?.x ?? 0} y={ctxMenuPos?.y ?? 0} onClose={() => { actionSheet = null; ctxMenuPos = null; }} class={isDesktop ? 'w-55' : ''}>
+    {#if actionSource}
+      {#if isDesktop}
+        <div class="flex items-center gap-2.5 p-2.5 px-3 border-b border-bd-0">
+          <div class="w-6 h-6 flex items-center justify-center bg-bg-1 border border-bd-1 rounded">
+            <SourceGlyph kind={actionSource.kind} size={11} />
+          </div>
+          <div class="min-w-0">
+            <div class="text-ink-0 truncate text-[11px] leading-none font-mono">{actionSource.name}</div>
+            <div class="text-ink-3 truncate text-[9px] leading-none font-mono">{actionSource.host}</div>
+          </div>
+        </div>
+        {@render actions(13, 'text-[11px] leading-none')}
+      {:else}
+        <div class="flex items-center gap-2.5 px-4 py-3.5 border-b border-bd-0">
+          <div class="w-8 h-8 flex items-center justify-center bg-bg-1 border border-bd-1 rounded">
+            <SourceGlyph kind={actionSource.kind} size={14} />
+          </div>
+          <div>
+            <div class="text-ink-0 text-[13px] leading-none font-mono">{actionSource.name}</div>
+            <div class="mt-1 text-ink-3 text-[10px] leading-none font-mono">{actionSource.host}</div>
+          </div>
+          <span class="flex-1"></span>
+          <StatusDot status={actionSource.status} />
+        </div>
+        {@render actions(16, 'text-[13px] leading-none')}
+        <button onclick={() => { actionSheet = null; ctxMenuPos = null; }} class="menu-row justify-center text-[12px] leading-none text-ink-2">cancel</button>
+      {/if}
+    {/if}
+  </ContextMenu>
 
   <!-- Edit source sheet / Desktop popover -->
     <Dialog.Root open={editingSourceId !== null} onOpenChange={(open) => { if (!open) editingSourceId = null; }}>
@@ -343,12 +322,12 @@
     </Dialog.Root>
 </div>
 
-{#snippet actions(iconSize: number, padCls: string)}
+{#snippet actions(iconSize: number, sizeCls: string)}
   {#each sourceActions as act}
     <button
       onclick={act.action}
-      class="flex items-center w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left font-mono {padCls}"
-      style="color:{act.label === 'Remove source' ? T.red : T.ink0};-webkit-tap-highlight-color:transparent;"
+      class="menu-row {sizeCls}"
+      style="color:{act.label === 'Remove source' ? T.red : undefined};-webkit-tap-highlight-color:transparent;"
     >
       <Icon name={act.icon} size={iconSize} color={act.label === 'Remove source' ? T.red : act.label === 'Edit source' ? T.cyan : T.ink2} />
       {act.label}

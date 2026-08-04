@@ -272,12 +272,6 @@ button:not(:disabled) { cursor: pointer; }
     user-select: text;
     -webkit-user-select: text;
   }
-  @media (hover: hover) {
-    button:not(:disabled):hover,
-    [role='button']:hover {
-      transform: translateY(-0.5px);
-    }
-  }
   button:not(:disabled):active,
   [role='button']:active {
     transform: translateY(0.5px) scale(0.99);
