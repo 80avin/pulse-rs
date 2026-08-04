@@ -438,7 +438,7 @@
               <IconBtn onclick={doSync} ariaLabel="Sync feeds" name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1}>
                 <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1} /></span>
               </IconBtn>
-              <IconBtn onclick={() => { document.querySelector('.add-source-target')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} title="Add source" ariaLabel="Add source" name="plus" size={16} color={T.cyan} />
+              <IconBtn onclick={() => { window.dispatchEvent(new CustomEvent('pulse:open-add-source')); setTimeout(() => { document.querySelector('.add-source-target')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60); }} title="Add source" ariaLabel="Add source" name="plus" size={16} color={T.cyan} />
               <GhostButton onclick={() => { showOnboarding = true; }} class="text-ink-2 min-h-11 px-1 text-[10px] leading-none tracking-[0.4px]" title="Discover feeds" ariaLabel="Discover feeds">discover</GhostButton>
             </div>
             <div class="flex-1 overflow-auto">

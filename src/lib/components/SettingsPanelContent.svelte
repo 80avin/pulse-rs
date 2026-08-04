@@ -174,10 +174,6 @@
 <SettingsSection label="notifications">
   <div class="flex flex-col gap-2.5">
     <div class="flex items-center gap-2">
-      <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">High-signal items</span>
-      <ToggleSwitch on={settings.notifyHighSignal} change={() => { settings.notifyHighSignal = !settings.notifyHighSignal; }} ariaLabel="Notify on high-signal items" />
-    </div>
-    <div class="flex items-center gap-2">
       <span class="flex-1 text-ink-1 text-[11px] leading-none font-mono">Saved item updates</span>
       <ToggleSwitch on={settings.notifySaved} change={() => { settings.notifySaved = !settings.notifySaved; }} ariaLabel="Notify when items are saved" />
     </div>

@@ -72,8 +72,6 @@ pub struct AppSettingsDto {
     // TODO: Planned features — not yet consumed by backend
     pub background_sync: bool,
     // TODO: Planned features — not yet consumed by backend
-    pub notify_high_signal: bool,
-    // TODO: Planned features — not yet consumed by backend
     pub notify_saved: bool,
     /// When true: pulse_core=debug. When false: info + warn only.
     #[serde(default)]
@@ -88,7 +86,6 @@ impl Default for AppSettingsDto {
             sync_interval_min: 15,
             wifi_only: false,
             background_sync: true,
-            notify_high_signal: false,
             notify_saved: false,
             verbose_logging: false,
         }

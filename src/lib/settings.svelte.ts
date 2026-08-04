@@ -28,7 +28,6 @@ export const settings = $state({
   syncIntervalMin:     (saved.syncIntervalMin     ?? 15)       as SyncInterval,
   wifiOnly:            (saved.wifiOnly            ?? false)    as boolean,
   backgroundSync:      (saved.backgroundSync      ?? true)     as boolean,
-  notifyHighSignal:    (saved.notifyHighSignal     ?? false)   as boolean,
   notifySaved:         (saved.notifySaved          ?? false)   as boolean,
   verboseLogging:      (saved.verboseLogging       ?? false)   as boolean,
 });
@@ -61,7 +60,6 @@ export async function initSettings(): Promise<void> {
       if (s.syncIntervalMin !== undefined && s.syncIntervalMin !== null) settings.syncIntervalMin = s.syncIntervalMin as SyncInterval;
       if (s.wifiOnly !== undefined && s.wifiOnly !== null)        settings.wifiOnly            = s.wifiOnly;
       if (s.backgroundSync !== undefined && s.backgroundSync !== null) settings.backgroundSync = s.backgroundSync;
-      if (s.notifyHighSignal !== undefined && s.notifyHighSignal !== null) settings.notifyHighSignal = s.notifyHighSignal;
       if (s.notifySaved !== undefined && s.notifySaved !== null)  settings.notifySaved         = s.notifySaved;
       if (s.verboseLogging !== undefined && s.verboseLogging !== null) settings.verboseLogging = s.verboseLogging;
       return;
@@ -82,7 +80,6 @@ $effect.root(() => {
       syncIntervalMin:     settings.syncIntervalMin,
       wifiOnly:            settings.wifiOnly,
       backgroundSync:      settings.backgroundSync,
-      notifyHighSignal:    settings.notifyHighSignal,
       notifySaved:         settings.notifySaved,
       verboseLogging:      settings.verboseLogging,
     };

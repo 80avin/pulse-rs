@@ -52,6 +52,14 @@
   let newGroupName = $state('');
   let fetchingTitle = $state(false);
   let nameTouched = $state(false);
+  let expanded = $state(false);
+
+  $effect(() => {
+    if (mode !== 'add' || typeof window === 'undefined') return;
+    function open() { expanded = true; }
+    window.addEventListener('pulse:open-add-source', open);
+    return () => window.removeEventListener('pulse:open-add-source', open);
+  });
 
   function inferSourceMeta(rawUrl: string): { kind: SourceKind; name: string; url: string } {
     const normalised = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
@@ -121,15 +129,25 @@
 
 <div class={mode === 'add' ? 'add-source-target mx-2.5 my-3 p-2.5 px-3 bg-bg-1 border border-dashed border-bd-2 rounded text-ink-1 text-[11px] leading-[1.4] font-mono' : ''}>
   {#if mode === 'add'}
-    <div class="flex items-center gap-2 mb-2">
-      <Icon name="plus" size={13} color={T.cyan} />
+    <button
+      onclick={() => { expanded = !expanded; }}
+      aria-expanded={expanded}
+      class="flex items-center gap-2 w-full bg-transparent border-none cursor-pointer p-0 mb-2"
+    >
+      <Icon name={expanded ? 'x' : 'plus'} size={13} color={T.cyan} />
       <span class="text-ink-0 tracking-[0.4px]">ADD SOURCE</span>
-    </div>
+      <span class="flex-1"></span>
+      <Icon name="chev-dn" size={10} color={T.ink3} />
+    </button>
+    {#if !expanded}
+      <div class="text-ink-3 text-[10px] leading-none font-mono">add an rss / hn / reddit feed</div>
+    {/if}
   {:else}
     <div class="text-ink-2 uppercase mb-1 tracking-[0.5px] text-[11px] leading-none font-mono">edit source</div>
   {/if}
 
-  <div class="flex flex-col gap-1.5">
+  {#if mode === 'edit' || expanded}
+    <div class="flex flex-col gap-1.5">
     <div class="flex flex-col gap-1.5">
       <label for="src-url" class="text-ink-3 text-[10px] leading-none font-mono">URL</label>
       <input
@@ -228,4 +246,5 @@
       {/if}
     </div>
   </div>
+  {/if}
 </div>
