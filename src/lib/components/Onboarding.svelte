@@ -4,6 +4,7 @@
   import Icon from '$lib/components/Icon.svelte';
   import GhostButton from '$lib/components/shared/GhostButton.svelte';
   import { tauriInvoke, reloadSources, reloadGroups, reloadDbStats } from '$lib/stores/data.svelte';
+  import { isDesktop } from '$lib/use-is-desktop.svelte';
 
   interface PopularFeedDto { name: string; url: string; kind: string; }
   interface PopularCategoryDto { category: string; experimental?: boolean; feeds: PopularFeedDto[]; }
@@ -66,7 +67,8 @@
   }
 </script>
 
-<div role="dialog" aria-modal="true" aria-label="Discover feeds" class="absolute inset-0 z-50 bg-bg-0 flex flex-col text-ink-0">
+<div role="dialog" aria-modal="true" aria-label="Discover feeds" class="fixed inset-0 z-50 text-ink-0 {isDesktop() ? 'bg-black/50 flex items-center justify-center p-4' : 'bg-bg-0 flex flex-col'}">
+  <div class={isDesktop() ? 'bg-bg-0 border border-bd-1 rounded-lg shadow-[0_16px_48px_rgba(0,0,0,0.7)] w-[760px] max-w-[94vw] h-[85vh] flex flex-col overflow-hidden' : 'flex-1 flex flex-col min-h-0'}>
   <!-- Header -->
   <div class="shrink-0 px-4 pt-4 pb-2.5 border-b border-bd-0">
     <div class="text-[13px] leading-none font-mono font-semibold tracking-[0.3px] text-ink-0">welcome to <span class="text-cyan">pulse</span></div>
@@ -136,4 +138,5 @@
       >{adding ? 'adding…' : `add ${selectedCount} feed${selectedCount === 1 ? '' : 's'}`}</button>
     </div>
   {/if}
+  </div>
 </div>

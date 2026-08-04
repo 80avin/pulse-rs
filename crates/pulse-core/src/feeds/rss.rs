@@ -75,7 +75,7 @@ pub async fn fetch_rss(client: &Client, feed: &Feed) -> Result<RssFetchResult, F
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
-    let bytes = crate::feeds::read_body_capped(response, 10 * 1024 * 1024).await?;
+    let bytes = crate::feeds::read_body_capped(response, 20 * 1024 * 1024).await?;
 
     // Parse with feed-rs
     let parsed = feed_rs::parser::parse(bytes.as_slice()).map_err(|e| FeedError::Parse {

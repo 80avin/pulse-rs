@@ -52,6 +52,8 @@
   let newGroupName = $state('');
   let fetchingTitle = $state(false);
   let nameTouched = $state(false);
+  let fetchError = $state('');
+  let hueOpen = $state(false);
   let expanded = $state(false);
 
   $effect(() => {
@@ -79,13 +81,18 @@
   }
 
   async function fetchTitleForUrl(url: string) {
-    if (!url) return;
+    if (!url.trim()) { fetchError = 'enter a URL first'; return; }
+    fetchError = '';
     fetchingTitle = true;
     try {
       const preview = await detectFeed(url);
       if (preview?.name) {
         nameDraft = preview.name;
+      } else {
+        fetchError = 'no feed detected at that url';
       }
+    } catch {
+      fetchError = 'could not fetch the title';
     } finally {
       fetchingTitle = false;
     }
@@ -155,7 +162,7 @@
         bind:value={urlDraft}
         placeholder="https://example.com/feed.xml"
         onkeydown={(e) => { if (e.key === 'Enter' && mode === 'add') submitAddSource(); }}
-        oninput={() => { const meta = inferSourceMeta(urlDraft); kindDraft = meta.kind; if (mode === 'add' && !nameTouched) nameDraft = meta.name; }}
+        oninput={() => { fetchError = ''; const meta = inferSourceMeta(urlDraft); kindDraft = meta.kind; if (mode === 'add' && !nameTouched) nameDraft = meta.name; }}
         class="w-full p-2.5 bg-bg-0 border border-bd-1 rounded text-ink-0 outline-none box-border text-[12px] leading-none font-mono"
       />
     </div>
@@ -177,6 +184,9 @@
         placeholder="Display name"
         class="w-full p-2.5 bg-bg-0 border border-bd-1 rounded text-ink-0 outline-none box-border text-[12px] leading-none font-mono"
       />
+      {#if fetchError}
+        <div class="text-red text-[10px] leading-none font-mono">{fetchError}</div>
+      {/if}
     </div>
 
     <div class="flex gap-2">
@@ -204,27 +214,32 @@
       />
     {/if}
 
-    <div class="flex flex-col gap-1.5">
-      <div class="flex items-center justify-between">
-        <span class="text-ink-3 text-[10px] leading-none font-mono">COLOUR</span>
-        {#if hueDraft != null}
-          <button
-            onclick={() => hueDraft = undefined}
-            class="bg-transparent border-none text-ink-3 cursor-pointer p-0 text-[9px] leading-none font-mono"
-          >reset</button>
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-ink-3 text-[10px] leading-none font-mono">COLOUR</span>
+      <div class="flex items-center gap-1.5">
+        {#if hueOpen}
+          <input
+            type="range"
+            min="0" max="360"
+            value={hueDraft ?? 200}
+            oninput={(e) => hueDraft = parseInt((e.target as HTMLInputElement).value)}
+            class="w-24 h-1.5" style="accent-color:{T.cyan};"
+          />
+          {#if hueDraft != null}
+            <button
+              onclick={() => hueDraft = undefined}
+              class="bg-transparent border-none text-ink-3 cursor-pointer p-0 text-[9px] leading-none font-mono"
+            >reset</button>
+          {/if}
         {/if}
-      </div>
-      <div class="flex items-center gap-2">
-        <input
-          type="range"
-          min="0" max="360"
-          value={hueDraft ?? 200}
-          oninput={(e) => hueDraft = parseInt((e.target as HTMLInputElement).value)}
-          class="flex-1 h-1.5" style="accent-color:{T.cyan};"
-        />
-        <div class="w-7 h-7 rounded-[3px] shrink-0 border border-bd-1" style="
-          background:{hueDraft != null ? `oklch(0.45 0.14 ${hueDraft})` : T.ink4};
-        "></div>
+        <button
+          onclick={() => hueOpen = !hueOpen}
+          aria-label="Feed colour"
+          aria-expanded={hueOpen}
+          title="Colour"
+          class="w-6 h-6 rounded-[3px] border border-bd-1 cursor-pointer shrink-0"
+          style="background:{hueDraft != null ? `oklch(0.45 0.14 ${hueDraft})` : T.ink4};"
+        ></button>
       </div>
     </div>
 
