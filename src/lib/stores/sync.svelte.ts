@@ -4,9 +4,9 @@ import { logger } from '../logger';
 
 // --- Mock sync pool (browser dev only) ---
 const SYNC_POOL = [
-  { id: 'syn01', src: 'hn-front', kind: 'link', domain: 'matklad.github.io', title: 'One Hundred Thousand Lines of Rust', author: 'matklad', age: '1m', score: 891, n: 143, tags: ['technical', 'deepdive'], aiScore: 0.96, read: false, saved: false, body: "" },
-  { id: 'syn02', src: 'r-localllama', kind: 'text', title: 'Gemma-3n achieves 90.1 on MMLU-Pro at 4B params', author: 'u/mlbench', age: '3m', score: 1204, n: 87, tags: ['ai/ml', 'research'], aiScore: 0.91, read: false, saved: false, body: '' },
-  { id: 'syn03', src: 'rss-julia', kind: 'link', domain: 'jvns.ca', title: 'Some fun things you can do with strace', author: 'b0rk', age: '5m', score: 0, n: 0, tags: ['tutorial', 'technical'], aiScore: 0.89, read: false, saved: false, body: '' },
+  { id: 'syn01', src: 'hn-front', kind: 'link', domain: 'matklad.github.io', title: 'One Hundred Thousand Lines of Rust', author: 'matklad', age: '1m', score: 891, n: 143, tags: ['technical', 'deepdive'], read: false, saved: false, body: "" },
+  { id: 'syn02', src: 'r-localllama', kind: 'text', title: 'Gemma-3n achieves 90.1 on MMLU-Pro at 4B params', author: 'u/mlbench', age: '3m', score: 1204, n: 87, tags: ['ai/ml', 'research'], read: false, saved: false, body: '' },
+  { id: 'syn03', src: 'rss-julia', kind: 'link', domain: 'jvns.ca', title: 'Some fun things you can do with strace', author: 'b0rk', age: '5m', score: 0, n: 0, tags: ['tutorial', 'technical'], read: false, saved: false, body: '' },
 ] as const;
 
 let syncPoolIdx = 0;

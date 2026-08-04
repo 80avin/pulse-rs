@@ -11,7 +11,7 @@
   interface BackendPage {
     items: BackendItem[];
     nextCursor: { publishedAt: number; itemId: string } | null;
-    counts: { total: number; unread: number; saved: number; signal: number };
+    counts: { total: number; unread: number; saved: number };
   }
 
   // The bottom nav is rendered by AppShell; this pane only provides content.

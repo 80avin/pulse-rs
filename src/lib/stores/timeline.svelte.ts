@@ -7,7 +7,7 @@ import { logger } from '../logger';
 interface BackendPage {
   items: BackendItem[];
   nextCursor: { publishedAt: number; itemId: string } | null;
-  counts: { total: number; unread: number; saved: number; signal: number };
+  counts: { total: number; unread: number; saved: number };
 }
 
 export const timelineFilter = $state<{
@@ -16,7 +16,7 @@ export const timelineFilter = $state<{
 }>({ groupId: null, feedId: null, tag: null, isRead: null, isSaved: null });
 
 export const loadingMore = $state({ active: false, cursor: null as { publishedAt: number; itemId: string } | null });
-export const pageCounts = $state({ total: 0, unread: 0, saved: 0, signal: 0 });
+export const pageCounts = $state({ total: 0, unread: 0, saved: 0 });
 
 const MAX_CACHED_ITEMS = 500;
 const EVICT_COUNT = 100;
@@ -57,7 +57,6 @@ async function resetAndFetch(): Promise<void> {
     pageCounts.total = page.counts.total;
     pageCounts.unread = page.counts.unread;
     pageCounts.saved = page.counts.saved;
-    pageCounts.signal = page.counts.signal;
   }
 }
 
@@ -77,7 +76,6 @@ export async function fetchNextPage(): Promise<void> {
       pageCounts.total = page.counts.total;
       pageCounts.unread = page.counts.unread;
       pageCounts.saved = page.counts.saved;
-      pageCounts.signal = page.counts.signal;
     }
   } catch (e) {
     logger.warn('fetchNextPage failed', e);

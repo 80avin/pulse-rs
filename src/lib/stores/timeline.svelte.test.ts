@@ -16,13 +16,13 @@ function mkItem(id: string) {
     id, sourceId: 's1', sourceName: 'src', title: `title ${id}`, url: 'https://example.com',
     body: '', bodyHtml: null, externalUrl: null, author: null,
     publishedAt: '2026-01-01T00:00:00Z', read: false, saved: false, hidden: false,
-    score: null, n: 0, tags: [], signal: 0, ogImage: null, note: null,
+    score: null, n: 0, tags: [], ogImage: null, note: null,
   };
 }
 
-type Page = { items: ReturnType<typeof mkItem>[]; nextCursor: null; counts: { total: number; unread: number; saved: number; signal: number } };
+type Page = { items: ReturnType<typeof mkItem>[]; nextCursor: null; counts: { total: number; unread: number; saved: number } };
 
-const COUNTS = { total: 1, unread: 1, saved: 0, signal: 0 };
+const COUNTS = { total: 1, unread: 1, saved: 0 };
 
 describe('timeline request-epoch guard (category-flash bug R2)', () => {
   let tl: typeof import('./timeline.svelte');

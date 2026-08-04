@@ -5,7 +5,7 @@ use chrono::TimeZone;
 use pulse_core::types::{
     Feed, FeedGroup, FeedType, ItemStatePatch, TimelineCursor, TimelineFilter,
 };
-use tauri::{Emitter, State};
+use tauri::State;
 use uuid::Uuid;
 
 use crate::AppState;
@@ -120,7 +120,6 @@ fn adapt_item(view: &pulse_core::types::FeedItemView) -> FeedItemDto {
         tags: view.ai_tags.clone(),
         user_tags: view.user_tags.clone(),
         og_image: view.og_image.clone(),
-        signal: view.signal,
         note: view.note.clone(),
     }
 }
@@ -273,7 +272,6 @@ pub async fn get_items_page(
     tag: Option<String>,
     is_read: Option<bool>,
     is_saved: Option<bool>,
-    signal_threshold: Option<f64>,
     limit: Option<usize>,
     cursor: Option<CursorInput>,
 ) -> Result<ItemPageDto, String> {
@@ -285,7 +283,6 @@ pub async fn get_items_page(
         tag,
         is_read,
         is_saved,
-        signal_threshold,
     };
     let tauri_cursor = cursor.map(|c| TimelineCursor {
         published_at: c.published_at,
@@ -305,7 +302,6 @@ pub async fn get_items_page(
             total: page.counts.total,
             unread: page.counts.unread,
             saved: page.counts.saved,
-            signal: page.counts.signal,
         },
     })
 }

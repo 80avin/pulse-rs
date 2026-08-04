@@ -4,7 +4,6 @@
   import { items, sources, saveWithNote, toggleSaved, domainOf } from '$lib/stores/data.svelte';
   import { openExternal, sanitizeHtml, TAG_EVIDENCE } from '$lib/utils';
   import TagChip from './TagChip.svelte';
-  import ScoreBar from './ScoreBar.svelte';
   import Icon from './Icon.svelte';
   import GhostButton from './shared/GhostButton.svelte';
   import { isDesktop } from '$lib/use-is-desktop.svelte';
@@ -95,8 +94,6 @@
           <TagChip {tag} size={10} onclick={() => { onTagClick ? onTagClick(tag) : (popoverTag = tag); }} />
         {/each}
         <span class="flex-1 min-w-[12px]"></span>
-        <span class="text-ink-2 text-[10px] leading-none font-mono">signal</span>
-        <ScoreBar value={item.aiScore} w={36} />
         {#if item.score > 0}<span class="text-amber text-[11px] leading-none font-mono">▲ {item.score}</span>{/if}
         {#if item.n > 0}<span class="text-ink-1 text-[11px] leading-none font-mono">{item.n} comments</span>{/if}
       </div>
@@ -169,7 +166,7 @@
             <div class="flex items-center justify-between mb-2.5">
               <div class="flex items-center gap-2">
                 <TagChip tag={popoverTag} size={11} />
-                <span class="text-[10px] leading-none font-mono text-ink-3">rule engine · {Math.round((item.aiScore ?? 0.8) * 100)}% conf</span>
+                <span class="text-[10px] leading-none font-mono text-ink-3">rule engine</span>
               </div>
               <Dialog.Close class="bg-transparent border-none text-ink-2 cursor-pointer flex"><Icon name="x" size={14} /></Dialog.Close>
             </div>

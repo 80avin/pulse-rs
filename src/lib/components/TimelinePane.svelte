@@ -29,7 +29,7 @@
 
   const activeGroup = $derived(timelineFilter.groupId ?? 'all');
   const displayItems = $derived.by(() => {
-    if (sort === 'score') return [...items].sort((a, b) => b.aiScore - a.aiScore);
+    if (sort === 'score') return [...items].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
     return items;
   });
 
@@ -40,7 +40,7 @@
   );
 
   // Counts from the backend (accurate, not derived from paginated items).
-  const counts = $derived({ all: pageCounts.total, unread: pageCounts.unread, saved: pageCounts.saved, signal: pageCounts.signal });
+  const counts = $derived({ all: pageCounts.total, unread: pageCounts.unread, saved: pageCounts.saved });
 
   // Top 5 tags from global tag stats.
   const topTags = $derived(tagStats.tagCounts.slice(0, 5).map(([tag]) => tag));

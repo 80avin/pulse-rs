@@ -40,7 +40,6 @@ pub struct FeedItemDto {
     pub tags: Vec<String>,
     pub user_tags: Vec<String>,
     pub og_image: Option<String>,
-    pub signal: f64,
     pub note: Option<String>,
 }
 
@@ -188,7 +187,6 @@ pub struct TimelineCountsDto {
     pub total: i64,
     pub unread: i64,
     pub saved: i64,
-    pub signal: i64,
 }
 
 /// Paginated timeline response

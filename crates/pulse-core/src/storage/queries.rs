@@ -133,7 +133,6 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
     let is_read_i: i64 = row.try_get("is_read").map_err(StorageError::Sqlite)?;
     let is_saved_i: i64 = row.try_get("is_saved").map_err(StorageError::Sqlite)?;
     let is_hidden_i: i64 = row.try_get("is_hidden").map_err(StorageError::Sqlite)?;
-    let signal: f64 = row.try_get("signal").unwrap_or(0.0);
 
     let feed_type = FeedType::from_str(&feed_type_str).unwrap_or(FeedType::Rss);
     let ai_tags: Vec<String> = serde_json::from_str(&ai_tags_json).unwrap_or_default();
@@ -166,7 +165,6 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
         note: row.try_get("note").ok(),
         ai_tags,
         user_tags,
-        signal,
     })
 }
 
@@ -200,26 +198,18 @@ pub async fn get_timeline_counts(
 
     let where_clause = conditions.join(" AND ");
 
-    let threshold = filter.signal_threshold.unwrap_or(0.5);
     let sql = format!(
         "SELECT
             COUNT(*) as total,
             SUM(CASE WHEN ist.is_read = 0 THEN 1 ELSE 0 END) as unread,
-            SUM(CASE WHEN ist.is_saved = 1 THEN 1 ELSE 0 END) as saved,
-            SUM(CASE WHEN COALESCE(at_signal.max_confidence, 0.0) >= ? THEN 1 ELSE 0 END) as signal
+            SUM(CASE WHEN ist.is_saved = 1 THEN 1 ELSE 0 END) as saved
          FROM feed_items fi
          JOIN feeds f ON fi.feed_id = f.id
          JOIN item_states ist ON ist.item_id = fi.id
-         LEFT JOIN (
-             SELECT item_id, MAX(confidence) as max_confidence
-             FROM ai_tags
-             GROUP BY item_id
-         ) at_signal ON at_signal.item_id = fi.id
          WHERE {where_clause}"
     );
 
     let mut query = sqlx::query(&sql);
-    query = query.bind(threshold);
 
     if let Some(ref g) = filter.group_id {
         query = query.bind(g.as_str());
@@ -244,7 +234,6 @@ pub async fn get_timeline_counts(
         total: row.try_get("total").unwrap_or(0),
         unread: row.try_get("unread").unwrap_or(0),
         saved: row.try_get("saved").unwrap_or(0),
-        signal: row.try_get("signal").unwrap_or(0),
     })
 }
 
@@ -300,8 +289,7 @@ pub async fn get_timeline(
             f.group_id, fg.name AS group_name,
             ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
             COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
-            COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags,
-            COALESCE(MAX(at.confidence), 0.0) AS signal
+            COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags
          FROM feed_items fi
          JOIN feeds f ON fi.feed_id = f.id
          LEFT JOIN feed_groups fg ON f.group_id = fg.id
@@ -431,8 +419,7 @@ pub async fn get_item_view(pool: &SqlitePool, item_id: &ItemId) -> Result<FeedIt
             f.group_id, fg.name AS group_name,
             ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
             COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
-            COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags,
-            COALESCE(MAX(at.confidence), 0.0) AS signal
+            COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags
          FROM feed_items fi
          JOIN feeds f ON fi.feed_id = f.id
          LEFT JOIN feed_groups fg ON f.group_id = fg.id
@@ -494,8 +481,7 @@ pub async fn search_items(
                 f.group_id, fg.name AS group_name,
                 ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
                 COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
-            COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags,
-                COALESCE(MAX(at.confidence), 0.0) AS signal
+            COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags
          FROM feed_items_fts
          JOIN feed_items fi ON fi.rowid = feed_items_fts.rowid
          JOIN feeds f ON fi.feed_id = f.id

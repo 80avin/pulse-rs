@@ -48,7 +48,7 @@ export function adaptItem(b: BackendItem): FeedItem {
     bodyHtml: b.bodyHtml ?? undefined,
     externalUrl: b.externalUrl ?? undefined,
     author: b.author ?? '', age: ageLabel(b.publishedAt),
-    score: b.score ?? 0, n: b.n, tags: b.tags, userTags: b.userTags ?? [], aiScore: b.signal,
+    score: b.score ?? 0, n: b.n, tags: b.tags, userTags: b.userTags ?? [],
     read: b.read, saved: b.saved,
     domain: domainOf(b.url),
     ogImage: b.ogImage ?? null, note: b.note ?? undefined,
@@ -92,7 +92,7 @@ export async function reloadItems(): Promise<void> {
   // Join the timeline epoch protocol: if the filter changed while this refresh
   // was in flight, discard the stale page instead of clobbering the newer list.
   const myEpoch = currentEpoch();
-  const page = await tauriInvoke<{ items: BackendItem[]; nextCursor: { publishedAt: number; itemId: string } | null; counts: { total: number; unread: number; saved: number; signal: number } }>('get_items_page', {
+  const page = await tauriInvoke<{ items: BackendItem[]; nextCursor: { publishedAt: number; itemId: string } | null; counts: { total: number; unread: number; saved: number } }>('get_items_page', {
     groupId: timelineFilter.groupId ?? null,
     feedId: timelineFilter.feedId ?? null,
     tag: timelineFilter.tag ?? null,
@@ -109,7 +109,6 @@ export async function reloadItems(): Promise<void> {
     pageCounts.total = page.counts.total;
     pageCounts.unread = page.counts.unread;
     pageCounts.saved = page.counts.saved;
-    pageCounts.signal = page.counts.signal;
   }
 }
 
@@ -153,7 +152,7 @@ export async function initStore(): Promise<void> {
       const tInvoke = performance.now();
       const [page, bs, bg] = await Promise.race([
         Promise.all([
-          tauriInvoke<{ items: BackendItem[]; nextCursor: { publishedAt: number; itemId: string } | null; counts: { total: number; unread: number; saved: number; signal: number } }>('get_items_page', { limit: 100 }),
+          tauriInvoke<{ items: BackendItem[]; nextCursor: { publishedAt: number; itemId: string } | null; counts: { total: number; unread: number; saved: number } }>('get_items_page', { limit: 100 }),
           tauriInvoke<BackendSource[]>('get_sources'),
           tauriInvoke<BackendGroup[]>('get_groups'),
         ]),
@@ -169,7 +168,6 @@ export async function initStore(): Promise<void> {
         pageCounts.total = page.counts.total;
         pageCounts.unread = page.counts.unread;
         pageCounts.saved = page.counts.saved;
-        pageCounts.signal = page.counts.signal;
       }
       const tAdaptDone = performance.now();
       storeReady.loading = false;
