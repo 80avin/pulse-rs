@@ -264,7 +264,7 @@ button:not(:disabled) { cursor: pointer; }
     -webkit-touch-callout: none;
     user-select: none;
     -webkit-user-select: none;
-    transition: filter 0.1s ease, transform 0.06s ease;
+    transition: transform 0.06s ease;
   }
   /* Article-body links must stay selectable/copyable in the reader. */
   .item-body a {
@@ -275,12 +275,11 @@ button:not(:disabled) { cursor: pointer; }
   @media (hover: hover) {
     button:not(:disabled):hover,
     [role='button']:hover {
-      filter: brightness(1.07);
+      transform: translateY(-0.5px);
     }
   }
   button:not(:disabled):active,
   [role='button']:active {
-    filter: brightness(0.92);
     transform: translateY(0.5px) scale(0.99);
   }
 }

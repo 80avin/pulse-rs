@@ -7,7 +7,6 @@
   import { timelineFilter, applyFilter, setFeedFilter, setGroupFilter, setTagFilter, pageCounts } from '$lib/stores/timeline.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal } from '$lib/utils';
-  import { Portal } from 'bits-ui';
   import Icon from '$lib/components/Icon.svelte';
   import KeyCap from '$lib/components/KeyCap.svelte';
   import DragHandle from '$lib/components/DragHandle.svelte';
@@ -26,6 +25,9 @@
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import MobileSaved from './MobileSaved.svelte';
   import SearchView from '$lib/components/SearchView.svelte';
+  import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
+  import { SOURCE_ACTIONS, type SourceActionKind } from '$lib/source-actions';
+  import { itemMenu } from '$lib/stores/item-menu.svelte';
   import { TABS, isTabId, type TabId } from '$lib/nav';
 
   // ── Shared navigation state (one shell, both breakpoints) ───────────────
@@ -204,12 +206,25 @@
   async function sourceMenuMarkRead(id: string) { await markSourceRead(id); closeSourceMenu(); }
   async function sourceMenuRemove(id: string) { await removeSource(id); closeSourceMenu(); }
   function sourceMenuEdit() { closeSourceMenu(); showSources = true; }
+  function runSourceAction(kind: SourceActionKind) {
+    if (kind === 'edit') { sourceMenuEdit(); return; }
+    const id = sourceMenu?.source.id;
+    if (!id) return;
+    switch (kind) {
+      case 'view':      sourceMenuView(id); break;
+      case 'refresh':   sourceMenuRefresh(id); break;
+      case 'mark-read': sourceMenuMarkRead(id); break;
+      case 'remove':    sourceMenuRemove(id); break;
+      default: break;
+    }
+  }
 
   // Wide keyboard shortcuts
   $effect(() => {
     function onKey(e: KeyboardEvent) {
       if (!isWide) return;
       if (showOnboarding) { if (e.key === 'Escape') showOnboarding = false; return; }
+      if (showSources || showSettings || showCheatsheet || itemMenu.current || sourceMenu) return;
       const target = e.target as HTMLElement;
       const inInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 
@@ -314,14 +329,14 @@
             </div>
             <FilterPills active={desktopFilter} onChange={handleFilterChange} />
             <div class="border-b border-bd-0 pt-0.5 pb-1 shrink-0">
-              <div class="uppercase text-ink-3 px-3 pt-1.5 pb-0.5 tracking-[0.6px] text-[10px] leading-none font-mono">groups</div>
+              <div class="uppercase text-ink-2 px-3 pt-1.5 pb-0.5 tracking-[0.6px] text-[10px] leading-none font-mono">groups</div>
               <div class="max-h-40 overflow-y-auto">
                 <GroupTabs {groups} active={activeGroup} onSelect={(id) => selectGroup(id)} orientation="vertical" />
               </div>
             </div>
             <div class="flex-1 min-h-0 flex flex-col border-b border-bd-0">
-              <button onclick={() => showSourcesAccordion = !showSourcesAccordion} aria-label={`Sources for ${activeGroupLabel}`} aria-expanded={showSourcesAccordion} class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3 shrink-0">
-                <span class="uppercase flex-1 text-ink-3 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
+              <button onclick={() => showSourcesAccordion = !showSourcesAccordion} aria-label={`Sources for ${activeGroupLabel}`} aria-expanded={showSourcesAccordion} class="flex items-center gap-1 w-full bg-transparent border-none cursor-pointer text-left p-1.5 px-3 pt-2.5 shrink-0">
+                <span class="uppercase flex-1 text-ink-2 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
                 <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
                 <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
               </button>
@@ -467,33 +482,14 @@
     <Onboarding onDone={finishOnboarding} />
   {/if}
 
-  {#if sourceMenu}
-    <Portal>
-      <div class="fixed inset-0 z-[100] anim-sheet-overlay-in" onclick={closeSourceMenu} aria-hidden="true"></div>
-      <div class="fixed z-[101] bg-bg-1 border border-bd-1 rounded overflow-hidden w-48 shadow-[0_8px_32px_rgba(0,0,0,0.6)] anim-pop-in" style="left:{Math.max(4, Math.min(sourceMenu.x, window.innerWidth - 200))}px;top:{Math.max(4, Math.min(sourceMenu.y, window.innerHeight - 230))}px;">
-        <button onclick={() => sourceMenuView(sourceMenu!.source.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[11px_14px] text-[12px] leading-none font-mono" style="color:{T.ink2};">
-          <Icon name="list" size={12} color={T.ink2} />
-          <span>View feed</span>
-        </button>
-        <button onclick={() => sourceMenuRefresh(sourceMenu!.source.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[11px_14px] text-[12px] leading-none font-mono" style="color:{T.ink2};">
-          <Icon name="sync" size={12} color={T.ink2} />
-          <span>Refresh now</span>
-        </button>
-        <button onclick={() => sourceMenuMarkRead(sourceMenu!.source.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[11px_14px] text-[12px] leading-none font-mono" style="color:{T.ink2};">
-          <Icon name="star" size={12} color={T.ink2} />
-          <span>Mark all read</span>
-        </button>
-        <button onclick={sourceMenuEdit} class="flex items-center gap-2.5 w-full bg-transparent border-none border-b border-bd-0 cursor-pointer text-left p-[11px_14px] text-[12px] leading-none font-mono" style="color:{T.cyan};">
-          <Icon name="edit" size={12} color={T.cyan} />
-          <span>Edit</span>
-        </button>
-        <button onclick={() => sourceMenuRemove(sourceMenu!.source.id)} class="flex items-center gap-2.5 w-full bg-transparent border-none cursor-pointer text-left p-[11px_14px] text-[12px] leading-none font-mono" style="color:{T.red};">
-          <Icon name="trash" size={12} color={T.red} />
-          <span>Remove</span>
-        </button>
-      </div>
-    </Portal>
-  {/if}
+  <ContextMenu open={sourceMenu !== null} mode="popup" x={sourceMenu?.x ?? 0} y={sourceMenu?.y ?? 0} onClose={closeSourceMenu} class="w-48">
+    {#each SOURCE_ACTIONS as act}
+      <button class="menu-row text-[12px] leading-none" style="color:{act.color};" onclick={() => runSourceAction(act.kind)}>
+        <Icon name={act.icon} size={12} color={act.color} />
+        <span>{act.label}</span>
+      </button>
+    {/each}
+  </ContextMenu>
 
   <ItemActionsMenu />
 </div>

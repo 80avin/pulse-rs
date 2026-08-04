@@ -90,8 +90,8 @@
   onkeydown={(e) => { if (e.key === 'Enter') handleRowClick(); }}
   oncontextmenu={handleContextMenu}
   use:longpress={{ onLongpress: handleLongPress }}
-  class="relative flex p-0 border-0 border-b border-bd-0 cursor-pointer select-none w-full text-left min-h-14"
-  style="background:{isFocused ? 'rgba(78,205,214,0.05)' : 'transparent'};-webkit-touch-callout:none;"
+  class="relative flex p-0 border-0 border-b border-bd-0 cursor-pointer select-none w-full text-left min-h-14 hover:bg-bg-2"
+  style={isFocused ? "background:rgba(78,205,214,0.05);-webkit-touch-callout:none;" : "-webkit-touch-callout:none;"}
 >
     <!-- Platform-colored left spine -->
     <span class="shrink-0" style="width:3px;background:{sk.spine};"></span>
