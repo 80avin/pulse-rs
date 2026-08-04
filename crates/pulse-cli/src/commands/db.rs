@@ -66,7 +66,7 @@ async fn cmd_stats(args: DbStatsArgs, core: &PulseCore, global_json: bool) -> an
     println!("Database:   {}", db_path);
     println!("Size:       {}", format_bytes(stats.db_size_bytes));
     println!();
-    println!("{:<24}  {}", "Metric", "Count");
+    println!("{:<24}  Count", "Metric");
     println!("{}", "─".repeat(36));
     println!("{:<24}  {}", "feeds (enabled)", stats.feed_count);
     println!("{:<24}  {}", "feed_items", stats.item_count);

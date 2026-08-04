@@ -303,14 +303,14 @@ async fn cmd_list(args: FeedListArgs, core: &PulseCore, global_json: bool) -> an
 
     // Human-readable table
     println!(
-        "{:<8}  {:<6}  {:<32}  {:<12}  {:<8}  {:<6}  {}",
-        "ID", "TYPE", "TITLE", "GROUP", "INTERVAL", "HEALTH", "LAST SYNC"
+        "{:<8}  {:<6}  {:<32}  {:<12}  {:<8}  {:<6}  LAST SYNC",
+        "ID", "TYPE", "TITLE", "GROUP", "INTERVAL", "HEALTH"
     );
     for f in &filtered {
         let id_prefix = &f.id[..f.id.len().min(8)];
         let feed_type = f.feed_type.as_str();
         let title = f.title.as_deref().unwrap_or(&f.url);
-        let title_trunc = crate::output::truncate_chars(&title, 32);
+        let title_trunc = crate::output::truncate_chars(title, 32);
         let group_name = f
             .group_id
             .as_ref()
@@ -417,7 +417,7 @@ async fn cmd_show(args: FeedShowArgs, core: &PulseCore, global_json: bool) -> an
 
 async fn cmd_remove(args: FeedRemoveArgs, core: &PulseCore) -> anyhow::Result<()> {
     let feed = resolve_feed(core, &args.id).await?;
-    if !args.yes && !confirm(&format!("Remove feed {} and all its items?", &args.id)) {
+    if !args.yes && !confirm(&format!("Remove feed {} and all its items?", args.id)) {
         println!("cancelled");
         return Ok(());
     }
@@ -425,7 +425,7 @@ async fn cmd_remove(args: FeedRemoveArgs, core: &PulseCore) -> anyhow::Result<()
         print_error(&format!("failed to remove feed: {e}"));
         e
     })?;
-    println!("removed feed {}", &feed.id);
+    println!("removed feed {}", feed.id);
     Ok(())
 }
 
@@ -467,7 +467,7 @@ async fn cmd_edit(args: FeedEditArgs, core: &PulseCore) -> anyhow::Result<()> {
     }
     feed.updated_at = chrono::Utc::now().timestamp();
     core.db.upsert_feed(feed).await?;
-    println!("feed {} updated", &args.id);
+    println!("feed {} updated", args.id);
     Ok(())
 }
 
@@ -519,12 +519,12 @@ async fn cmd_health(
     }
 
     println!(
-        "{:<8}  {:<28}  {:<10}  {:<12}  {:<14}  {}",
-        "ID", "TITLE", "SUCCESS%", "AVG_LAT_MS", "FAIL_STREAK", "LAST_SUCCESS"
+        "{:<8}  {:<28}  {:<10}  {:<12}  {:<14}  LAST_SUCCESS",
+        "ID", "TITLE", "SUCCESS%", "AVG_LAT_MS", "FAIL_STREAK"
     );
     for h in &health {
         let title = h.title.as_deref().unwrap_or("-");
-        let title_trunc = crate::output::truncate_chars(&title, 28);
+        let title_trunc = crate::output::truncate_chars(title, 28);
         let rate = h
             .success_rate_pct
             .map(|r| format!("{:.0}%", r))

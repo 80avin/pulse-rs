@@ -124,8 +124,8 @@ async fn cmd_rules_list(args: AiRulesListArgs, global_json: bool) -> anyhow::Res
     }
 
     println!(
-        "{:<20}  {:<20}  {:<6}  {:<8}  {:<8}  {}",
-        "ID", "TAG", "CONF", "ENABLED", "PATTERNS", "SCOPE"
+        "{:<20}  {:<20}  {:<6}  {:<8}  {:<8}  SCOPE",
+        "ID", "TAG", "CONF", "ENABLED", "PATTERNS"
     );
     for v in &views {
         println!(

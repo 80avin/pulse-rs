@@ -58,7 +58,6 @@ pub async fn run(args: TimelineArgs, core: &PulseCore, global_json: bool) -> any
         is_read: if args.unread { Some(false) } else { None },
         is_saved: if args.saved { Some(true) } else { None },
         tag: args.tag,
-        ..Default::default()
     };
 
     let page = core.get_timeline_page(filter, None, args.limit).await?;
@@ -87,9 +86,9 @@ pub fn print_items_human(items: &[FeedItemView]) {
         let age = relative_time(item.published_at);
         let score = score_display(item.score, &item.feed_type);
         let feed = item.feed_title.as_deref().unwrap_or(&item.feed_url);
-        let feed_trunc = crate::output::truncate_chars(&feed, 20);
+        let feed_trunc = crate::output::truncate_chars(feed, 20);
         let title = &item.title;
-        let title_trunc = crate::output::truncate_chars(&title, 60);
+        let title_trunc = crate::output::truncate_chars(title, 60);
         println!(
             "{} {} {}  {:<5}  {:<20}  \"{}\"",
             id_prefix, state, age, score, feed_trunc, title_trunc

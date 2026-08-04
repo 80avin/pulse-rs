@@ -158,12 +158,12 @@ async fn cmd_status(
 
     let now = chrono::Utc::now().timestamp();
     println!(
-        "{:<8}  {:<28}  {:<12}  {:<12}  {:<4}  {}",
-        "ID", "TITLE", "NEXT_SYNC", "LAST_SUCCESS", "FAIL", "ENABLED"
+        "{:<8}  {:<28}  {:<12}  {:<12}  {:<4}  ENABLED",
+        "ID", "TITLE", "NEXT_SYNC", "LAST_SUCCESS", "FAIL"
     );
     for s in &statuses {
         let title = s.title.as_deref().unwrap_or("-");
-        let title_trunc = crate::output::truncate_chars(&title, 28);
+        let title_trunc = crate::output::truncate_chars(title, 28);
         let next = s
             .next_fetch_at
             .map(|ts| {

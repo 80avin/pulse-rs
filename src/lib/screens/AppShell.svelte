@@ -221,6 +221,7 @@
     function onKey(e: KeyboardEvent) {
       if (!isWide) return;
       if (showOnboarding) { if (e.key === 'Escape') showOnboarding = false; return; }
+      if (showCheatsheet && e.key === '?') { showCheatsheet = false; return; }
       if (anyOverlayOpen()) return;
       const target = e.target as HTMLElement;
       const inInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;

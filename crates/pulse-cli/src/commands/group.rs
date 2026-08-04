@@ -108,7 +108,7 @@ async fn cmd_list(args: GroupListArgs, core: &PulseCore, global_json: bool) -> a
         return Ok(());
     }
 
-    println!("{:<8}  {:<24}  {}", "ID", "NAME", "DESCRIPTION");
+    println!("{:<8}  {:<24}  DESCRIPTION", "ID", "NAME");
     for g in &groups {
         let id_prefix = &g.id[..g.id.len().min(8)];
         let desc = g.description.as_deref().unwrap_or("-");
@@ -174,6 +174,6 @@ async fn cmd_add_feed(args: GroupAddFeedArgs, core: &PulseCore) -> anyhow::Resul
     feed.group_id = Some(group.id.clone());
     feed.updated_at = chrono::Utc::now().timestamp();
     core.db.upsert_feed(feed).await?;
-    println!("feed {} added to group '{}'", &args.feed_id, args.group);
+    println!("feed {} added to group '{}'", args.feed_id, args.group);
     Ok(())
 }
