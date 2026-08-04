@@ -55,8 +55,8 @@
           oncontextmenu={(e: MouseEvent) => { e.preventDefault(); editing = true; }}
           onfocus={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = `1px solid ${T.cyan}`; }}
           onblur={(e: FocusEvent) => { (e.currentTarget as HTMLElement).style.outline = 'none'; }}
-          class="flex items-center gap-2 cursor-pointer text-left w-full border-none px-3 py-1.5 shrink-0" style="
-            background:{active === g.id ? 'rgba(78,205,214,0.06)' : 'transparent'};
+          class="flex items-center gap-2 cursor-pointer text-left w-full border-none px-3 py-1.5 shrink-0 hover:bg-bg-2" style="
+            {active === g.id ? 'background:rgba(78,205,214,0.06);' : ''}
             border-left:2px solid {active === g.id ? T.cyan : 'transparent'};
             color:{active === g.id ? T.ink0 : T.ink1};
             font:{active === g.id ? '600' : '400'} 13px/1.2 {T.mono};
@@ -82,7 +82,7 @@
       {#each groups as g}
         <button
           onclick={() => { if (suppressClick) { suppressClick = false; return; } onSelect(g.id); }}
-          class="shrink-0 bg-transparent border-none cursor-pointer flex items-center gap-1.5" style="
+          class="shrink-0 bg-transparent border-none cursor-pointer flex items-center gap-1.5 hover:bg-bg-2" style="
             padding:13px 14px;min-height:44px;
             border-bottom:2px solid {active === g.id ? T.cyan : 'transparent'};
             color:{active === g.id ? T.ink0 : T.ink2};

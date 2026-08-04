@@ -45,10 +45,17 @@
         onClose();
       }
     }
+    function onPointerDown(e: MouseEvent) {
+      if (menuEl && !menuEl.contains(e.target as Node)) {
+        onClose();
+      }
+    }
     window.addEventListener('keydown', onKey, true);
+    document.addEventListener('pointerdown', onPointerDown, true);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('pointerdown', onPointerDown, true);
       if (previouslyFocused && document.contains(previouslyFocused)) {
         previouslyFocused.focus();
       }
