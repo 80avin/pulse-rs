@@ -50,9 +50,20 @@ export function adaptItem(b: BackendItem): FeedItem {
     author: b.author ?? '', age: ageLabel(b.publishedAt),
     score: b.score ?? 0, n: b.n, tags: b.tags, userTags: b.userTags ?? [],
     read: b.read, saved: b.saved,
+    savedAt: b.savedAt ?? undefined,
     domain: domainOf(b.url),
     ogImage: b.ogImage ?? null, note: b.note ?? undefined,
   };
+}
+
+export async function getItem(itemId: string): Promise<FeedItem | null> {
+  if (!IS_TAURI) return null;
+  try {
+    const b = await tauriInvoke<BackendItem>('get_item', { itemId });
+    return adaptItem(b);
+  } catch {
+    return null;
+  }
 }
 
 function adaptSource(b: BackendSource): Source {

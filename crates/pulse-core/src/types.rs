@@ -217,6 +217,7 @@ pub struct FeedItemView {
     pub is_read: bool,
     pub is_saved: bool,
     pub is_hidden: bool,
+    pub saved_at: Option<i64>,
     pub note: Option<String>,
 
     // Enrichment fields

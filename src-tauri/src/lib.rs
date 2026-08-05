@@ -243,6 +243,7 @@ pub fn run() {
             commands::delete_source,
             commands::update_source,
             commands::get_items_page,
+            commands::get_item,
             commands::mark_items_read,
             commands::mark_source_read,
             commands::toggle_saved,

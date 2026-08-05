@@ -162,6 +162,7 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
         is_read: is_read_i != 0,
         is_saved: is_saved_i != 0,
         is_hidden: is_hidden_i != 0,
+        saved_at: row.try_get("saved_at").ok(),
         note: row.try_get("note").ok(),
         ai_tags,
         user_tags,
@@ -251,10 +252,19 @@ pub async fn get_timeline(
         .map(|c| c.id.clone())
         .unwrap_or_else(|| "\u{FFFF}".repeat(40));
 
+    // In the saved view, order by when the item was saved (latest first);
+    // everywhere else, order by publication time.
+    let saved_mode = filter.is_saved == Some(true);
+
     // Build WHERE clauses dynamically
+    let cursor_cond = if saved_mode {
+        "(COALESCE(ist.saved_at, 0) < ? OR (COALESCE(ist.saved_at, 0) = ? AND fi.id < ?))"
+    } else {
+        "(fi.published_at < ? OR (fi.published_at = ? AND fi.id < ?))"
+    };
     let mut conditions = vec![
         "ist.is_hidden = 0".to_string(),
-        "(fi.published_at < ? OR (fi.published_at = ? AND fi.id < ?))".to_string(),
+        cursor_cond.to_string(),
     ];
 
     if filter.group_id.is_some() {
@@ -278,6 +288,11 @@ pub async fn get_timeline(
     }
 
     let where_clause = conditions.join(" AND ");
+    let order_by = if saved_mode {
+        "COALESCE(ist.saved_at, 0) DESC, fi.id DESC"
+    } else {
+        "fi.published_at DESC, fi.id DESC"
+    };
 
     let sql = format!(
         "SELECT
@@ -287,7 +302,7 @@ pub async fn get_timeline(
             json_extract(fi.source_meta, '$.og_image') AS og_image,
             f.id AS feed_id, f.title AS feed_title, f.feed_type, f.url AS feed_url,
             f.group_id, fg.name AS group_name,
-            ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
+            ist.is_read, ist.is_saved, ist.is_hidden, ist.saved_at, ist.note,
             COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
             COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags
          FROM feed_items fi
@@ -298,7 +313,7 @@ pub async fn get_timeline(
          LEFT JOIN user_tags ut ON ut.item_id = fi.id
          WHERE {where_clause}
          GROUP BY fi.id
-         ORDER BY fi.published_at DESC, fi.id DESC
+         ORDER BY {order_by}
          LIMIT ?"
     );
 
@@ -340,7 +355,11 @@ pub async fn get_timeline(
 
     let next_cursor = if has_more {
         items.last().map(|item| TimelineCursor {
-            published_at: item.published_at,
+            published_at: if saved_mode {
+                item.saved_at.unwrap_or(0)
+            } else {
+                item.published_at
+            },
             id: item.id.clone(),
         })
     } else {
@@ -417,7 +436,7 @@ pub async fn get_item_view(pool: &SqlitePool, item_id: &ItemId) -> Result<FeedIt
             json_extract(fi.source_meta, '$.og_image') AS og_image,
             f.id AS feed_id, f.title AS feed_title, f.feed_type, f.url AS feed_url,
             f.group_id, fg.name AS group_name,
-            ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
+            ist.is_read, ist.is_saved, ist.is_hidden, ist.saved_at, ist.note,
             COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
             COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags
          FROM feed_items fi
@@ -479,7 +498,7 @@ pub async fn search_items(
                 json_extract(fi.source_meta, '$.external_url') AS external_url,
                 f.id AS feed_id, f.title AS feed_title, f.feed_type, f.url AS feed_url,
                 f.group_id, fg.name AS group_name,
-                ist.is_read, ist.is_saved, ist.is_hidden, ist.note,
+                ist.is_read, ist.is_saved, ist.is_hidden, ist.saved_at, ist.note,
                 COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
             COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags
          FROM feed_items_fts

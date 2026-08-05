@@ -112,6 +112,12 @@ fn adapt_item(view: &pulse_core::types::FeedItemView) -> FeedItemDto {
             .single()
             .map(|dt| dt.to_rfc3339())
             .unwrap_or_default(),
+        saved_at: view.saved_at.and_then(|ts| {
+            chrono::Utc
+                .timestamp_opt(ts, 0)
+                .single()
+                .map(|dt| dt.to_rfc3339())
+        }),
         read: view.is_read,
         saved: view.is_saved,
         hidden: view.is_hidden,
@@ -260,6 +266,17 @@ pub async fn update_source(
 pub struct CursorInput {
     pub published_at: i64,
     pub item_id: String,
+}
+
+/// Fetch a single item by ID (full view). Errors if the item doesn't exist.
+#[tauri::command]
+pub async fn get_item(
+    state: State<'_, AppState>,
+    item_id: String,
+) -> Result<FeedItemDto, String> {
+    let core = state.core().await?;
+    let view = core.get_item_view(&item_id).await.map_err(|e| e.to_string())?;
+    Ok(adapt_item(&view))
 }
 
 /// Paginated timeline command. Returns up to `limit` items starting after `cursor`.

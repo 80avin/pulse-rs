@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { items, sources, markRead, toggleSaved, saveWithNote, hideItem } from '$lib/stores/data.svelte';
+  import { items, sources, markRead, toggleSaved, saveWithNote, hideItem, getItem } from '$lib/stores/data.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, shareItem } from '$lib/utils';
   import { untrack } from 'svelte';
@@ -31,7 +31,25 @@
   const storeItem = $derived(items.find(i => i.id === itemId));
   let cachedItem = $state<import('$lib/types').FeedItem | null>(null);
   $effect(() => { if (storeItem) cachedItem = storeItem; });
-  const item = $derived(storeItem ?? cachedItem);
+  // Fetch-by-ID fallback: the reader only sees the paginated `items` cache, so
+  // items that aren't in it (e.g. old saved items) would otherwise show
+  // "item not found" even though they exist in the DB.
+  let fetchedItem = $state<import('$lib/types').FeedItem | null>(null);
+  let fetchState = $state<'idle' | 'loading' | 'missing'>('idle');
+  $effect(() => {
+    if (!itemId) { fetchedItem = null; fetchState = 'idle'; return; }
+    if (storeItem || cachedItem) { fetchedItem = null; fetchState = 'idle'; return; }
+    let cancelled = false;
+    fetchedItem = null;
+    fetchState = 'loading';
+    getItem(itemId).then((i) => {
+      if (cancelled) return;
+      fetchedItem = i;
+      fetchState = i ? 'idle' : 'missing';
+    });
+    return () => { cancelled = true; };
+  });
+  const item = $derived(storeItem ?? cachedItem ?? fetchedItem);
   const source = $derived(item ? sources.find(s => s.id === item.src) : undefined);
   const idx    = $derived(allIds.indexOf(itemId));
   const hasPrev = $derived(idx > 0);
@@ -210,5 +228,12 @@
     {/if}
   </div>
 {:else}
-  <div class="h-full flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">item not found</div>
+  {#if fetchState === 'loading'}
+    <div class="h-full flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">loading…</div>
+  {:else}
+    <div class="h-full flex flex-col items-center justify-center gap-4">
+      <div class="text-ink-3 text-[11px] leading-none font-mono">item not found</div>
+      <button onclick={onBack} class="bg-transparent border border-bd-1 text-ink-2 cursor-pointer rounded px-3 py-2 text-[10px] leading-none font-mono">← back to list</button>
+    </div>
+  {/if}
 {/if}

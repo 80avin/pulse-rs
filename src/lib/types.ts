@@ -38,6 +38,7 @@ export interface FeedItem {
   userTags: string[];
   read: boolean;
   saved: boolean;
+  savedAt?: string;
   body: string;
   bodyHtml?: string;
   externalUrl?: string;
@@ -58,6 +59,7 @@ export interface BackendItem {
   id: string; sourceId: string; sourceName: string; title: string; url: string;
   body: string; bodyHtml: string | null; externalUrl: string | null; author: string | null;
   publishedAt: string; read: boolean; saved: boolean; hidden: boolean;
+  savedAt: string | null;
   score: number | null; n: number; tags: string[];
   ogImage: string | null; note: string | null; userTags: string[];
 }

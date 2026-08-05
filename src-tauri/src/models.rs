@@ -32,6 +32,7 @@ pub struct FeedItemDto {
     pub external_url: Option<String>,
     pub author: Option<String>,
     pub published_at: String,
+    pub saved_at: Option<String>,
     pub read: bool,
     pub saved: bool,
     pub hidden: bool,
