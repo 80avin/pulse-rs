@@ -61,7 +61,7 @@
   function closeReader() { openId = ''; readerList = []; }
 
   // Narrow navigation (history-backed so Android back unwinds in-app)
-  type NavState = { tab: string; openItemId: string | null };
+  type NavState = { tab: string; openItemId: string | null; onboarding?: boolean; previewUrl?: string | null };
   function changeTab(newTab: string) {
     if (!isTabId(newTab)) { activeTab = 'feed'; newTab = 'feed'; }
     if (newTab === activeTab && !openId) return;
@@ -80,6 +80,8 @@
       const s = e.state as NavState | null;
       activeTab = (s?.tab && isTabId(s.tab)) ? s.tab : 'feed';
       openId = s?.openItemId ?? '';
+      showOnboarding = !!s?.onboarding;
+      onboardingPreviewUrl = s?.previewUrl ?? null;
     }
     window.addEventListener('popstate', handlePop);
     return () => window.removeEventListener('popstate', handlePop);
@@ -138,18 +140,24 @@
   let showSourcesAccordion = $state(true);
   let showCheatsheet = $state(false);
   let showOnboarding = $state(false);
+  let onboardingPreviewUrl = $state<string | null>(null);
   const ONBOARDING_DONE_KEY = 'pulse:onboarding-done';
 
   // First-run onboarding: only when cold-start finishes with no sources
   // and the user hasn't dismissed it before.
   $effect(() => {
     if (!storeReady.loading && sources.length === 0 && !localStorage.getItem(ONBOARDING_DONE_KEY)) {
-      showOnboarding = true;
+      openOnboarding();
     }
   });
+  function openOnboarding() { showOnboarding = true; onboardingPreviewUrl = null; history.pushState({ tab: activeTab, openItemId: null, onboarding: true } satisfies NavState, ''); }
+  function openPreview(url: string) { onboardingPreviewUrl = url; history.pushState({ tab: activeTab, openItemId: null, onboarding: true, previewUrl: url } satisfies NavState, ''); }
+  function exitPreview() { onboardingPreviewUrl = null; history.replaceState({ tab: activeTab, openItemId: null, onboarding: true } satisfies NavState, ''); }
   function finishOnboarding() {
     localStorage.setItem(ONBOARDING_DONE_KEY, '1');
     showOnboarding = false;
+    onboardingPreviewUrl = null;
+    history.replaceState({ tab: activeTab, openItemId: null } satisfies NavState, '');
   }
 
   // FTS backend search — debounced 300ms, only in Tauri context.
@@ -224,7 +232,7 @@
     function onKey(e: KeyboardEvent) {
       if (!isWide) return;
       if (overviewMode) return;
-      if (showOnboarding) { if (e.key === 'Escape') showOnboarding = false; return; }
+      if (showOnboarding) { if (e.key === 'Escape') { if (onboardingPreviewUrl) exitPreview(); else showOnboarding = false; } return; }
       if (showCheatsheet && e.key === '?') { showCheatsheet = false; return; }
       if (anyOverlayOpen()) return;
       const target = e.target as HTMLElement;
@@ -366,7 +374,7 @@
                       <Icon name="plus" size={11} color={T.ink3} />
                       <span>Manage Sources</span>
                     </GhostButton>
-                    <GhostButton onclick={() => { showOnboarding = true; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 justify-center px-1.5 py-1.5 text-[12px] leading-none" title="Discover feeds" ariaLabel="Discover feeds">
+                    <GhostButton onclick={openOnboarding} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 justify-center px-1.5 py-1.5 text-[12px] leading-none" title="Discover feeds" ariaLabel="Discover feeds">
                       <Icon name="list" size={11} color={T.ink3} />
                       <span>discover</span>
                     </GhostButton>
@@ -455,7 +463,7 @@
                 <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1} /></span>
               </IconBtn>
               <IconBtn onclick={() => { window.dispatchEvent(new CustomEvent('pulse:open-add-source')); setTimeout(() => { document.querySelector('.add-source-target')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60); }} title="Add source" ariaLabel="Add source" name="plus" size={16} color={T.cyan} />
-              <GhostButton onclick={() => { showOnboarding = true; }} class="text-ink-2 min-h-11 px-1.5 text-[12px] leading-none tracking-[0.4px]" title="Discover feeds" ariaLabel="Discover feeds">discover</GhostButton>
+              <GhostButton onclick={openOnboarding} class="text-ink-2 min-h-11 px-1.5 text-[12px] leading-none tracking-[0.4px]" title="Discover feeds" ariaLabel="Discover feeds">discover</GhostButton>
             </div>
             <div class="flex-1 overflow-auto">
               <SourceExplorer onSourceSelect={openSourceFeed} onSync={doSync} />
@@ -490,7 +498,7 @@
   {/if}
 
   {#if showOnboarding}
-    <Onboarding onDone={finishOnboarding} />
+    <Onboarding onDone={finishOnboarding} previewUrl={onboardingPreviewUrl} onOpenPreview={openPreview} onExitPreview={exitPreview} />
   {/if}
 
   <ContextMenu open={sourceMenu !== null} mode="popup" x={sourceMenu?.x ?? 0} y={sourceMenu?.y ?? 0} onClose={closeSourceMenu} class="w-48">

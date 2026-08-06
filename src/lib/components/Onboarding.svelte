@@ -12,7 +12,7 @@
   interface OnboardSelectionDto { name: string; url: string; kind: string; category: string; }
   interface PreviewItemDto { id: string; title: string; url: string | null; author: string | null; publishedAt: string | null; }
 
-  let { onDone }: { onDone: () => void } = $props();
+  let { onDone, previewUrl, onOpenPreview, onExitPreview }: { onDone: () => void; previewUrl: string | null; onOpenPreview: (url: string) => void; onExitPreview: () => void } = $props();
 
   let cats = $state<PopularCategoryDto[]>([]);
   let loading = $state(true);
@@ -20,7 +20,35 @@
   let selected = $state<Record<string, boolean>>({});
   let adding = $state(false);
   let addError = $state(false);
-  let preview = $state<{ feed: PopularFeedDto; items: PreviewItemDto[]; loading: boolean; error: string } | null>(null);
+  let previewItems = $state<PreviewItemDto[]>([]);
+  let previewLoading = $state(false);
+  let previewError = $state('');
+  const previewFeed = $derived(previewUrl ? cats.flatMap(c => c.feeds).find(f => f.url === previewUrl) ?? null : null);
+
+  $effect(() => {
+    if (!previewUrl) {
+      previewItems = [];
+      previewLoading = false;
+      previewError = '';
+      return;
+    }
+    const url = previewUrl;
+    previewItems = [];
+    previewLoading = true;
+    previewError = '';
+    const kind = previewFeed?.kind ?? 'rss';
+    tauriInvoke<PreviewItemDto[]>('preview_feed', { url, kind, limit: 30 })
+      .then((items) => {
+        if (previewUrl !== url) return;
+        previewItems = items;
+        previewLoading = false;
+      })
+      .catch((e) => {
+        if (previewUrl !== url) return;
+        previewError = typeof e === 'string' ? e : 'preview request failed';
+        previewLoading = false;
+      });
+  });
 
   async function loadCatalog() {
     loading = true;
@@ -46,23 +74,6 @@
   function toggleCategory(cat: PopularCategoryDto) {
     const all = catAllSelected(cat);
     for (const f of cat.feeds) selected[f.url] = !all;
-  }
-
-  async function openPreview(f: PopularFeedDto) {
-    const url = f.url;
-    preview = { feed: f, items: [], loading: true, error: '' };
-    try {
-      const items = await tauriInvoke<PreviewItemDto[]>('preview_feed', { url: f.url, kind: f.kind, limit: 30 });
-      if (preview?.feed.url === url) {
-        preview.items = items;
-        preview.loading = false;
-      }
-    } catch (e) {
-      if (preview?.feed.url === url) {
-        preview.error = typeof e === 'string' ? e : 'preview request failed';
-        preview.loading = false;
-      }
-    }
   }
 
   async function handleAdd() {
@@ -102,32 +113,32 @@
       <button onclick={loadCatalog} class="bg-bg-1 border border-bd-1 text-ink-1 cursor-pointer rounded p-2.5 px-4 text-[11px] leading-none font-mono">retry</button>
       <GhostButton onclick={onDone} class="text-ink-3 text-[10px] leading-none">skip for now</GhostButton>
     </div>
-  {:else if preview}
+  {:else if previewFeed}
     <div class="flex-1 flex flex-col min-h-0">
       <div class="shrink-0 px-4 pt-3 pb-2.5 border-b border-bd-0">
         <div class="flex items-center gap-2">
           <div class="flex-1 min-w-0">
-            <div class="text-[11px] leading-none font-mono text-ink-0 truncate">previewing <span class="text-cyan">{preview.feed.name}</span></div>
-            <div class="mt-1.5 text-[9px] leading-none font-mono text-ink-3 truncate">{preview.feed.url}</div>
+            <div class="text-[11px] leading-none font-mono text-ink-0 truncate">previewing <span class="text-cyan">{previewFeed.name}</span></div>
+            <div class="mt-1.5 text-[9px] leading-none font-mono text-ink-3 truncate">{previewFeed.url}</div>
           </div>
           <GhostButton
-            onclick={() => preview = null}
+            onclick={onExitPreview}
             class="shrink-0 text-[9px] leading-none uppercase tracking-[0.5px]"
             style="color:{T.cyan};"
           >exit preview</GhostButton>
         </div>
-        {#if preview.loading}
+        {#if previewLoading}
           <div class="mt-2.5 text-[10px] leading-none font-mono text-ink-3">loading items…</div>
-        {:else if preview.error}
-          <div class="mt-2.5 text-[10px] leading-[1.5] font-mono text-red">couldn't load items — {preview.error}</div>
+        {:else if previewError}
+          <div class="mt-2.5 text-[10px] leading-[1.5] font-mono text-red">couldn't load items — {previewError}</div>
         {/if}
       </div>
       <div class="flex-1 overflow-y-auto">
-        {#if !preview.loading && !preview.error}
-          {#if preview.items.length === 0}
+        {#if !previewLoading && !previewError}
+          {#if previewItems.length === 0}
             <div class="px-4 py-4 text-[11px] leading-none font-mono text-ink-3">no items yet</div>
           {:else}
-            {#each preview.items as item}
+            {#each previewItems as item}
               <button
                 onclick={() => item.url && openExternal(item.url)}
                 class="block w-full text-left cursor-pointer bg-transparent border-none px-4 py-2.5"
@@ -184,7 +195,7 @@
                 </button>
                 <span class="shrink-0 text-[9px] leading-none font-mono uppercase tracking-[0.5px]" style="color:{SOURCE_KIND[f.kind]?.color ?? T.ink3};">{f.kind}</span>
                 <button
-                  onclick={(e) => { e.stopPropagation(); openPreview(f); }}
+                  onclick={(e) => { e.stopPropagation(); onOpenPreview(f.url); }}
                   title={`preview ${f.name}`}
                   aria-label={`preview ${f.name}`}
                   class="shrink-0 flex items-center justify-center rounded-sm bg-transparent border-none cursor-pointer p-[3px]"
