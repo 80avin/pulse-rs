@@ -282,6 +282,7 @@
     <Overview
       onOpenGroup={(id) => { selectGroup(id); overviewMode = false; }}
       onExit={() => { overviewMode = false; }}
+      onOpenItem={(id, ids, list) => openItemAndRead(id, ids, list)}
     />
   {:else if isWide}
     <div class="flex flex-col w-full h-full bg-bg-0 text-ink-0 overflow-hidden">
@@ -356,12 +357,12 @@
                   {/each}
                 </div>
                 <div class="shrink-0 flex items-center gap-1 px-2 pb-1.5 pt-1">
-                  <GhostButton onclick={() => { showSources = !showSources; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 text-left px-1.5 py-1 text-[10px] leading-none">
-                    <Icon name="plus" size={10} color={T.ink3} />
+                  <GhostButton onclick={() => { showSources = !showSources; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 text-left px-1.5 py-1.5 text-[12px] leading-none">
+                    <Icon name="plus" size={11} color={T.ink3} />
                     <span>Manage Sources</span>
                   </GhostButton>
-                  <GhostButton onclick={() => { showOnboarding = true; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 justify-center px-1.5 py-1 text-[10px] leading-none" title="Discover feeds" ariaLabel="Discover feeds">
-                    <Icon name="list" size={10} color={T.ink3} />
+                  <GhostButton onclick={() => { showOnboarding = true; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 justify-center px-1.5 py-1.5 text-[12px] leading-none" title="Discover feeds" ariaLabel="Discover feeds">
+                    <Icon name="list" size={11} color={T.ink3} />
                     <span>discover</span>
                   </GhostButton>
                 </div>
@@ -441,7 +442,7 @@
                 <span class={syncState.syncing ? 'syncing' : ''}><Icon name="sync" size={16} color={syncState.syncing ? T.cyan : T.ink1} /></span>
               </IconBtn>
               <IconBtn onclick={() => { window.dispatchEvent(new CustomEvent('pulse:open-add-source')); setTimeout(() => { document.querySelector('.add-source-target')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60); }} title="Add source" ariaLabel="Add source" name="plus" size={16} color={T.cyan} />
-              <GhostButton onclick={() => { showOnboarding = true; }} class="text-ink-2 min-h-11 px-1 text-[10px] leading-none tracking-[0.4px]" title="Discover feeds" ariaLabel="Discover feeds">discover</GhostButton>
+              <GhostButton onclick={() => { showOnboarding = true; }} class="text-ink-2 min-h-11 px-1.5 text-[12px] leading-none tracking-[0.4px]" title="Discover feeds" ariaLabel="Discover feeds">discover</GhostButton>
             </div>
             <div class="flex-1 overflow-auto">
               <SourceExplorer onSourceSelect={openSourceFeed} onSync={doSync} />
