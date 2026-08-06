@@ -150,7 +150,16 @@ fn normalize_rss_entry(
 
     let url = entry.links.first().map(|l| l.href.clone());
 
-    let author = entry.authors.first().map(|a| a.name.clone());
+    let author = entry.authors.first().map(|a| {
+        // feed-rs parses RSS <author>text</author> as name="author" + email=text
+        // (its handle_contact sets name to the element role). Prefer the email
+        // content so the real author name/address isn't replaced by "author".
+        if a.name == "author" {
+            a.email.clone().or_else(|| Some(a.name.clone()))
+        } else {
+            Some(a.name.clone())
+        }
+    }).flatten();
 
     let published_at = entry
         .published
