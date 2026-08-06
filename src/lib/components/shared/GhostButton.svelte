@@ -11,6 +11,7 @@
     style,
     ariaExpanded,
     ariaCurrent,
+    dataActive,
     ontouchstart,
     ontouchend,
     ontouchcancel,
@@ -25,6 +26,7 @@
     style?: string;
     ariaExpanded?: boolean;
     ariaCurrent?: 'page' | 'step' | 'location' | 'date' | 'time' | boolean | null;
+    dataActive?: boolean | 'true' | 'false' | undefined;
     ontouchstart?: (e: TouchEvent) => void;
     ontouchend?: (e: TouchEvent) => void;
     ontouchcancel?: (e: TouchEvent) => void;
@@ -41,6 +43,7 @@
   {style}
   aria-expanded={ariaExpanded}
   aria-current={ariaCurrent}
+  data-active={dataActive ? 'true' : undefined}
   {ontouchstart}
   {ontouchend}
   {ontouchcancel}

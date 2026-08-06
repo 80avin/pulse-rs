@@ -45,6 +45,15 @@
   }
 
   let suppressClick = false;
+
+  let hScrollEl = $state<HTMLDivElement | null>(null);
+  $effect(() => {
+    if (orientation !== 'horizontal' || !hScrollEl) return;
+    const el = hScrollEl.querySelector<HTMLElement>('[data-active="true"]');
+    if (!el) return;
+    const target = el.offsetLeft - hScrollEl.clientWidth / 2 + el.clientWidth / 2;
+    hScrollEl.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+  });
 </script>
 
 {#if orientation === 'vertical'}
@@ -79,9 +88,10 @@
   </div>
 {:else}
   <div class="flex shrink-0 border-b border-bd-0 bg-bg-1">
-    <div class="flex-1 min-w-0 overflow-x-auto flex" style="scrollbar-width:none;">
+    <div bind:this={hScrollEl} class="flex-1 min-w-0 overflow-x-auto flex" style="scrollbar-width:none;">
       {#each groups as g}
         <GhostButton
+          dataActive={active === g.id ? 'true' : undefined}
           onclick={() => { if (suppressClick) { suppressClick = false; return; } onSelect(g.id); }}
           class="shrink-0 flex items-center gap-1.5 hover:bg-bg-2" style="
             padding:13px 14px;min-height:44px;
