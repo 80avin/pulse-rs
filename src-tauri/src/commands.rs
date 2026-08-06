@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use chrono::TimeZone;
@@ -127,6 +128,21 @@ fn adapt_item(view: &pulse_core::types::FeedItemView) -> FeedItemDto {
         user_tags: view.user_tags.clone(),
         og_image: view.og_image.clone(),
         note: view.note.clone(),
+    }
+}
+
+fn adapt_preview_item(item: &pulse_core::types::PreviewItem) -> PreviewItemDto {
+    PreviewItemDto {
+        id: item.id.clone(),
+        title: item.title.clone(),
+        url: item.url.clone(),
+        author: item.author.clone(),
+        published_at: item.published_at.and_then(|ts| {
+            chrono::Utc
+                .timestamp_opt(ts, 0)
+                .single()
+                .map(|dt| dt.to_rfc3339())
+        }),
     }
 }
 
@@ -269,12 +285,12 @@ pub struct CursorInput {
 
 /// Fetch a single item by ID (full view). Errors if the item doesn't exist.
 #[tauri::command]
-pub async fn get_item(
-    state: State<'_, AppState>,
-    item_id: String,
-) -> Result<FeedItemDto, String> {
+pub async fn get_item(state: State<'_, AppState>, item_id: String) -> Result<FeedItemDto, String> {
     let core = state.core().await?;
-    let view = core.get_item_view(&item_id).await.map_err(|e| e.to_string())?;
+    let view = core
+        .get_item_view(&item_id)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(adapt_item(&view))
 }
 
@@ -388,7 +404,9 @@ pub async fn set_user_tags(
     tags: Vec<String>,
 ) -> Result<(), String> {
     let core = state.core().await?;
-    core.set_user_tags(&id, tags).await.map_err(|e| e.to_string())
+    core.set_user_tags(&id, tags)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -396,7 +414,6 @@ pub async fn hide_item(state: State<'_, AppState>, id: String) -> Result<(), Str
     let core = state.core().await?;
     core.hide_item(&id).await.map_err(|e| e.to_string())
 }
-
 
 #[tauri::command]
 pub async fn get_popular_feeds() -> Result<Vec<PopularCategoryDto>, String> {
@@ -444,7 +461,27 @@ pub async fn add_onboard_feeds(
             category: s.category,
         })
         .collect();
-    core.add_onboard_feeds(&sels).await.map_err(|e| e.to_string())
+    core.add_onboard_feeds(&sels)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Fetch a feed's current items without subscribing (discover preview).
+#[tauri::command]
+pub async fn preview_feed(
+    state: State<'_, AppState>,
+    url: String,
+    kind: String,
+    limit: Option<usize>,
+) -> Result<Vec<PreviewItemDto>, String> {
+    let core = state.core().await?;
+    let feed_type = pulse_core::types::FeedType::from_str(&kind)
+        .map_err(|e| format!("invalid feed kind: {e}"))?;
+    let items = core
+        .preview_feed(&url, feed_type, limit.unwrap_or(30))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(items.iter().map(adapt_preview_item).collect())
 }
 // ── Group commands ─────────────────────────────────────────────────────────────
 

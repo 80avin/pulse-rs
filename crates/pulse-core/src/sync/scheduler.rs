@@ -119,6 +119,11 @@ impl SyncScheduler {
         self.http.clone()
     }
 
+    /// Expose the Reddit OAuth handle, if credentials are configured.
+    pub fn reddit_auth(&self) -> Option<&RedditAuth> {
+        self.reddit_auth.as_deref()
+    }
+
     pub async fn refresh_feed(&self, feed_id: FeedId) {
         if self.live_task(&feed_id).await {
             self.send_command(SyncCommand::RefreshFeed(feed_id));
@@ -180,7 +185,8 @@ async fn feed_sync_task(
     if sync_immediately {
         match load_feed(&db, &feed_id).await {
             Some(feed) if feed.is_enabled => {
-                if let Err(e) = perform_sync(&feed_id, &db, &tagger, &http, reddit_auth.as_deref()).await
+                if let Err(e) =
+                    perform_sync(&feed_id, &db, &tagger, &http, reddit_auth.as_deref()).await
                 {
                     tracing::warn!(feed_id = %feed_id, error = %e, "Initial sync failed");
                 }

@@ -3,12 +3,14 @@
   import { T, SOURCE_KIND } from '$lib/tokens';
   import Icon from '$lib/components/Icon.svelte';
   import GhostButton from '$lib/components/shared/GhostButton.svelte';
-  import { tauriInvoke, reloadSources, reloadGroups, reloadDbStats } from '$lib/stores/data.svelte';
+  import { tauriInvoke, reloadSources, reloadGroups, reloadDbStats, ageLabel, domainOf } from '$lib/stores/data.svelte';
+  import { openExternal } from '$lib/utils';
   import { isDesktop } from '$lib/use-is-desktop.svelte';
 
   interface PopularFeedDto { name: string; url: string; kind: string; }
   interface PopularCategoryDto { category: string; experimental?: boolean; feeds: PopularFeedDto[]; }
   interface OnboardSelectionDto { name: string; url: string; kind: string; category: string; }
+  interface PreviewItemDto { id: string; title: string; url: string | null; author: string | null; publishedAt: string | null; }
 
   let { onDone }: { onDone: () => void } = $props();
 
@@ -18,6 +20,7 @@
   let selected = $state<Record<string, boolean>>({});
   let adding = $state(false);
   let addError = $state(false);
+  let preview = $state<{ feed: PopularFeedDto; items: PreviewItemDto[]; loading: boolean; error: string } | null>(null);
 
   async function loadCatalog() {
     loading = true;
@@ -43,6 +46,23 @@
   function toggleCategory(cat: PopularCategoryDto) {
     const all = catAllSelected(cat);
     for (const f of cat.feeds) selected[f.url] = !all;
+  }
+
+  async function openPreview(f: PopularFeedDto) {
+    const url = f.url;
+    preview = { feed: f, items: [], loading: true, error: '' };
+    try {
+      const items = await tauriInvoke<PreviewItemDto[]>('preview_feed', { url: f.url, kind: f.kind, limit: 30 });
+      if (preview?.feed.url === url) {
+        preview.items = items;
+        preview.loading = false;
+      }
+    } catch (e) {
+      if (preview?.feed.url === url) {
+        preview.error = typeof e === 'string' ? e : 'preview request failed';
+        preview.loading = false;
+      }
+    }
   }
 
   async function handleAdd() {
@@ -82,6 +102,53 @@
       <button onclick={loadCatalog} class="bg-bg-1 border border-bd-1 text-ink-1 cursor-pointer rounded p-2.5 px-4 text-[11px] leading-none font-mono">retry</button>
       <GhostButton onclick={onDone} class="text-ink-3 text-[10px] leading-none">skip for now</GhostButton>
     </div>
+  {:else if preview}
+    <div class="flex-1 flex flex-col min-h-0">
+      <div class="shrink-0 px-4 pt-3 pb-2.5 border-b border-bd-0">
+        <div class="flex items-center gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="text-[11px] leading-none font-mono text-ink-0 truncate">previewing <span class="text-cyan">{preview.feed.name}</span></div>
+            <div class="mt-1.5 text-[9px] leading-none font-mono text-ink-3 truncate">{preview.feed.url}</div>
+          </div>
+          <GhostButton
+            onclick={() => preview = null}
+            class="shrink-0 text-[9px] leading-none uppercase tracking-[0.5px]"
+            style="color:{T.cyan};"
+          >exit preview</GhostButton>
+        </div>
+        {#if preview.loading}
+          <div class="mt-2.5 text-[10px] leading-none font-mono text-ink-3">loading items…</div>
+        {:else if preview.error}
+          <div class="mt-2.5 text-[10px] leading-[1.5] font-mono text-red">couldn't load items — {preview.error}</div>
+        {/if}
+      </div>
+      <div class="flex-1 overflow-y-auto">
+        {#if !preview.loading && !preview.error}
+          {#if preview.items.length === 0}
+            <div class="px-4 py-4 text-[11px] leading-none font-mono text-ink-3">no items yet</div>
+          {:else}
+            {#each preview.items as item}
+              <button
+                onclick={() => item.url && openExternal(item.url)}
+                class="block w-full text-left cursor-pointer bg-transparent border-none px-4 py-2.5"
+                style="border-bottom:1px solid {T.bd0};"
+              >
+                <div class="text-[11px] leading-[1.45] font-mono text-ink-0 truncate">{item.title}</div>
+                <div class="mt-1.5 flex items-center gap-2 text-[10px] leading-none font-mono text-ink-3">
+                  <span class="min-w-0 truncate">{item.author ?? 'unknown'}</span>
+                  {#if item.publishedAt}
+                    <span class="shrink-0">{ageLabel(item.publishedAt)} ago</span>
+                  {/if}
+                </div>
+                {#if item.url}
+                  <div class="mt-1 text-[9px] leading-none font-mono text-ink-2 truncate">{domainOf(item.url)}</div>
+                {/if}
+              </button>
+            {/each}
+          {/if}
+        {/if}
+      </div>
+    </div>
   {:else}
     <div class="flex-1 overflow-y-auto">
       {#each cats as cat}
@@ -101,18 +168,31 @@
           </div>
           <div class="grid grid-cols-1 gap-1.5 px-3 pb-3 pt-1 sm:grid-cols-2">
             {#each cat.feeds as f}
-              <button
-                onclick={() => toggle(f.url)}
-                aria-pressed={selected[f.url]}
-                class="flex items-center gap-2 text-left cursor-pointer rounded-sm px-2.5 py-2"
+              <div
+                class="flex items-center gap-2 rounded-sm px-2.5 py-2"
                 style="background:{selected[f.url] ? 'rgba(78,205,214,0.06)' : T.bg1};border:1px solid {selected[f.url] ? T.cyan : T.bd1};"
               >
-                <span class="shrink-0 w-3.5 h-3.5 flex items-center justify-center rounded-sm" style="background:{selected[f.url] ? T.cyan : 'transparent'};border:1px solid {selected[f.url] ? T.cyan : T.bd1};">
-                  {#if selected[f.url]}<Icon name="check" size={9} color={T.bg0} />{/if}
-                </span>
-                <span class="flex-1 min-w-0 text-[11px] leading-none font-mono text-ink-0 truncate">{f.name}</span>
+                <button
+                  onclick={() => toggle(f.url)}
+                  aria-pressed={selected[f.url]}
+                  class="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer rounded-sm bg-transparent border-none p-0 font-mono"
+                >
+                  <span class="shrink-0 w-3.5 h-3.5 flex items-center justify-center rounded-sm" style="background:{selected[f.url] ? T.cyan : 'transparent'};border:1px solid {selected[f.url] ? T.cyan : T.bd1};">
+                    {#if selected[f.url]}<Icon name="check" size={9} color={T.bg0} />{/if}
+                  </span>
+                  <span class="flex-1 min-w-0 text-[11px] leading-none font-mono text-ink-0 truncate">{f.name}</span>
+                </button>
                 <span class="shrink-0 text-[9px] leading-none font-mono uppercase tracking-[0.5px]" style="color:{SOURCE_KIND[f.kind]?.color ?? T.ink3};">{f.kind}</span>
-              </button>
+                <button
+                  onclick={(e) => { e.stopPropagation(); openPreview(f); }}
+                  title={`preview ${f.name}`}
+                  aria-label={`preview ${f.name}`}
+                  class="shrink-0 flex items-center justify-center rounded-sm bg-transparent border-none cursor-pointer p-[3px]"
+                  style="color:{T.ink2};"
+                >
+                  <Icon name="eye" size={12} />
+                </button>
+              </div>
             {/each}
           </div>
         </section>

@@ -108,6 +108,17 @@ pub struct FeedItem {
     pub source_meta: serde_json::Value,
 }
 
+/// A lightweight, transient feed item used by the discover preview. Never
+/// persisted — the id is only a Svelte key.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreviewItem {
+    pub id: String,
+    pub title: String,
+    pub url: Option<String>,
+    pub author: Option<String>,
+    pub published_at: Option<i64>,
+}
+
 /// User-controlled state for a feed item
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ItemState {

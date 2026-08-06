@@ -253,6 +253,7 @@ pub fn run() {
             commands::set_user_tags,
             commands::get_popular_feeds,
             commands::add_onboard_feeds,
+            commands::preview_feed,
             commands::get_groups,
             commands::add_group,
             commands::rename_group,

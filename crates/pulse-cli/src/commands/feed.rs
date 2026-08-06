@@ -34,6 +34,8 @@ pub enum FeedCommand {
     Health(FeedHealthArgs),
     /// Import feeds from a JSON export file
     ImportJson(FeedImportJsonArgs),
+    /// Preview a feed's current items without subscribing
+    Preview(FeedPreviewArgs),
 }
 
 #[derive(Debug, Args)]
@@ -121,6 +123,18 @@ pub struct FeedImportJsonArgs {
     pub path: String,
 }
 
+#[derive(Debug, Args)]
+pub struct FeedPreviewArgs {
+    /// Feed URL
+    pub url: String,
+    /// Feed type (rss|hn|reddit) — auto-detected if omitted
+    #[arg(long)]
+    pub r#type: Option<String>,
+    /// Max items to return
+    #[arg(long)]
+    pub limit: Option<usize>,
+}
+
 /// Auto-detect feed type from URL or input string.
 fn detect_feed_type(url: &str) -> FeedType {
     let lower = url.to_lowercase();
@@ -182,6 +196,7 @@ pub async fn run(args: FeedArgs, core: &PulseCore, global_json: bool) -> anyhow:
         FeedCommand::Edit(a) => cmd_edit(a, core).await,
         FeedCommand::Health(a) => cmd_health(a, core, global_json).await,
         FeedCommand::ImportJson(a) => cmd_import_json(a, core).await,
+        FeedCommand::Preview(a) => cmd_preview(a, core, global_json).await,
     }
 }
 
@@ -361,7 +376,11 @@ pub(crate) async fn resolve_feed(core: &PulseCore, id: &str) -> anyhow::Result<F
         0 => anyhow::bail!("feed not found: {id}"),
         n => anyhow::bail!(
             "ambiguous feed prefix '{id}' ({n} matches): {}",
-            matches.iter().map(|f| f.id.as_str()).collect::<Vec<_>>().join(", ")
+            matches
+                .iter()
+                .map(|f| f.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     }
 }
@@ -541,6 +560,42 @@ async fn cmd_health(
             "{:<8}  {:<28}  {:<10}  {:<12}  {:<14}  {}",
             h.id, title_trunc, rate, lat, h.failure_streak, last
         );
+    }
+    Ok(())
+}
+
+// ── Preview ─────────────────────────────────────────────────────────────────────
+
+async fn cmd_preview(
+    args: FeedPreviewArgs,
+    core: &PulseCore,
+    global_json: bool,
+) -> anyhow::Result<()> {
+    let feed_type = if let Some(ref t) = args.r#type {
+        t.parse::<FeedType>().map_err(|e| anyhow::anyhow!(e))?
+    } else {
+        detect_feed_type(&args.url)
+    };
+
+    let items = core
+        .preview_feed(&args.url, feed_type, args.limit.unwrap_or(30))
+        .await?;
+
+    if global_json {
+        print_json(&items);
+        return Ok(());
+    }
+
+    println!("{:<36}  {:<20}  {:<8}  URL", "TITLE", "AUTHOR", "AGE");
+    for it in &items {
+        let title = crate::output::truncate_chars(&it.title, 36);
+        let author = it.author.as_deref().unwrap_or("-");
+        let age = it
+            .published_at
+            .map(relative_time)
+            .unwrap_or_else(|| "-".to_string());
+        let url = it.url.as_deref().unwrap_or("-");
+        println!("{title:<36}  {author:<20}  {age:<8}  {url}");
     }
     Ok(())
 }

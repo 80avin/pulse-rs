@@ -149,6 +149,17 @@ pub struct PopularFeedDto {
     pub kind: String,
 }
 
+/// A single item from a live feed preview (never persisted).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewItemDto {
+    pub id: String,
+    pub title: String,
+    pub url: Option<String>,
+    pub author: Option<String>,
+    pub published_at: Option<String>,
+}
+
 /// One category in the onboarding catalog (feeds are auto-grouped into it).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

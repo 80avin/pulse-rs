@@ -1,8 +1,8 @@
 pub mod ai;
 pub mod config;
-pub mod onboarding;
 pub mod error;
 pub mod feeds;
+pub mod onboarding;
 pub mod search;
 pub mod storage;
 pub mod sync;
@@ -14,7 +14,9 @@ use tokio::sync::mpsc;
 
 use crate::ai::tagger::TagRequest;
 use crate::ai::tagger::process_tag_request;
-use crate::ai::{RuleEngine, RulesTagger, TAGGER_QUEUE_SIZE, TaggerHandle, default_rules, tagger_task};
+use crate::ai::{
+    RuleEngine, RulesTagger, TAGGER_QUEUE_SIZE, TaggerHandle, default_rules, tagger_task,
+};
 use crate::config::PulseConfig;
 use crate::error::PulseError;
 use crate::feeds::{RedditAuth, fetch_enrichment, is_image_url, should_enrich};
@@ -26,8 +28,9 @@ use crate::storage::queries::{count_pending_enrichment, get_pending_enrichment};
 use crate::sync::SyncScheduler;
 use crate::timeline::TimelineService;
 use crate::types::{
-    AiTag, DbStats, EnrichItemResult, EnrichStats, EnrichStatus, Feed, FeedGroup, FeedId,
-    FeedItemView, ItemId, ItemStatePatch, TimelineCursor, TimelineFilter, TimelinePage,
+    AiTag, DbStats, EnrichItemResult, EnrichStats, EnrichStatus, Feed, FeedGroup, FeedId, FeedItem,
+    FeedItemView, ItemId, ItemStatePatch, PreviewItem, TimelineCursor, TimelineFilter,
+    TimelinePage,
 };
 
 /// Top-level application core. Holds all subsystem handles.
@@ -336,16 +339,14 @@ impl PulseCore {
     ) -> Result<usize, PulseError> {
         use std::collections::HashMap;
         let existing_groups = self.get_feed_groups().await?;
-        let mut group_ids: HashMap<String, String> =
-            existing_groups.into_iter().map(|g| (g.name.clone(), g.id)).collect();
+        let mut group_ids: HashMap<String, String> = existing_groups
+            .into_iter()
+            .map(|g| (g.name.clone(), g.id))
+            .collect();
         // Skip feeds the user already subscribes to (feeds.url is UNIQUE); re-adding
         // would abort the whole batch on a constraint error.
-        let subscribed: std::collections::HashSet<String> = self
-            .get_feeds()
-            .await?
-            .into_iter()
-            .map(|f| f.url)
-            .collect();
+        let subscribed: std::collections::HashSet<String> =
+            self.get_feeds().await?.into_iter().map(|f| f.url).collect();
         let mut added = 0usize;
         for sel in selections {
             if subscribed.contains(&sel.url) {
@@ -491,6 +492,69 @@ impl PulseCore {
             .map_err(PulseError::Storage)
     }
 
+    /// Fetch a feed's current items without subscribing (discover preview).
+    /// The temp feed is never persisted; only the fetcher's URL/type/etag are
+    /// read, so a transient `Feed` with default health fields is sufficient.
+    pub async fn preview_feed(
+        &self,
+        url: &str,
+        kind: crate::types::FeedType,
+        limit: usize,
+    ) -> Result<Vec<PreviewItem>, PulseError> {
+        let now = chrono::Utc::now().timestamp();
+        let temp_feed = Feed {
+            id: uuid::Uuid::new_v4().to_string(),
+            url: url.to_string(),
+            feed_type: kind,
+            title: None,
+            description: None,
+            site_url: None,
+            icon_url: None,
+            group_id: None,
+            poll_interval_secs: 0,
+            is_enabled: true,
+            etag: None,
+            last_modified: None,
+            last_fetched_at: None,
+            last_success_at: None,
+            last_item_at: None,
+            failure_streak: 0,
+            total_fetches: 0,
+            total_failures: 0,
+            avg_latency_ms: None,
+            next_fetch_at: None,
+            source_config: serde_json::json!({ "initial_limit": limit }),
+            language: None,
+            hue: None,
+            created_at: now,
+            updated_at: now,
+        };
+
+        let http = self.scheduler.http_client();
+
+        let items = match temp_feed.feed_type {
+            crate::types::FeedType::Rss => crate::feeds::fetch_rss(&http, &temp_feed)
+                .await
+                .map(|r| r.items)?,
+            crate::types::FeedType::Hn => crate::feeds::fetch_hn(&http, &temp_feed)
+                .await
+                .map(|r| r.items)?,
+            crate::types::FeedType::Reddit => {
+                let Some(auth) = self.scheduler.reddit_auth() else {
+                    return Err(PulseError::Config(
+                        "reddit preview needs REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET to be configured"
+                            .to_string(),
+                    ));
+                };
+                crate::feeds::fetch_reddit(&http, &temp_feed, Some(auth))
+                    .await
+                    .map(|r| r.items)?
+            }
+        };
+
+        Ok(items.iter().take(limit).map(preview_item).collect())
+    }
+
     // ─── Timeline ─────────────────────────────────────────────────────────────
 
     pub async fn get_timeline_page(
@@ -634,7 +698,8 @@ impl PulseCore {
         let mut items_processed = 0usize;
         let mut tags_created = 0usize;
 
-        let tagger: Arc<dyn crate::ai::Tagger> = Arc::new(RulesTagger::new(self.rule_engine.clone()));
+        let tagger: Arc<dyn crate::ai::Tagger> =
+            Arc::new(RulesTagger::new(self.rule_engine.clone()));
 
         for (item, feed_type) in work {
             if force {
@@ -679,7 +744,11 @@ impl PulseCore {
     }
 
     /// Replace the user-defined tags for an item (full-set semantics).
-    pub async fn set_user_tags(&self, item_id: &ItemId, tags: Vec<String>) -> Result<(), PulseError> {
+    pub async fn set_user_tags(
+        &self,
+        item_id: &ItemId,
+        tags: Vec<String>,
+    ) -> Result<(), PulseError> {
         self.db
             .replace_user_tags(item_id.clone(), tags)
             .await
@@ -695,12 +764,26 @@ impl PulseCore {
             .map_err(PulseError::Storage)
     }
 
-    pub async fn get_tag_stats(
-        &self,
-    ) -> Result<storage::queries::TagStats, PulseError> {
+    pub async fn get_tag_stats(&self) -> Result<storage::queries::TagStats, PulseError> {
         self.db
             .with_reader(|pool| async move { storage::queries::get_tag_stats(&pool).await })
             .await
             .map_err(PulseError::Storage)
+    }
+}
+
+/// Map a fetched `FeedItem` to a transient preview row. The id only needs to
+/// be unique per list (url + timestamp); it is not persisted.
+pub(crate) fn preview_item(item: &FeedItem) -> PreviewItem {
+    PreviewItem {
+        id: format!(
+            "{}-{}",
+            item.url.as_deref().unwrap_or(""),
+            item.published_at
+        ),
+        title: item.title.clone(),
+        url: item.url.clone(),
+        author: item.author.clone(),
+        published_at: Some(item.published_at),
     }
 }
