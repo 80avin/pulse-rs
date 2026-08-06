@@ -258,6 +258,7 @@ pub fn run() {
             commands::add_group,
             commands::rename_group,
             commands::delete_group,
+            commands::get_overview,
             commands::sync_source,
             commands::sync_all,
             commands::get_settings,

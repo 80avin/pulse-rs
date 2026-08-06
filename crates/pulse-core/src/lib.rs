@@ -29,8 +29,8 @@ use crate::sync::SyncScheduler;
 use crate::timeline::TimelineService;
 use crate::types::{
     AiTag, DbStats, EnrichItemResult, EnrichStats, EnrichStatus, Feed, FeedGroup, FeedId, FeedItem,
-    FeedItemView, ItemId, ItemStatePatch, PreviewItem, TimelineCursor, TimelineFilter,
-    TimelinePage,
+    FeedItemView, GroupOverview, ItemId, ItemStatePatch, PreviewItem, TimelineCursor,
+    TimelineFilter, TimelinePage,
 };
 
 /// Top-level application core. Holds all subsystem handles.
@@ -567,6 +567,34 @@ impl PulseCore {
             .get_page(filter, cursor, limit)
             .await
             .map_err(PulseError::Storage)
+    }
+
+    /// Per-group recent items for the overview screen. Groups with no items
+    /// (no feeds or nothing synced) are skipped.
+    pub async fn get_overview(&self, limit: usize) -> Result<Vec<GroupOverview>, PulseError> {
+        let groups = self.get_feed_groups().await?;
+        let mut out = Vec::with_capacity(groups.len());
+        for g in groups {
+            let page = self
+                .get_timeline_page(
+                    TimelineFilter {
+                        group_id: Some(g.id.clone()),
+                        ..Default::default()
+                    },
+                    None,
+                    limit,
+                )
+                .await?;
+            if page.items.is_empty() {
+                continue;
+            }
+            out.push(GroupOverview {
+                group_id: g.id,
+                group_name: g.name,
+                items: page.items,
+            });
+        }
+        Ok(out)
     }
 
     // ─── Item state ───────────────────────────────────────────────────────────

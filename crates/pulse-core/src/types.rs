@@ -268,6 +268,14 @@ pub struct TimelinePage {
     pub counts: TimelineCounts,
 }
 
+/// A group plus its most recent items — feeds the overview screen.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupOverview {
+    pub group_id: GroupId,
+    pub group_name: String,
+    pub items: Vec<FeedItemView>,
+}
+
 /// Result of a sync operation for a feed
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncResult {

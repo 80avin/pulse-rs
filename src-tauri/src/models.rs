@@ -204,3 +204,12 @@ pub struct ItemPageDto {
     pub next_cursor: Option<CursorDto>,
     pub counts: TimelineCountsDto,
 }
+
+/// A group plus its most recent items — for the overview screen.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupOverviewDto {
+    pub group_id: String,
+    pub group_name: String,
+    pub items: Vec<FeedItemDto>,
+}

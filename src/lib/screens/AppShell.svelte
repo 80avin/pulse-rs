@@ -18,6 +18,7 @@
   import SourceExplorer from '$lib/components/SourceExplorer.svelte';
   import TimelinePane from '$lib/components/TimelinePane.svelte';
   import ReaderPane from '$lib/components/ReaderPane.svelte';
+  import Overview from '$lib/components/Overview.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import Onboarding from '$lib/components/Onboarding.svelte';
@@ -38,6 +39,7 @@
   let timelineIds = $state<string[]>([]);
   let readerList = $state<import('$lib/types').FeedItem[]>([]);
   let activeTab = $state<TabId>('feed');
+  let overviewMode = $state(false);
 
   const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -220,6 +222,7 @@
   $effect(() => {
     function onKey(e: KeyboardEvent) {
       if (!isWide) return;
+      if (overviewMode) return;
       if (showOnboarding) { if (e.key === 'Escape') showOnboarding = false; return; }
       if (showCheatsheet && e.key === '?') { showCheatsheet = false; return; }
       if (anyOverlayOpen()) return;
@@ -275,6 +278,11 @@
     <div class="flex items-center justify-center w-full h-full bg-bg-0 text-red text-[11px] leading-[1.6] font-mono">
       failed to load data — check console for details
     </div>
+  {:else if overviewMode}
+    <Overview
+      onOpenGroup={(id) => { selectGroup(id); overviewMode = false; }}
+      onExit={() => { overviewMode = false; }}
+    />
   {:else if isWide}
     <div class="flex flex-col w-full h-full bg-bg-0 text-ink-0 overflow-hidden">
       <!-- App toolbar (window controls are handled by the native OS title bar) -->
@@ -366,7 +374,7 @@
         <DragHandle edge="left" {onDragStart} {dragging} />
 
         <div class="shrink-0 flex flex-col border-r border-bd-0 overflow-hidden bg-bg-0" style="width:{timelineWidth}px">
-          <TimelinePane mode="wide" items={displayItems} {searchQuery} {openId} onOpen={(id, ids, list) => openItemAndRead(id, ids, list)} />
+          <TimelinePane mode="wide" items={displayItems} {searchQuery} {openId} onOpen={(id, ids, list) => openItemAndRead(id, ids, list)} onToggleOverview={() => overviewMode = !overviewMode} overviewActive={overviewMode} />
         </div>
 
         <DragHandle edge="timeline" {onDragStart} {dragging} />
@@ -424,7 +432,7 @@
       <div class="shrink-0 h-[var(--sat)]"></div>
       <div class="flex-1 overflow-hidden flex flex-col relative">
         {#if activeTab === 'feed'}
-          <TimelinePane mode="narrow" items={items} openId={openId ?? ''} onOpen={(id, ids, list) => openItem(id, ids, list)} onSearch={goToSearch} />
+          <TimelinePane mode="narrow" items={items} openId={openId ?? ''} onOpen={(id, ids, list) => openItem(id, ids, list)} onSearch={goToSearch} onToggleOverview={() => overviewMode = !overviewMode} overviewActive={overviewMode} />
         {:else if activeTab === 'sources'}
           <div class="flex flex-col h-full bg-bg-0 text-ink-0">
             <div class="h-[44px] flex items-center px-[10px] border-b border-b-bd-0 bg-bg-1 shrink-0 gap-2">

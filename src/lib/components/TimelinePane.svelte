@@ -15,13 +15,15 @@
 
   // One timeline pane for both breakpoints. `mode` switches the toolbar/filter
   // layout; the list, filter state, counts, and tag logic are shared.
-  let { mode, items, onOpen, onSearch, searchQuery = '', openId = '' }: {
+  let { mode, items, onOpen, onSearch, searchQuery = '', openId = '', onToggleOverview, overviewActive = false }: {
     mode: 'wide' | 'narrow';
     items: FeedItem[];
     onOpen: (id: string, allIds: string[], list: FeedItem[]) => void;
     onSearch?: () => void;
     searchQuery?: string;
     openId?: string;
+    onToggleOverview?: () => void;
+    overviewActive?: boolean;
   } = $props();
 
   let sort = $state('time');
@@ -71,6 +73,9 @@
         <span><span class="text-cyan">{counts.unread}</span><span class="text-ink-3"> unread</span></span>
         {#if searchQuery}<span class="text-ink-3">·</span><span class="text-amber">"{searchQuery}"</span>{/if}
         <span class="flex-1"></span>
+        {#if onToggleOverview}
+          <GhostButton onclick={onToggleOverview} class="text-[10px] leading-none uppercase tracking-[0.5px]" style="color:{T.cyan};">{overviewActive ? 'timeline' : 'overview'}</GhostButton>
+        {/if}
         {#if counts.unread > 0}
           <GhostButton onclick={() => markAllRead(displayItems.map(i => i.id))} class="text-ink-2 text-[10px] leading-none">mark all read</GhostButton>
         {/if}
@@ -89,6 +94,9 @@
       <div class="flex items-center gap-1.5 flex-1">
         <span class="font-semibold text-[14px] leading-none font-mono text-ink-0 tracking-[1px]">PULSE<span class="text-cyan">.</span></span>
       </div>
+      {#if onToggleOverview}
+        <GhostButton onclick={onToggleOverview} class="text-ink-2 text-[10px] leading-none uppercase tracking-[0.5px]" style="color:{overviewActive ? T.cyan : T.ink2};">{overviewActive ? 'timeline' : 'overview'}</GhostButton>
+      {/if}
       <IconBtn onclick={doSync} ariaLabel="Sync feeds" name="sync" size={18} color={syncState.syncing ? T.cyan : T.ink1}>
         <span class={syncState.syncing ? 'syncing' : ''}>
           <Icon name="sync" size={18} color={syncState.syncing ? T.cyan : T.ink1} />

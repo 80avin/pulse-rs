@@ -524,6 +524,27 @@ pub async fn get_groups(state: State<'_, AppState>) -> Result<Vec<GroupDto>, Str
     Ok(dtos)
 }
 
+/// Per-group recent items for the overview screen.
+#[tauri::command]
+pub async fn get_overview(
+    state: State<'_, AppState>,
+    limit: Option<usize>,
+) -> Result<Vec<GroupOverviewDto>, String> {
+    let core = state.core().await?;
+    let overview = core
+        .get_overview(limit.unwrap_or(8))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(overview
+        .iter()
+        .map(|o| GroupOverviewDto {
+            group_id: o.group_id.clone(),
+            group_name: o.group_name.clone(),
+            items: o.items.iter().map(adapt_item).collect(),
+        })
+        .collect())
+}
+
 #[tauri::command]
 pub async fn add_group(state: State<'_, AppState>, id: String, name: String) -> Result<(), String> {
     let core = state.core().await?;
