@@ -57,7 +57,6 @@ fn row_to_feed(row: &sqlx::sqlite::SqliteRow) -> Result<Feed, StorageError> {
     })
 }
 
-/// Fetch all feeds from the database
 pub async fn get_feeds(pool: &SqlitePool) -> Result<Vec<Feed>, StorageError> {
     let rows = sqlx::query(
         "SELECT id, url, feed_type, title, description, site_url, icon_url,
@@ -75,7 +74,6 @@ pub async fn get_feeds(pool: &SqlitePool) -> Result<Vec<Feed>, StorageError> {
     rows.iter().map(row_to_feed).collect()
 }
 
-/// Fetch a single feed by ID
 pub async fn get_feed(pool: &SqlitePool, feed_id: &FeedId) -> Result<Feed, StorageError> {
     let row = sqlx::query(
         "SELECT id, url, feed_type, title, description, site_url, icon_url,
@@ -98,7 +96,6 @@ pub async fn get_feed(pool: &SqlitePool, feed_id: &FeedId) -> Result<Feed, Stora
     }
 }
 
-/// Fetch all feed groups
 pub async fn get_feed_groups(pool: &SqlitePool) -> Result<Vec<FeedGroup>, StorageError> {
     let rows = sqlx::query(
         "SELECT id, name, description, color, sort_order, created_at, updated_at
@@ -169,7 +166,6 @@ fn row_to_feed_item_view(row: &sqlx::sqlite::SqliteRow) -> Result<FeedItemView, 
     })
 }
 
-/// Fetch counts for timeline items matching the filter
 pub async fn get_timeline_counts(
     pool: &SqlitePool,
     filter: &TimelineFilter,
@@ -238,7 +234,6 @@ pub async fn get_timeline_counts(
     })
 }
 
-/// Fetch a page of timeline items
 pub async fn get_timeline(
     pool: &SqlitePool,
     filter: &TimelineFilter,
@@ -252,11 +247,9 @@ pub async fn get_timeline(
         .map(|c| c.id.clone())
         .unwrap_or_else(|| "\u{FFFF}".repeat(40));
 
-    // In the saved view, order by when the item was saved (latest first);
-    // everywhere else, order by publication time.
+    // Saved view orders by saved_at (latest first); elsewhere by publication time.
     let saved_mode = filter.is_saved == Some(true);
 
-    // Build WHERE clauses dynamically
     let cursor_cond = if saved_mode {
         "(COALESCE(ist.saved_at, 0) < ? OR (COALESCE(ist.saved_at, 0) = ? AND fi.id < ?))"
     } else {
@@ -319,10 +312,8 @@ pub async fn get_timeline(
 
     let mut query = sqlx::query(&sql);
 
-    // Bind cursor params
     query = query.bind(cursor_ts).bind(cursor_ts).bind(&cursor_id);
 
-    // Bind filter params
     if let Some(ref g) = filter.group_id {
         query = query.bind(g.as_str());
     }
@@ -366,7 +357,7 @@ pub async fn get_timeline(
         None
     };
 
-    // Fetch counts without read/saved filter so tab badges stay global (scoped by group/feed/tag only)
+    // Counts ignore read/saved so tab badges stay global (still scoped by group/feed/tag)
     let count_filter = TimelineFilter {
         is_read: None,
         is_saved: None,
@@ -384,7 +375,6 @@ pub async fn get_timeline(
     })
 }
 
-/// Fetch a single feed item by ID
 pub async fn get_item(pool: &SqlitePool, item_id: &ItemId) -> Result<FeedItem, StorageError> {
     let row = sqlx::query(
         "SELECT id, feed_id, source_guid, title, url, author, published_at, fetched_at,
@@ -425,9 +415,7 @@ pub async fn get_item(pool: &SqlitePool, item_id: &ItemId) -> Result<FeedItem, S
     }
 }
 
-/// Fetch a single item as a fully-joined view (feed + group + state + tags),
-/// regardless of how old it is. Unlike paging the timeline, this is an exact
-/// ID lookup so no recency cap applies.
+/// Exact-ID lookup — unlike timeline paging, no recency cap applies.
 pub async fn get_item_view(pool: &SqlitePool, item_id: &ItemId) -> Result<FeedItemView, StorageError> {
     let sql = "SELECT
             fi.id, fi.title, fi.url, fi.author, fi.published_at, fi.fetched_at,
@@ -486,7 +474,6 @@ pub async fn resolve_item_id(
     Ok(row)
 }
 
-/// Full-text search across feed items
 pub async fn search_items(
     pool: &SqlitePool,
     query: &str,
@@ -523,7 +510,6 @@ pub async fn search_items(
     rows.iter().map(row_to_feed_item_view).collect()
 }
 
-/// Get all AI tags for an item
 pub async fn get_ai_tags(pool: &SqlitePool, item_id: &ItemId) -> Result<Vec<AiTag>, StorageError> {
     let rows = sqlx::query(
         "SELECT id, item_id, tag, confidence, tagger_source, rule_id, model_name,
@@ -611,7 +597,6 @@ pub async fn get_pending_enrichment(
         .collect()
 }
 
-/// Count items still pending enrichment
 pub async fn count_pending_enrichment(
     pool: &SqlitePool,
     feed_id_filter: Option<&str>,
@@ -689,7 +674,6 @@ pub async fn get_unread_counts_by_feed(
     Ok(map)
 }
 
-/// Get database statistics
 pub async fn get_db_stats(pool: &SqlitePool) -> Result<DbStats, StorageError> {
     let feed_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM feeds WHERE is_enabled = 1")
         .fetch_one(pool)
@@ -761,7 +745,6 @@ pub async fn get_tag_stats(pool: &SqlitePool) -> Result<TagStats, StorageError> 
     Ok(TagStats { tagged_count, tag_counts })
 }
 
-/// Fetch user-defined tags for a single item.
 pub async fn get_user_tags(pool: &SqlitePool, item_id: &ItemId) -> Result<Vec<String>, StorageError> {
     let rows = sqlx::query("SELECT tag FROM user_tags WHERE item_id = ? ORDER BY created_at, tag")
         .bind(item_id)

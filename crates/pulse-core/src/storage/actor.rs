@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 type DbResult<T> = Result<T, StorageError>;
 
-/// Health metrics recorded after a sync attempt. Carried through the
-/// `DbCommand::UpdateFeedHealth` message and consumed by `update_feed_health`.
+/// Health metrics recorded after a sync attempt, carried through
+/// `DbCommand::UpdateFeedHealth` and consumed by `update_feed_health`.
 #[derive(Debug, Clone)]
 pub struct FeedHealthUpdate {
     pub feed_id: FeedId,
@@ -27,32 +27,27 @@ pub enum DbCommand {
         reply: oneshot::Sender<DbResult<usize>>,
     },
 
-    /// Update the read/saved/hidden state of an item
     UpdateItemState {
         item_id: ItemId,
         patch: ItemStatePatch,
         reply: oneshot::Sender<DbResult<()>>,
     },
 
-    /// Insert or update a feed
     UpsertFeed {
         feed: Box<Feed>,
         reply: oneshot::Sender<DbResult<()>>,
     },
 
-    /// Insert a feed group
     InsertFeedGroup {
         group: FeedGroup,
         reply: oneshot::Sender<DbResult<()>>,
     },
 
-    /// Update feed health after a sync
     UpdateFeedHealth {
         update: FeedHealthUpdate,
         reply: oneshot::Sender<DbResult<()>>,
     },
 
-    /// Store AI tags for an item
     InsertAiTags {
         item_id: ItemId,
         tags: Vec<TagResult>,
@@ -114,10 +109,8 @@ pub enum DbCommand {
         reply: oneshot::Sender<DbResult<()>>,
     },
 
-
-    /// VACUUM the database and rebuild the FTS index afterwards.
-    /// VACUUM can renumber implicit rowids, which would silently corrupt the
-    /// external-content FTS mapping, so the rebuild is mandatory.
+    /// VACUUM can renumber implicit rowids, silently corrupting the external-content
+    /// FTS mapping — the mandatory rebuild restores it.
     Vacuum { reply: oneshot::Sender<DbResult<()>> },
 }
 
@@ -262,11 +255,10 @@ async fn upsert_items(pool: &SqlitePool, items: &[FeedItem]) -> DbResult<usize> 
         .await
         .map_err(StorageError::Sqlite)?;
 
-        // Check if row was actually inserted
+        // FTS5 is application-managed (no triggers); the just-inserted rowid is needed
         if result.rows_affected() > 0 {
             new_count += 1;
 
-            // Insert item_states in same transaction
             sqlx::query(
                 "INSERT OR IGNORE INTO item_states (item_id, is_read, is_saved, is_hidden, updated_at)
                  VALUES (?, 0, 0, 0, ?)"
@@ -277,8 +269,6 @@ async fn upsert_items(pool: &SqlitePool, items: &[FeedItem]) -> DbResult<usize> 
             .await
             .map_err(StorageError::Sqlite)?;
 
-            // Insert into FTS5 index (application-managed, not trigger)
-            // We need the rowid of the just-inserted feed_item
             let rowid: Option<i64> =
                 sqlx::query_scalar("SELECT rowid FROM feed_items WHERE id = ?")
                     .bind(&item.id)
@@ -314,8 +304,8 @@ async fn update_item_state(
 ) -> DbResult<()> {
     let now = chrono::Utc::now().timestamp();
 
-    // Ensure a state row exists (created lazily for items synced before this fix);
-    // otherwise the UPDATEs below would silently no-op.
+    // Lazily create the state row — items synced before the fix lack one, and
+    // the UPDATEs below would silently no-op otherwise.
     sqlx::query(
         "INSERT INTO item_states (item_id, updated_at) VALUES (?, ?)
          ON CONFLICT(item_id) DO NOTHING",
@@ -388,15 +378,12 @@ async fn update_item_state(
 }
 
 async fn vacuum_db(pool: &SqlitePool) -> DbResult<()> {
-    // Must run outside a transaction; the writer connection is a single,
-    // otherwise-idle connection at this point.
+    // Must run outside a transaction; the writer connection is otherwise idle here.
     sqlx::raw_sql("VACUUM")
         .execute(pool)
         .await
         .map_err(StorageError::Sqlite)?;
-    // VACUUM can renumber implicit rowids, which would silently break the
-    // external-content FTS mapping (indexed by rowid). Rebuild the index so it
-    // points at the correct rows again.
+    // VACUUM renumbers implicit rowids, breaking the rowid-keyed FTS mapping — rebuild.
     sqlx::raw_sql("INSERT INTO feed_items_fts(feed_items_fts) VALUES('rebuild')")
         .execute(pool)
         .await
@@ -565,7 +552,7 @@ async fn update_feed_health(pool: &SqlitePool, update: &FeedHealthUpdate) -> DbR
         .await
         .map_err(StorageError::Sqlite)?;
 
-        // Check if streak >= max and disable the feed
+        // Disable after max consecutive failures
         let streak: i64 = sqlx::query_scalar("SELECT failure_streak FROM feeds WHERE id = ?")
             .bind(&update.feed_id)
             .fetch_one(pool)
@@ -671,8 +658,7 @@ async fn delete_feed(pool: &SqlitePool, feed_id: &FeedId) -> DbResult<()> {
 
 async fn clear_feed_cache(pool: &SqlitePool, feed_id: &FeedId) -> DbResult<()> {
     let now = chrono::Utc::now().timestamp();
-    // Clear ETag + Last-Modified + last_seen_id from source_config in one statement.
-    // json_remove strips last_seen_id; the rest are top-level columns.
+    // ETag/Last-Modified are top-level columns; last_seen_id sits in source_config (json_remove).
     sqlx::query(
         "UPDATE feeds SET
             etag = NULL,
@@ -695,8 +681,7 @@ async fn enrich_item(
     body_text: Option<&str>,
     source_meta_patch: &serde_json::Value,
 ) -> DbResult<()> {
-    // Merge patch fields into existing source_meta using json_set.
-    // Build a dynamic json_set expression for each patch key.
+    // Merge patch fields into existing source_meta via a dynamic json_set expression.
     let patch_obj = match source_meta_patch.as_object() {
         Some(m) => m,
         None => return Ok(()),
@@ -706,7 +691,6 @@ async fn enrich_item(
         return Ok(());
     }
 
-    // Build: json_set(source_meta, '$.k1', ?, '$.k2', ?, ...)
     let mut set_expr = String::from("json_set(source_meta");
     let mut bindings: Vec<String> = Vec::new();
     for (k, v) in patch_obj {
@@ -719,8 +703,8 @@ async fn enrich_item(
     }
     set_expr.push(')');
 
-    // Two separate updates to avoid unnecessary FTS trigger when body_text is unchanged.
-    // 1. Update source_meta always (no FTS trigger — trigger only watches body_text/title/author)
+    // Two updates: source_meta always (no FTS trigger), body_text only when currently
+    // null (that trigger fires on body_text/title/author changes).
     let meta_sql = format!(
         "UPDATE feed_items SET source_meta = {} WHERE id = ?",
         set_expr
@@ -734,7 +718,7 @@ async fn enrich_item(
         .await
         .map_err(StorageError::Sqlite)?;
 
-    // 2. Update body_text only if provided AND item currently has none (triggers FTS update)
+    // body_text only when provided AND the item has none (triggers the FTS update)
     if let Some(bt) = body_text {
         sqlx::query("UPDATE feed_items SET body_text = ? WHERE id = ? AND body_text IS NULL")
             .bind(bt)
@@ -808,13 +792,12 @@ impl DbHandle {
             .map_err(|_| StorageError::ActorDisconnected)?
     }
 
-    /// Upsert a batch of feed items; returns count of newly inserted items
+    /// Upsert a batch of feed items; returns the count of newly inserted items
     pub async fn upsert_items(&self, items: Vec<FeedItem>) -> DbResult<usize> {
         self.send(|reply| DbCommand::UpsertItems { items, reply })
             .await
     }
 
-    /// Update item state
     pub async fn update_item_state(&self, item_id: ItemId, patch: ItemStatePatch) -> DbResult<()> {
         self.send(|reply| DbCommand::UpdateItemState {
             item_id,
@@ -824,7 +807,6 @@ impl DbHandle {
         .await
     }
 
-    /// Upsert a feed record
     pub async fn upsert_feed(&self, feed: Feed) -> DbResult<()> {
         self.send(|reply| DbCommand::UpsertFeed {
             feed: Box::new(feed),
@@ -833,19 +815,16 @@ impl DbHandle {
         .await
     }
 
-    /// Insert or update a feed group
     pub async fn insert_feed_group(&self, group: FeedGroup) -> DbResult<()> {
         self.send(|reply| DbCommand::InsertFeedGroup { group, reply })
             .await
     }
 
-    /// Update feed health metrics after a sync attempt
     pub async fn update_feed_health(&self, update: FeedHealthUpdate) -> DbResult<()> {
         self.send(|reply| DbCommand::UpdateFeedHealth { update, reply })
             .await
     }
 
-    /// Store AI tags for an item
     pub async fn insert_ai_tags(&self, item_id: ItemId, tags: Vec<TagResult>) -> DbResult<()> {
         self.send(|reply| DbCommand::InsertAiTags {
             item_id,

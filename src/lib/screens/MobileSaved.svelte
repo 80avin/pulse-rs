@@ -24,8 +24,7 @@
   let loading = $state(false);
 
   async function fetchMore() {
-    // Terminal guard: once we've loaded a page and there's no further cursor,
-    // stop. (A null cursor means "no more items".)
+    // Stop once we've loaded a page and the cursor is null ("no more items")
     if (loading || (!cursor && saved.length > 0)) return;
     loading = true;
     try {
@@ -45,8 +44,8 @@
     }
   }
 
-  // Load the first page exactly once on mount. (An $effect here would re-run on
-  // every cursor/saved change and re-fetch from the start — the infinite loop.)
+  // Group by saved-month (backend orders saved_at DESC). An $effect here would
+  // re-run on every cursor/saved change and re-fetch from the start.
   onMount(() => { fetchMore(); });
 
   async function onUnsave(item: FeedItem) {
@@ -56,9 +55,7 @@
 
   const allSavedIds = $derived(saved.map(i => i.id));
 
-  // Group saved items by the month they were SAVED (backend orders saved_at
-  // DESC, so groups appear newest-first). Months with no saves simply don't
-  // appear — grouping is derived from what's actually saved.
+  // Group by month SAVED (backend orders saved_at DESC → newest-first groups)
   const groups = $derived.by(() => {
     const out: { key: string; label: string; items: FeedItem[] }[] = [];
     for (const item of saved) {
@@ -78,7 +75,6 @@
 </script>
 
 <div class="flex flex-col h-full bg-bg-0 text-ink-0">
-  <!-- Header -->
   <div class="shrink-0 border-b border-bd-0 bg-bg-1 px-3.5 flex items-center gap-2.5" style="height:44px;">
     <Icon name="bookmark" size={15} color={T.amber} />
     <span class="text-[12px] leading-none font-mono text-ink-0 tracking-[0.5px]">saved</span>

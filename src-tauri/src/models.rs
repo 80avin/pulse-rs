@@ -68,11 +68,9 @@ pub struct AppSettingsDto {
     pub density: String,
     pub mark_read_on: String,
     pub sync_interval_min: i64,
-    // TODO: Planned features — not yet consumed by backend
+    // TODO: planned features — not yet consumed by backend
     pub wifi_only: bool,
-    // TODO: Planned features — not yet consumed by backend
     pub background_sync: bool,
-    // TODO: Planned features — not yet consumed by backend
     pub notify_saved: bool,
     /// When true: pulse_core=debug. When false: info + warn only.
     #[serde(default)]

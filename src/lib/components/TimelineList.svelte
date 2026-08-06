@@ -33,12 +33,9 @@
 
   const density = $derived(settings.density);
   const allIds = $derived(items.map(i => i.id));
-  // Register rendered items in the shared cache so the reader can open any of
-  // them later, even after they're evicted from the paginated store.
+  // Cache rendered items so the reader can open them after pagination evicts them
   $effect(() => { for (const it of items) rememberItem(it); });
-  // Custom pagination override: when `hasMore`/`onLoadMore` are supplied they
-  // drive the near-bottom / auto-fill checks instead of the global timeline
-  // store (used by MobileSaved). Default = existing timeline-store behavior.
+  // hasMore/onLoadMore override the timeline store's pagination (MobileSaved)
   const more = $derived(hasMore ?? !!loadingMore.cursor);
   const loadMore = $derived(onLoadMore ?? fetchNextPage);
   const busy = $derived(onLoadMore !== undefined ? false : loadingMore.active);

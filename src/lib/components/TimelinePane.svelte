@@ -64,7 +64,6 @@
 
 <div class="flex flex-col h-full bg-bg-0 text-ink-0 min-w-0">
   {#if mode === 'wide'}
-    <!-- Wide toolbar -->
     <div class="flex flex-col border-b border-bd-0 bg-bg-1 shrink-0">
       <div class="flex items-center gap-2.5 text-ink-2 px-2.5 py-1.5 text-[10px] leading-none font-mono">
         <span class="text-ink-0 truncate">{viewLabel}</span>
@@ -86,7 +85,6 @@
       {/if}
     </div>
   {:else}
-    <!-- Narrow top bar -->
     <div class="h-11 flex items-center gap-1.5 shrink-0 bg-bg-1 border-b border-bd-0 px-2">
       <div class="flex items-center gap-1.5 flex-1">
         <span class="font-semibold text-[14px] leading-none font-mono text-ink-0 tracking-[1px]">PULSE<span class="text-cyan">.</span></span>
@@ -102,7 +100,6 @@
       {/if}
     </div>
 
-    <!-- Status strip -->
     <div class="flex items-center justify-between bg-bg-0 text-ink-2 shrink-0 p-1.25 px-2.5 border-b border-b-bd-0 text-[10px] leading-none font-mono">
       <div class="flex items-center gap-2.5">
         <span>
@@ -135,8 +132,6 @@
   {:else if mode === 'narrow'}
     <GroupTabs {groups} active={activeGroup} onSelect={(id) => { applyFilter({ isRead: null, isSaved: null, groupId: id === 'all' ? null : id }); }} />
   {/if}
-
-  <!-- Tag filter banner -->
   {#if timelineFilter.tag}
     <div class="flex items-center gap-2 shrink-0 p-1.25 px-3 bg-[rgba(78,205,214,0.06)] border-b border-b-bd-0 text-[10px] leading-none font-mono">
       <span class="text-ink-3">tag:</span>
@@ -148,7 +143,6 @@
     </div>
   {/if}
 
-  <!-- List -->
   <TimelineList
     items={displayItems}
     emptyMessage={timelineFilter.feedId || timelineFilter.tag ? 'no matching items' : filter !== 'all' ? `no ${filter} items in this view` : 'no items'}

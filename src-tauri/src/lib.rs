@@ -171,8 +171,8 @@ pub fn run() {
             // Build config before moving data_dir into AppState.
             let config = PulseConfig::default_config().with_data_dir(data_dir.clone());
 
-            // Manage AppState immediately so Tauri can start dispatching queued IPC.
-            // Commands await `state.core()` which blocks on init_rx until PulseCore is ready.
+            // Manage AppState immediately so queued IPC dispatches; commands
+            // await `core()` which blocks on init_rx until PulseCore is ready.
             let (init_tx, init_rx) = tokio::sync::watch::channel(InitState::Pending);
             app.manage(AppState {
                 init_rx,
@@ -263,14 +263,10 @@ pub fn run() {
             commands::save_settings,
             commands::get_db_stats,
             commands::search_items,
-            // AI management
-                                                                                    commands::get_tag_stats,
-            // Share intent
+            commands::get_tag_stats,
             commands::detect_feed,
             commands::get_pending_share,
-            // Frontend log bridge
             commands::log_from_frontend,
-            // Diagnostics
             commands::set_log_level,
             commands::get_log_content,
             commands::get_log_path,
@@ -323,10 +319,8 @@ pub extern "C" fn Java_com_avinthakur080_pulse_1rs_ShareBridge_onShareUrl<'local
         return;
     }
 
-    // Buffer the URL for recovery via get_pending_share, but ONLY during the
-    // startup window when the WebView listener may not be live yet. Buffering
-    // mid-session would leave a stale URL that pops an old ShareSheet on the
-    // next cold start.
+    // Buffer for get_pending_share only within the cold-start window; buffering
+    // mid-session would leave a stale URL popping an old ShareSheet next launch.
     let within_boot_window = BOOT_TIME
         .get()
         .map_or(true, |t| t.elapsed() < std::time::Duration::from_secs(10));

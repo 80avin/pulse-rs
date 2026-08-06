@@ -139,8 +139,8 @@
   let showOnboarding = $state(false);
   const ONBOARDING_DONE_KEY = 'pulse:onboarding-done';
 
-  // First-run onboarding: auto-show once cold-start finishes with no sources,
-  // and only if it hasn't been dismissed before.
+  // First-run onboarding: only when cold-start finishes with no sources
+  // and the user hasn't dismissed it before.
   $effect(() => {
     if (!storeReady.loading && sources.length === 0 && !localStorage.getItem(ONBOARDING_DONE_KEY)) {
       showOnboarding = true;
@@ -191,7 +191,6 @@
   }
   async function doSync() { await storeSync(); }
 
-  // Right-click source context menu
   let sourceMenu = $state<{ source: import('$lib/types').Source; x: number; y: number } | null>(null);
   function openSourceMenu(e: MouseEvent, s: import('$lib/types').Source) {
     e.preventDefault();
@@ -218,8 +217,6 @@
       default: break;
     }
   }
-
-  // Wide keyboard shortcuts
   $effect(() => {
     function onKey(e: KeyboardEvent) {
       if (!isWide) return;
@@ -293,7 +290,6 @@
         <GhostButton onclick={() => showCheatsheet = !showCheatsheet} ariaLabel="Keyboard shortcuts (?)" class="text-ink-3 px-1 text-[10px] leading-none" title="Keyboard shortcuts (?)">?</GhostButton>
       </div>
 
-      <!-- Main body -->
       <div class="flex-1 flex overflow-hidden relative" role="presentation" onmousemove={onMouseMove} onmouseup={stopDrag} onmouseleave={stopDrag}>
         {#if leftRailCollapsed}
           <div class="w-8 shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col items-center pt-1 overflow-hidden gap-1.5">
@@ -369,31 +365,26 @@
 
         <DragHandle edge="left" {onDragStart} {dragging} />
 
-        <!-- Timeline pane -->
         <div class="shrink-0 flex flex-col border-r border-bd-0 overflow-hidden bg-bg-0" style="width:{timelineWidth}px">
           <TimelinePane mode="wide" items={displayItems} {searchQuery} {openId} onOpen={(id, ids, list) => openItemAndRead(id, ids, list)} />
         </div>
 
         <DragHandle edge="timeline" {onDragStart} {dragging} />
 
-        <!-- Reader pane -->
         {#if openItemObj}
           <div class="flex-1 min-w-0 flex flex-col bg-bg-0 overflow-hidden">
             <ReaderPane mode="wide" itemId={openItemObj.id} list={readerList} onBack={closeReader} onNavigate={(id) => openItemAndRead(id, readerList.map(i => i.id), readerList)} />
           </div>
         {/if}
 
-        <!-- Settings modal -->
         <Modal open={showSettings} title="Settings" onClose={() => { showSettings = false; }} width="560px">
           <SettingsPanelContent showShortcuts />
         </Modal>
 
-        <!-- Sources modal -->
         <Modal open={showSources} title="Sources" onClose={() => { showSources = false; }} width="640px">
           <SourceExplorer onSourceSelect={(id) => { setFeedFilter(id); showSources = false; }} compact={true} />
         </Modal>
 
-        <!-- Keyboard shortcut cheatsheet -->
         <Modal open={showCheatsheet} title="Keyboard Shortcuts" onClose={() => showCheatsheet = false} width="520px">
           <div class="grid grid-cols-2 gap-x-6">
             {#each [
@@ -417,7 +408,6 @@
         </Modal>
       </div>
 
-      <!-- Status bar -->
       <StatusBar
         density={settings.density}
         {activeGroupLabel} {activeSource}

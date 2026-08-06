@@ -188,7 +188,6 @@ pub struct TagResult {
 /// A flattened view of a feed item for display (joined with feed + state + tags)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedItemView {
-    // Item fields
     pub id: ItemId,
     pub title: String,
     pub url: Option<String>,
@@ -203,29 +202,24 @@ pub struct FeedItemView {
     pub body_html: Option<String>,
     pub external_url: Option<String>,
 
-    // Feed fields
     pub feed_id: FeedId,
     pub feed_title: Option<String>,
     pub feed_type: FeedType,
     pub feed_url: String,
 
-    // Group fields
     pub group_id: Option<GroupId>,
     pub group_name: Option<String>,
 
-    // State fields
     pub is_read: bool,
     pub is_saved: bool,
     pub is_hidden: bool,
     pub saved_at: Option<i64>,
     pub note: Option<String>,
 
-    // Enrichment fields
     pub og_image: Option<String>,
 
-    // AI tags (tag names)
+    // Tag names (ai_tags from the rule engine; user_tags from the user_tags table)
     pub ai_tags: Vec<String>,
-    // User-defined tags (from the user_tags table)
     pub user_tags: Vec<String>,
 }
 

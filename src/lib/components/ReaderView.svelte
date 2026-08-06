@@ -153,7 +153,6 @@
       {#if noteMode === 'inline'}<span class="text-green">● readable view</span>{/if}
     </div>
 
-    <!-- Tag explanation popover -->
     {#if popoverTag}
       {@const c = TAG_COLORS[popoverTag] ?? TAG_COLORS['low-effort']}
       {@const evidence = TAG_EVIDENCE[popoverTag] ?? ['title-token match', 'body-token match']}

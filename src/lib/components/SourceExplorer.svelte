@@ -178,7 +178,6 @@
       {/key}
     </div>
   {:else}
-  <!-- Status summary -->
   {#if !compact}
     <div class="flex gap-3 py-2 px-3 border-b border-bd-0 bg-bg-1 text-ink-2 shrink-0 text-[10px] leading-none font-mono">
       <span><span class="text-green">● </span>ok {okCount}</span>
@@ -190,10 +189,8 @@
   {/if}
 
   <div class="flex-1 overflow-y-auto">
-    <!-- Add source card -->
     <SourceForm mode="add" initial={addInitial} groups={groups} />
 
-    <!-- Import feeds -->
     <div class="mx-2.5 mb-3 flex flex-col gap-2">
       <div class="flex justify-end">
         <button
@@ -237,7 +234,6 @@
       {/if}
     </div>
 
-    <!-- Hint -->
     {#if !compact}
       <div class="pt-1 px-3 pb-2 text-ink-3 text-center text-[10px] leading-[1.4] font-mono">
         tap to view · hold for actions

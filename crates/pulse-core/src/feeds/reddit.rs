@@ -10,7 +10,6 @@ const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/80avin/pulse-rs; feed-r
 const REDDIT_BASE: &str = "https://www.reddit.com";
 const REDDIT_OAUTH_BASE: &str = "https://oauth.reddit.com";
 
-/// Result of a Reddit fetch
 pub struct RedditFetchResult {
     pub items: Vec<FeedItem>,
     pub etag: Option<String>,
@@ -51,9 +50,7 @@ struct RedditPost {
     thumbnail: Option<String>,
     // post_hint: "self" | "link" | "image" | "rich:video" | "hosted:video"
     post_hint: Option<String>,
-    // preview images
     preview: Option<RedditPreview>,
-    // crosspost chain
     crosspost_parent_list: Option<Vec<CrosspostParent>>,
 }
 
@@ -199,15 +196,13 @@ fn normalize_reddit_post(
         .as_deref()
         .unwrap_or(if is_self { "self" } else { "link" });
 
-    // Always use the Reddit permalink as the primary URL so the Open button
-    // navigates to the Reddit post page. For link posts, the external target
-    // is stored in source_meta["external_url"] and shown as a secondary link.
+    // Permalink is the primary URL so "Open" goes to the Reddit post; link-post
+    // targets go in source_meta["external_url"] as a secondary link.
     let external_url = if !is_self { post.url.clone() } else { None };
     let url = Some(comment_url.clone());
     let published_at = post.created_utc as i64;
 
-    // ── Body text assembly ────────────────────────────────────────────────────
-    // Priority: self-text → crosspost self-text → (enrichment fills in link posts later)
+    // Body priority: self-text → crosspost self-text (enrichment fills link posts later)
     let own_body_html = post
         .selftext_html
         .as_deref()
@@ -221,7 +216,7 @@ fn normalize_reddit_post(
         .map(collapse_whitespace)
         .or_else(|| own_body_html.as_deref().map(strip_html));
 
-    // Resolve crosspost chain (take first parent)
+    // Take the first crosspost parent
     let crosspost = post
         .crosspost_parent_list
         .as_deref()
@@ -240,7 +235,6 @@ fn normalize_reddit_post(
             .map(collapse_whitespace)
             .or_else(|| cp_body_html.as_deref().map(strip_html));
 
-        // Merge own + parent body
         let merged_text = match (own_body_text.as_deref(), cp_body_text.as_deref()) {
             (Some(own), Some(cp_t)) => Some(format!(
                 "{}\n\n[crosspost from r/{}]: {}",
@@ -274,7 +268,6 @@ fn normalize_reddit_post(
 
     let word_count = body_text.as_deref().map(|t| count_words(t) as i64);
 
-    // ── Best thumbnail / preview image ────────────────────────────────────────
     let preview_image_url = post
         .preview
         .as_ref()
@@ -282,7 +275,7 @@ fn normalize_reddit_post(
         .and_then(|imgs| imgs.first())
         .and_then(|img| img.source.as_ref())
         .and_then(|src| src.url.as_deref())
-        // Reddit encodes preview URLs with HTML entities; decode &amp; → &
+        // Reddit HTML-encodes preview URLs; decode &amp; → &
         .map(|u| u.replace("&amp;", "&"));
 
     let thumbnail_url = post
@@ -299,10 +292,8 @@ fn normalize_reddit_post(
         })
         .map(|s| s.to_string());
 
-    // Use full preview image over thumbnail if available
     let best_image = preview_image_url.or(thumbnail_url);
 
-    // ── source_meta ───────────────────────────────────────────────────────────
     let mut meta = serde_json::json!({
         "subreddit": post.subreddit,
         "flair": post.link_flair_text,
@@ -352,7 +343,7 @@ fn subreddit_from_url(url: &str) -> Option<&str> {
 fn sort_from_url(url: &str) -> Option<&str> {
     let after_r = url.split("/r/").nth(1)?;
     let mut parts = after_r.splitn(3, '/');
-    let _ = parts.next()?; // subreddit
+    let _ = parts.next()?;
     let sort_part = parts.next()?;
     let sort = sort_part.split('.').next()?;
     if sort.is_empty() { None } else { Some(sort) }

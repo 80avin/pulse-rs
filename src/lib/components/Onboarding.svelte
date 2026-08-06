@@ -69,7 +69,6 @@
 
 <div role="dialog" aria-modal="true" aria-label="Discover feeds" class="fixed inset-0 z-50 text-ink-0 {isDesktop() ? 'bg-black/50 flex items-center justify-center p-4' : 'bg-bg-0 flex flex-col'}">
   <div class={isDesktop() ? 'bg-bg-0 border border-bd-1 rounded-lg shadow-[0_16px_48px_rgba(0,0,0,0.7)] w-[760px] max-w-[94vw] h-[85vh] flex flex-col overflow-hidden' : 'flex-1 flex flex-col min-h-0'}>
-  <!-- Header -->
   <div class="shrink-0 px-4 pt-4 pb-2.5 border-b border-bd-0">
     <div class="text-[13px] leading-none font-mono font-semibold tracking-[0.3px] text-ink-0">welcome to <span class="text-cyan">pulse</span></div>
     <div class="mt-2 text-[10px] leading-[1.5] font-mono text-ink-3">a curated, dev-focused feed reader. pick the feeds you care about — we'll group them into categories for you.</div>
@@ -84,7 +83,6 @@
       <GhostButton onclick={onDone} class="text-ink-3 text-[10px] leading-none">skip for now</GhostButton>
     </div>
   {:else}
-    <!-- Categories -->
     <div class="flex-1 overflow-y-auto">
       {#each cats as cat}
         <section class="border-b border-bd-0">
@@ -121,7 +119,6 @@
       {/each}
     </div>
 
-    <!-- Footer -->
     <div class="shrink-0 border-t border-bd-0 px-4 flex items-center gap-2" style="padding-top:12px;padding-bottom:max(12px,env(safe-area-inset-bottom));">
       {#if addError}
         <span class="text-red text-[10px] leading-none font-mono">couldn't add feeds — try again.</span>

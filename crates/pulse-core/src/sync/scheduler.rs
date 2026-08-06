@@ -193,9 +193,8 @@ async fn feed_sync_task(
         let feed = match load_feed(&db, &feed_id).await {
             Some(f) => f,
             None => {
-                // Transient read errors (e.g. a busy DB) must not permanently
-                // kill the task. Back off briefly and try again. A genuinely
-                // removed feed is aborted via the RemoveFeed command instead.
+                // A busy DB must not kill the task; back off and retry. A genuinely
+                // removed feed is stopped via RemoveFeed instead.
                 tokio::select! {
                     _ = tokio::time::sleep(tokio::time::Duration::from_secs(30)) => {}
                     cmd = cmd_rx.recv() => {
@@ -270,7 +269,7 @@ async fn load_feed(db: &DbHandle, feed_id: &FeedId) -> Option<crate::types::Feed
     }
 }
 
-/// Perform a single sync cycle for the given feed and return the number of new items.
+/// Run one sync cycle for a feed; returns the number of new items.
 pub(crate) async fn perform_sync(
     feed_id: &FeedId,
     db: &DbHandle,
@@ -323,7 +322,6 @@ pub(crate) async fn perform_sync(
 
             tracing::info!(feed_id = %feed_id, new_items, was_cached, elapsed_ms, "Sync complete");
 
-            // Update next_fetch_at
             let fid2 = feed_id.clone();
             if let Ok(updated_feed) = db
                 .with_reader(|pool| async move { get_feed(&pool, &fid2).await })
@@ -356,9 +354,8 @@ pub(crate) async fn perform_sync(
             {
                 tracing::warn!(feed_id = %feed_id, error = %e2, "Failed to update health after sync failure");
             }
-            // Schedule the retry with exponential backoff based on the NEW
-            // failure streak. Without this, a failing feed hot-loops (delay 0)
-            // until it exhausts its failure budget and disables itself.
+            // Backoff based on the NEW failure streak; without this a failing
+            // feed hot-loops (delay 0) until it disables itself.
             let fid3 = feed_id.clone();
             if let Ok(updated_feed) = db
                 .with_reader(|pool| async move { get_feed(&pool, &fid3).await })

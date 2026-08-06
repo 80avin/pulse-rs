@@ -42,18 +42,16 @@ pub struct PulseCore {
 }
 
 impl PulseCore {
-    /// Initialize PulseCore with the given configuration.
     pub async fn init(config: PulseConfig) -> Result<Self, PulseError> {
         let t0 = std::time::Instant::now();
         let config = Arc::new(config);
 
-        // Ensure data directory exists
         if let Some(parent) = config.db_path.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| PulseError::Config(format!("Failed to create data dir: {e}")))?;
         }
 
-        // Open writer pool (single connection) and run migrations
+        // Writer pool is a single connection; run migrations on it
         let writer_pool = open_writer_pool(&config.db_path, &config)
             .await
             .map_err(PulseError::Storage)?;
@@ -65,7 +63,7 @@ impl PulseCore {
             "coldstart: db open + migrations"
         );
 
-        // Open reader pool (concurrent reads via WAL)
+        // Reader pool for concurrent reads (WAL)
         let reader_pool = open_reader_pool(&config.db_path, &config)
             .await
             .map_err(PulseError::Storage)?;
@@ -74,7 +72,6 @@ impl PulseCore {
             "coldstart: reader pool open"
         );
 
-        // Spawn the DB writer actor
         let (writer_tx, writer_rx) = mpsc::channel::<crate::storage::actor::DbCommand>(128);
         let writer_pool_for_actor = writer_pool.clone();
         tokio::spawn(async move {
@@ -84,7 +81,6 @@ impl PulseCore {
         let db = DbHandle::new(writer_tx, reader_pool);
         tracing::info!(elapsed_ms = t0.elapsed().as_millis(), "coldstart: DB ready");
 
-        // Build the rules-only tagger and spawn the async tagging queue.
         let (tagger_tx, tagger_rx) = mpsc::channel(TAGGER_QUEUE_SIZE);
         let tagger_handle = TaggerHandle::new(tagger_tx);
 
@@ -96,7 +92,7 @@ impl PulseCore {
             tagger_task(tagger_rx, db_for_tagger, tagger_for_task).await;
         });
 
-        // Build Reddit auth from config if credentials are provided
+        // Reddit OAuth2 (only when credentials are configured)
         let reddit_auth = match (
             config.reddit_client_id.as_deref(),
             config.reddit_client_secret.as_deref(),
@@ -114,7 +110,6 @@ impl PulseCore {
             _ => None,
         };
 
-        // Initialize the sync scheduler
         let scheduler = Arc::new(SyncScheduler::new(
             db.clone(),
             tagger_handle.clone(),
@@ -139,17 +134,17 @@ impl PulseCore {
         })
     }
 
-    /// Start syncing all enabled feeds in the background
-    pub async fn start_sync(&self) {
-        self.scheduler.start_all().await;
-    }
-
     /// Run a sync for a single feed, awaiting completion. Returns new item count.
     pub async fn sync_feed(&self, feed_id: &FeedId) -> Result<usize, PulseError> {
         self.scheduler
             .sync_feed_blocking(feed_id)
             .await
             .map_err(PulseError::Sync)
+    }
+
+    /// Start syncing all enabled feeds in the background
+    pub async fn start_sync(&self) {
+        self.scheduler.start_all().await;
     }
 
     /// Shut down all background tasks
@@ -159,8 +154,7 @@ impl PulseCore {
 
     // ─── Enrichment ───────────────────────────────────────────────────────────
 
-    /// Enrich pending items (fetch OG metadata for link posts).
-    /// Returns stats about what happened.
+    /// Enrich pending items (fetch OG metadata for link posts). Returns stats.
     pub async fn enrich_pending(
         &self,
         feed_id: Option<&str>,
@@ -184,7 +178,6 @@ impl PulseCore {
 
         let mut stats = EnrichStats::default();
 
-        // Process with bounded concurrency using futures::stream
         use futures::stream::{self, StreamExt};
 
         let results: Vec<EnrichItemResult> = stream::iter(candidates)
@@ -266,8 +259,8 @@ impl PulseCore {
                 EnrichStatus::Error(_) => stats.errors += 1,
             }
 
-            // Write enriched_at only when we got a definitive answer (ok/image/skipped).
-            // Errors are NOT marked done — they can be retried on next run.
+            // Errors stay unmarked so they retry next run; only definitive
+            // results (ok/image/skipped) write enriched_at.
             if matches!(result.status, EnrichStatus::Error(_)) {
                 continue;
             }
@@ -436,7 +429,6 @@ impl PulseCore {
             .map_err(PulseError::Storage)
     }
 
-    /// Mark all items in a feed as read.
     pub async fn mark_feed_read(&self, feed_id: &FeedId) -> Result<(), PulseError> {
         self.db
             .mark_feed_read(feed_id.clone())
@@ -490,8 +482,8 @@ impl PulseCore {
             .map_err(PulseError::Storage)
     }
 
-    /// Clear the ETag, Last-Modified, and source_config cache keys for a feed,
-    /// forcing the next sync to perform a full re-fetch regardless of prior state.
+    /// Clear the ETag, Last-Modified, and source_config cache keys so the next
+    /// sync performs a full re-fetch regardless of prior state.
     pub async fn clear_feed_cache(&self, feed_id: &FeedId) -> Result<(), PulseError> {
         self.db
             .clear_feed_cache(feed_id.clone())
@@ -604,10 +596,9 @@ impl PulseCore {
 
     /// Tag items directly without the async queue. Returns `(items_processed, tags_created)`.
     ///
-    /// When `force = true`, deletes existing tags before retagging so vocabulary changes
-    /// are fully applied. When `force = false`, only processes items with no tags.
-    ///
-    /// `on_progress(tagged, total)` is called after each item is processed.
+    /// `force = true` deletes existing tags first so vocabulary changes are fully applied;
+    /// `force = false` only processes items with no tags.
+    /// `on_progress(tagged, total)` fires after each item.
     pub async fn run_tagger_direct(
         &self,
         feed_id: Option<&str>,
@@ -647,7 +638,7 @@ impl PulseCore {
 
         for (item, feed_type) in work {
             if force {
-                // Clear stale tags so removed/renamed tags don't persist.
+                // Drop stale tags so removed/renamed tags don't persist
                 let _ = self.db.delete_item_tags(item.id.clone()).await;
             }
             let req = TagRequest {

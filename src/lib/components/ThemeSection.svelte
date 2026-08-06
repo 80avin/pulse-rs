@@ -16,7 +16,6 @@
 </script>
 
 <div>
-  <!-- Theme mode -->
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
       <span class="text-[11px] leading-none font-mono text-ink-1">Theme</span>
@@ -52,7 +51,6 @@
     </div>
   </div>
 
-  <!-- Accent color -->
   <div class="flex flex-col gap-2 mt-4">
     <div class="flex items-center justify-between">
       <span class="text-[11px] leading-none font-mono text-ink-1">Accent Color</span>
@@ -71,7 +69,6 @@
     </div>
   </div>
 
-  <!-- Density -->
   <div class="flex flex-col gap-2 mt-4">
     <div class="flex items-center justify-between">
       <span class="text-[11px] leading-none font-mono text-ink-1">Density</span>

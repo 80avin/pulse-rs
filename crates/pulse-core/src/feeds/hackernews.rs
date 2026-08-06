@@ -28,21 +28,17 @@ struct HnItem {
     dead: Option<bool>,
 }
 
-/// Result of an HN fetch
 pub struct HnFetchResult {
     pub items: Vec<FeedItem>,
     pub last_seen_id: Option<u64>,
     pub was_cached: bool,
 }
 
-/// Fetch HN items (top stories, new stories, etc.)
-///
-/// - First sync: fetches top `initial_limit` items (default 30)
-/// - Subsequent syncs: only fetches items with ID > `last_seen_id`
+/// First sync fetches the top `initial_limit` items; later syncs fetch only
+/// items with ID > `last_seen_id`.
 pub async fn fetch_hn(client: &Client, feed: &Feed) -> Result<HnFetchResult, FeedError> {
     let fetched_at = chrono::Utc::now().timestamp();
 
-    // Parse source_config
     let section = feed
         .source_config
         .get("section")
@@ -60,7 +56,6 @@ pub async fn fetch_hn(client: &Client, feed: &Feed) -> Result<HnFetchResult, Fee
         .get("last_seen_id")
         .and_then(|v| v.as_u64());
 
-    // Fetch the IDs list
     let list_url = format!("{}/{}.json", HN_API_BASE, section);
     let all_ids: Vec<u64> = client
         .get(&list_url)
@@ -88,18 +83,17 @@ pub async fn fetch_hn(client: &Client, feed: &Feed) -> Result<HnFetchResult, Fee
 
     let max_id = all_ids.iter().copied().max();
 
-    // Determine which IDs to fetch
     let ids_to_fetch: Vec<u64> = if let Some(last_id) = last_seen_id {
-        // Incremental: only fetch items we haven't seen yet
+        // Incremental: only items we haven't seen yet
         all_ids.into_iter().filter(|&id| id > last_id).collect()
     } else {
-        // First sync: fetch only top N
+        // First sync: only top N
         all_ids.into_iter().take(initial_limit).collect()
     };
 
     if ids_to_fetch.is_empty() {
-        // Advance the cursor monotonically; a dip in the top-list max must not
-        // regress it (which would re-fetch already-seen stories).
+        // Monotonic cursor: a dip in the top-list max must not regress it
+        // (which would re-fetch already-seen stories).
         let new_last_seen = max_id
             .map(|m| last_seen_id.map_or(m, |l| m.max(l)))
             .or(last_seen_id);
@@ -110,13 +104,10 @@ pub async fn fetch_hn(client: &Client, feed: &Feed) -> Result<HnFetchResult, Fee
         });
     }
 
-    // Compute namespace UUID for this feed
     let ns_uuid = Uuid::new_v5(&Uuid::NAMESPACE_URL, feed.url.as_bytes());
 
-    // Fetch items concurrently (up to CONCURRENT_ITEM_FETCHES at a time).
-    // Track each fetch's outcome so the cursor only advances past stories that
-    // were actually retrieved — a transient failure must not permanently skip
-    // a story.
+    // Concurrent fetches, tracking each outcome so the cursor only advances past
+    // stories actually retrieved — a transient failure must not skip a story.
     let results: Vec<(u64, Result<Option<FeedItem>, FeedError>)> =
         stream::iter(ids_to_fetch)
             .map(|id| {
@@ -129,8 +120,8 @@ pub async fn fetch_hn(client: &Client, feed: &Feed) -> Result<HnFetchResult, Fee
             .await;
 
     let mut items = Vec::new();
-    // Ids whose fetch succeeded (Ok(Some) or Ok(None) — deleted/dead stories are
-    // permanently gone, so they count as processed). Err ids are NOT advanced past.
+    // Ok(Some) and Ok(None) both advance the cursor (deleted/dead stories are
+    // permanently gone); Err ids are NOT advanced past.
     let mut processed: Vec<u64> = Vec::new();
     for (id, result) in results {
         match result {
@@ -143,9 +134,8 @@ pub async fn fetch_hn(client: &Client, feed: &Feed) -> Result<HnFetchResult, Fee
         }
     }
 
-    // Cursor = the highest id in the contiguous run of successfully processed
-    // ids just above the previous cursor. If a middle story fails, the cursor
-    // stays below it so it is retried next sync instead of being skipped forever.
+    // Cursor = the highest id in the contiguous run just above the previous one;
+    // if a middle story fails, the cursor stays below it so it retries next sync.
     processed.sort_unstable();
     let base = last_seen_id.unwrap_or(0);
     let mut cursor = base;
@@ -196,7 +186,6 @@ async fn fetch_hn_item(
         return Ok(None);
     }
 
-    // Skip items without a title (not a story)
     let title = match hn_item.title {
         Some(t) if !t.is_empty() => t,
         _ => return Ok(None),

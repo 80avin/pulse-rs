@@ -41,7 +41,6 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
 
     tracing::debug!(url = %url, "detecting feed type");
 
-    // Reddit pattern
     if host.contains("reddit.com") {
         let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
         let (name, feed_url) = if parts.len() >= 2 && parts[0] == "r" && !parts[1].is_empty() {
@@ -64,7 +63,6 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
         });
     }
 
-    // HN pattern
     if host.contains("ycombinator.com") || host.contains("hacker-news") {
         return Ok(FeedCandidate {
             feed_url: "https://news.ycombinator.com/rss".into(),
@@ -84,7 +82,6 @@ pub async fn detect_feed_url(client: &Client, raw_url: &str) -> Result<FeedCandi
 
     tracing::debug!(url = %url, "fetching URL for feed discovery");
 
-    // Fetch the URL
     let response = client
         .get(&url)
         .header("User-Agent", "Pulse/1.0 feed-detector")
@@ -225,8 +222,7 @@ fn detect_well_known(host: &str, path: &str, query: &str) -> Option<FeedCandidat
                 ));
             }
         }
-        // /@handle — the generic scraper picks up the <link rel="alternate"> from
-        // the page HTML; no special handling needed here.
+        // /@handle — left to the generic scraper's <link rel="alternate"> discovery
     }
 
     // ── GitHub ─────────────────────────────────────────────────────────────────
@@ -345,10 +341,8 @@ fn detect_well_known(host: &str, path: &str, query: &str) -> Option<FeedCandidat
     }
 
     // ── lore.kernel.org (public-inbox mailing-list archives) ───────────────────
-    // Any /<list>/ path (inbox index, message, search) maps to the list's
-    // newest-messages Atom feed. The HTML pages sit behind a bot-protection
-    // challenge, so the generic scraper can't discover feeds from them — this
-    // deterministic mapping is required for a shared lore URL to resolve.
+    // Any /<list>/ path maps to the list's newest-messages Atom feed. The HTML
+    // sits behind bot-protection, so a deterministic mapping is required here.
     if host == "lore.kernel.org"
         && let Some(list) = path
             .trim_start_matches('/')

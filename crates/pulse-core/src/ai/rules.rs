@@ -68,7 +68,6 @@ impl RulePattern {
     }
 }
 
-/// A tag rule
 #[derive(Debug, Clone)]
 pub struct TagRule {
     pub id: String,
@@ -83,13 +82,11 @@ pub struct TagRule {
 }
 
 impl TagRule {
-    /// Evaluate this rule against a feed item. Returns a TagResult if it matches.
     pub fn evaluate(&self, item: &FeedItem, feed_type: &FeedType) -> Option<TagResult> {
         if !self.enabled {
             return None;
         }
 
-        // Build text to match against based on scope
         let title = item.title.as_str();
         let body = item.body_text.as_deref().unwrap_or("");
 
@@ -106,7 +103,6 @@ impl TagRule {
         };
 
         let matched_pattern = if self.require_all {
-            // AND: all patterns must match
             let all_match = self
                 .patterns
                 .iter()
@@ -121,7 +117,6 @@ impl TagRule {
                 return None;
             }
         } else {
-            // OR: find first matching pattern
             let first_match = self.patterns.iter().find_map(|p| {
                 if p.matches(item, &text_for_matching, feed_type) {
                     Some(
@@ -152,7 +147,6 @@ impl TagRule {
     }
 }
 
-/// The rule evaluation engine
 pub struct RuleEngine {
     rules: Vec<TagRule>,
 }
@@ -162,8 +156,7 @@ impl RuleEngine {
         Self { rules }
     }
 
-    /// Evaluate all rules against an item. Returns all matching tag results.
-    /// All rules are evaluated (no short-circuit) to allow multiple tags per item.
+    /// No short-circuit: evaluates all rules so an item can earn multiple tags.
     pub fn evaluate(&self, item: &FeedItem, feed_type: &FeedType) -> Vec<TagResult> {
         self.rules
             .iter()
@@ -172,7 +165,6 @@ impl RuleEngine {
     }
 }
 
-/// Build the default set of rules
 pub fn default_rules() -> Vec<TagRule> {
     vec![
         // ── Core content-type tags ─────────────────────────────────────────────
@@ -183,7 +175,6 @@ pub fn default_rules() -> Vec<TagRule> {
             confidence: 0.80,
             explanation_template: "matched keyword '{matched_text}' in content".to_string(),
             patterns: vec![
-                // languages
                 RulePattern::Regex(Regex::new(r"(?i)\brust\b").unwrap()),
                 RulePattern::Keyword("python".to_string()),
                 RulePattern::Keyword("typescript".to_string()),
@@ -198,7 +189,6 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("swift ".to_string()),
                 RulePattern::Keyword("kotlin".to_string()),
                 RulePattern::Keyword("ocaml".to_string()),
-                // infrastructure / tooling
                 RulePattern::Keyword("docker".to_string()),
                 RulePattern::Keyword("kubernetes".to_string()),
                 RulePattern::Keyword("linux".to_string()),
@@ -211,7 +201,6 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("runtime".to_string()),
                 RulePattern::Keyword("cpu ".to_string()),
                 RulePattern::Keyword("gpu ".to_string()),
-                // software engineering concepts
                 RulePattern::Keyword(" api ".to_string()),
                 RulePattern::Keyword("framework".to_string()),
                 RulePattern::Keyword("algorithm".to_string()),
@@ -224,7 +213,6 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("refactor".to_string()),
                 RulePattern::Keyword("memory safety".to_string()),
                 RulePattern::Keyword("type system".to_string()),
-                // Rust-specific / systems programming
                 RulePattern::Regex(Regex::new(r"(?i)\bstruct\b").unwrap()),
                 RulePattern::Keyword(" trait".to_string()),
                 RulePattern::Keyword(" macro".to_string()),
@@ -240,14 +228,12 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("axum".to_string()),
                 RulePattern::Keyword("actix".to_string()),
                 RulePattern::Keyword("rayon".to_string()),
-                // graphics / game dev
                 RulePattern::Keyword("shader".to_string()),
                 RulePattern::Keyword("rendering".to_string()),
                 RulePattern::Keyword("opengl".to_string()),
                 RulePattern::Keyword("vulkan".to_string()),
                 RulePattern::Keyword("webgl".to_string()),
                 RulePattern::Keyword("blending".to_string()),
-                // registries / hosting
                 RulePattern::Keyword("github.com".to_string()),
                 RulePattern::Keyword("crates.io".to_string()),
                 RulePattern::Keyword("npm".to_string()),
@@ -298,8 +284,7 @@ pub fn default_rules() -> Vec<TagRule> {
             confidence: 0.80,
             explanation_template: "matched research keyword '{matched_text}'".to_string(),
             patterns: vec![
-                // Title-only: prevents body-text "benchmark"/"experiment" false positives
-                // (software perf testing and casual experimentation both use these words)
+                // Title-only avoids body-text "benchmark"/"experiment" false positives
                 RulePattern::Keyword("arxiv.org".to_string()),
                 RulePattern::Regex(Regex::new(r"(?i)\barxiv\b").unwrap()),
                 RulePattern::Regex(Regex::new(r"(?i)\bstudy\b").unwrap()),
@@ -381,13 +366,11 @@ pub fn default_rules() -> Vec<TagRule> {
                 // batti/bijli + complaint word — avoids "bijli mahadev trek" false positive
                 RulePattern::Regex(Regex::new(r"(?i)(batti|bijli).{0,20}(nhi|nahi|kab|kyu)").unwrap()),
                 RulePattern::Regex(Regex::new(r"(?i)no\s+electricity").unwrap()),
-                // Municipal / civic bodies
                 RulePattern::Keyword("municipal".to_string()),
                 RulePattern::Keyword("jmc ".to_string()),
                 RulePattern::Keyword("civic sense".to_string()),
                 RulePattern::Keyword("civic body".to_string()),
                 RulePattern::Keyword("smart city".to_string()),
-                // Water, roads, sanitation
                 RulePattern::Keyword("water supply".to_string()),
                 RulePattern::Keyword("no water".to_string()),
                 RulePattern::Keyword("pani nahi".to_string()),
@@ -395,7 +378,6 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("drainage".to_string()),
                 RulePattern::Keyword("pothole".to_string()),
                 RulePattern::Keyword("road condition".to_string()),
-                // Telecom
                 RulePattern::Keyword("bsnl".to_string()),
                 RulePattern::Keyword("jio fiber".to_string()),
             ],
@@ -438,13 +420,12 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("best cafe".to_string()),
                 RulePattern::Keyword("halal spot".to_string()),
                 RulePattern::Keyword("veg spot".to_string()),
-                // Fitness
                 RulePattern::Keyword("good gym".to_string()),
                 RulePattern::Keyword("best gym".to_string()),
                 RulePattern::Keyword("suggest good gym".to_string()),
                 RulePattern::Keyword("suggest good gyms".to_string()),
                 RulePattern::Keyword("gym fees".to_string()),
-                // Education (specific local codes and institutions, not generic "college")
+                // Specific local codes/institutions, not generic "college"
                 RulePattern::Keyword("gcet ".to_string()),
                 RulePattern::Keyword("smvdu".to_string()),
                 RulePattern::Keyword("mbs college".to_string()),
@@ -456,11 +437,10 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("good coaching".to_string()),
                 RulePattern::Keyword("jkssb classes".to_string()),
                 RulePattern::Keyword("jkssb coaching".to_string()),
-                // Professionals and accommodation
                 RulePattern::Keyword("good lawyer".to_string()),
                 RulePattern::Keyword("good hotel".to_string()),
                 RulePattern::Keyword("review hotel".to_string()),
-                // Generic city-agnostic patterns: "[service] in [City]" and "best/good X in [City]"
+                // City-agnostic: "[service] in [City]" / "best X in [City]"
                 RulePattern::Regex(Regex::new(r"(?i)\b(best|good|any\s+good|recommend|suggest)\b.{0,40}\b(in|near)\s+[A-Za-z]{3,}\b").unwrap()),
                 RulePattern::Regex(Regex::new(r"(?i)\b(therapist|lawyer|advocate|hostel|coaching|dentist|dermatologist)\b.{0,30}\bin\s+[A-Za-z]{3,}\b").unwrap()),
                 RulePattern::Regex(Regex::new(r"(?i)\bhow\s+is\b.{0,30}\b(jkssb|gcet|smvdu|pmsss)\b").unwrap()),
@@ -477,11 +457,9 @@ pub fn default_rules() -> Vec<TagRule> {
             confidence: 0.85,
             explanation_template: "matched cultural/heritage keyword '{matched_text}'".to_string(),
             patterns: vec![
-                // Language and ethnic identity
                 RulePattern::Regex(Regex::new(r"(?i)\bdogr[ia]\b").unwrap()),
                 RulePattern::Keyword("pahari culture".to_string()),
                 RulePattern::Keyword("gojri".to_string()),
-                // Heritage and traditions
                 RulePattern::Keyword("folk tradition".to_string()),
                 RulePattern::Keyword("folk culture".to_string()),
                 RulePattern::Keyword("local heritage".to_string()),
@@ -489,9 +467,8 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("dogra dynasty".to_string()),
                 RulePattern::Keyword("dogra kingdom".to_string()),
                 RulePattern::Keyword("dogra sadar".to_string()),
-                // Historical figures (Maharaja is distinctive enough in J&K context)
+                // Maharaja is distinctive enough in J&K context
                 RulePattern::Regex(Regex::new(r"(?i)\bmaharaj(a)?\b").unwrap()),
-                // Local cultural landmarks and food traditions
                 RulePattern::Keyword("bahu fort".to_string()),
                 RulePattern::Keyword("anchali".to_string()),
                 RulePattern::Keyword("rasonth".to_string()),
@@ -515,7 +492,6 @@ pub fn default_rules() -> Vec<TagRule> {
             confidence: 0.90,
             explanation_template: "matched marketplace keyword '{matched_text}'".to_string(),
             patterns: vec![
-                // Selling
                 RulePattern::Regex(Regex::new(r"(?i)\bsell(ing)?\b").unwrap()),
                 RulePattern::Keyword("for sale".to_string()),
                 RulePattern::Keyword(" wts ".to_string()),
@@ -523,10 +499,8 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword(" wtt ".to_string()),
                 RulePattern::Keyword("looking to sell".to_string()),
                 RulePattern::Keyword("anyone selling".to_string()),
-                // Buying
                 RulePattern::Keyword("looking to buy".to_string()),
                 RulePattern::Keyword("anyone buying".to_string()),
-                // Rentals
                 RulePattern::Keyword("room for rent".to_string()),
                 RulePattern::Keyword("flat for rent".to_string()),
                 RulePattern::Keyword("for rent".to_string()),
@@ -534,7 +508,6 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("room available".to_string()),
                 RulePattern::Keyword("pg available".to_string()),
                 RulePattern::Keyword("accommodation available".to_string()),
-                // Domestic staff listings
                 RulePattern::Keyword("cook needed".to_string()),
                 RulePattern::Keyword("maid needed".to_string()),
                 RulePattern::Keyword("care giver".to_string()),
@@ -542,7 +515,7 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("driver needed".to_string()),
                 RulePattern::Keyword("looking for cook".to_string()),
                 RulePattern::Keyword("need a cook".to_string()),
-                // Job listings (complements the `job-posting` rule for corporate/HN context)
+                // Complements `job-posting` for corporate/HN context
                 RulePattern::Keyword("vacancy".to_string()),
                 RulePattern::Keyword("hiring for".to_string()),
             ],
@@ -636,7 +609,7 @@ pub fn default_rules() -> Vec<TagRule> {
             enabled: true,
         },
 
-        // \bai\b alone is too noisy in body text; restrict to titles where "AI" signals topic intent
+        // \bai\b alone is too noisy in body text; restrict to titles
         TagRule {
             id: "ai-ml-title".to_string(),
             tag: "ai-ml".to_string(),
@@ -769,8 +742,7 @@ pub fn default_rules() -> Vec<TagRule> {
             enabled: true,
         },
 
-        // low-effort is handled entirely by evaluate_low_effort() with compound logic;
-        // this TagRule entry is intentionally disabled to avoid false positives.
+        // Handled by evaluate_low_effort(); disabled here to avoid false positives
         TagRule {
             id: "low-effort".to_string(),
             tag: "low-effort".to_string(),
@@ -797,7 +769,7 @@ pub fn default_rules() -> Vec<TagRule> {
             ],
             scope: RuleScope::TitleOnly,
             require_all: false,
-            enabled: false, // disabled by default
+            enabled: false,
         },
 
         // ── Platform/format tags ───────────────────────────────────────────────
@@ -894,9 +866,8 @@ pub fn default_rules() -> Vec<TagRule> {
         },
 
         // ── Quality tags ───────────────────────────────────────────────────────
-        // These catch posts whose content is definitively identifiable as low-value.
-        // Suppression logic in process_tag_request ensures `no-context` is removed
-        // if a substantive topic tag (civic, local-rec, technical, etc.) also fires.
+        // process_tag_request removes `no-context` when a substantive topic tag
+        // (civic, local-rec, technical, etc.) also fires.
 
         TagRule {
             id: "no-context".to_string(),
@@ -904,7 +875,7 @@ pub fn default_rules() -> Vec<TagRule> {
             confidence: 0.82,
             explanation_template: "matched vague help-seeking pattern '{matched_text}'".to_string(),
             patterns: vec![
-                // Hindi / Hinglish vague question phrases (very distinctive)
+                // Very distinctive Hindi / Hinglish vague-question phrases
                 RulePattern::Keyword("kya karu".to_string()),
                 RulePattern::Keyword("kya karun".to_string()),
                 RulePattern::Keyword("kya karoon".to_string()),
@@ -960,7 +931,6 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("flat for couple".to_string()),
                 RulePattern::Keyword("couples room".to_string()),
                 RulePattern::Keyword("couples stay".to_string()),
-                // Dating / relationship seeking
                 RulePattern::Keyword("looking for girlfriend".to_string()),
                 RulePattern::Keyword("need a girlfriend".to_string()),
                 RulePattern::Keyword("want a girlfriend".to_string()),
@@ -977,7 +947,6 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Keyword("any girls here".to_string()),
                 RulePattern::Keyword("online dating".to_string()),
                 RulePattern::Keyword("dating app".to_string()),
-                // Explicit hookup seeking
                 RulePattern::Keyword("hookup".to_string()),
                 RulePattern::Keyword("hook up".to_string()),
                 RulePattern::Keyword("one night stand".to_string()),
@@ -1003,13 +972,10 @@ pub fn default_rules() -> Vec<TagRule> {
                 RulePattern::Regex(Regex::new(r"(?i)^rate\s+my\b").unwrap()),
                 RulePattern::Regex(Regex::new(r"(?i)^check\s+out\s+my\b").unwrap()),
                 RulePattern::Regex(Regex::new(r"(?i)^my\s+(gym|workout|progress|gains|setup|room|bike|car|cat|dog|pet)\b").unwrap()),
-                // Greetings / mood posts with no content
                 RulePattern::Regex(Regex::new(r"(?i)^good\s+(morning|evening|night)\s+\w+[\s!]*$").unwrap()),
                 RulePattern::Regex(Regex::new(r"(?i)^(weekend|sunday|monday|friday)\s+(vibes?|mood|feels?)[\s!]*$").unwrap()),
                 RulePattern::Regex(Regex::new(r"(?i)^(feeling|today\s+is)\s+(amazing|great|blessed|happy|sad|bored)[\s!]*$").unwrap()),
-                // Food sharing without a question
                 RulePattern::Regex(Regex::new(r"(?i)^(beer|pizza|biryani|chai|coffee|tea|momos?)\s+(time|night|vibes?)[\s!]*$").unwrap()),
-                // Random photo captions
                 RulePattern::Regex(Regex::new(r"(?i)^(random\s+)?(click|shot|photo|pic)\s+(of\s+the\s+day|today)[\s!]*$").unwrap()),
             ],
             scope: RuleScope::TitleOnly,
@@ -1019,7 +985,7 @@ pub fn default_rules() -> Vec<TagRule> {
     ]
 }
 
-/// Special evaluation for low-effort rule (requires score check + body length check)
+/// Low-effort needs score + body-length checks that no single TagRule can express
 pub fn evaluate_low_effort(item: &FeedItem, feed_type: &FeedType) -> Option<TagResult> {
     if feed_type != &FeedType::Reddit {
         return None;
@@ -1103,7 +1069,6 @@ mod tests {
     fn test_show_hn_title_only_no_feedtype_required() {
         let rules = default_rules();
         let engine = RuleEngine::new(rules);
-        // Works for any feed type
         let item = make_item("Show HN: My new project", None, None);
         let results = engine.evaluate(&item, &FeedType::Rss);
         assert!(results.iter().any(|r| r.tag == "show-hn"));

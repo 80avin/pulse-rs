@@ -27,8 +27,7 @@ const EVICT_COUNT = 100;
 // reverts to All" bug).
 let epoch = 0;
 
-/** Read the current request generation (for callers that refresh the current
- * filter from outside the timeline store, e.g. reloadItems after a sync). */
+/** Read the current request generation (used by external refreshers like reloadItems) */
 export function currentEpoch(): number {
   return epoch;
 }

@@ -6,7 +6,6 @@ use uuid::Uuid;
 
 const USER_AGENT: &str = "Pulse/0.1 (+https://github.com/80avin/pulse-rs; feed-reader)";
 
-/// Result of an RSS/Atom fetch
 pub struct RssFetchResult {
     pub items: Vec<FeedItem>,
     pub feed_title: Option<String>,
@@ -17,13 +16,11 @@ pub struct RssFetchResult {
     pub was_cached: bool,
 }
 
-/// Fetch and parse an RSS/Atom feed, returning normalized FeedItems.
-/// Respects conditional HTTP headers (ETag / If-Modified-Since).
+/// Fetch + parse an RSS/Atom feed, respecting ETag/If-Modified-Since.
 pub async fn fetch_rss(client: &Client, feed: &Feed) -> Result<RssFetchResult, FeedError> {
     let fetched_at = chrono::Utc::now().timestamp();
     let url = feed.url.clone();
 
-    // Build request with conditional headers
     let mut req = client.get(&url).header("User-Agent", USER_AGENT);
 
     if let Some(ref etag) = feed.etag {
@@ -62,7 +59,7 @@ pub async fn fetch_rss(client: &Client, feed: &Feed) -> Result<RssFetchResult, F
         });
     }
 
-    // Extract caching headers before consuming response
+    // Extract caching headers before consuming the response body
     let new_etag = response
         .headers()
         .get(reqwest::header::ETAG)
@@ -77,7 +74,6 @@ pub async fn fetch_rss(client: &Client, feed: &Feed) -> Result<RssFetchResult, F
 
     let bytes = crate::feeds::read_body_capped(response, 20 * 1024 * 1024).await?;
 
-    // Parse with feed-rs
     let parsed = feed_rs::parser::parse(bytes.as_slice()).map_err(|e| FeedError::Parse {
         url: url.clone(),
         source: Box::new(e),
@@ -120,20 +116,17 @@ fn normalize_rss_entry(
     ns_uuid: Uuid,
     fetched_at: i64,
 ) -> FeedItem {
-    // source_guid: prefer entry.id; else a stable hash of the link URL; else a
-    // stable hash of the item's own content, so distinct id-less, link-less
-    // entries never collapse to a single item.
+    // source_guid: prefer entry.id, else a hash of the link URL, else a hash of
+    // the item's own content — so distinct id-less, link-less entries never collapse.
     let source_guid = if !entry.id.is_empty() {
         entry.id.clone()
     } else if let Some(link) = entry.links.first() {
-        // Keep the historical scheme for linked entries so existing item IDs
-        // (and read/saved state) survive upgrades. The `sha256:` label is a
-        // legacy misnomer for SipHash, kept for backward compatibility.
+        // Keep the legacy scheme so existing item IDs (and read/saved state)
+        // survive upgrades; "sha256:" is a misnomer for SipHash.
         format!("sha256:{:x}", md5_hash(&link.href))
     } else {
-        // No id and no link: previously every such entry hashed the empty
-        // string and collapsed into a single item. Hash the item's own content
-        // so distinct entries stay distinct.
+        // No id and no link: previously every such entry hashed the empty string
+        // and collapsed into one item. Hash the content so distinct entries differ.
         let title = entry
             .title
             .as_ref()
@@ -159,14 +152,12 @@ fn normalize_rss_entry(
 
     let author = entry.authors.first().map(|a| a.name.clone());
 
-    // published_at: use published, then updated, then fetched_at
     let published_at = entry
         .published
         .or(entry.updated)
         .map(|dt| dt.timestamp())
         .unwrap_or(fetched_at);
 
-    // body_html: prefer content, fallback to summary
     let body_html = entry
         .content
         .as_ref()
@@ -174,12 +165,10 @@ fn normalize_rss_entry(
         .cloned()
         .or_else(|| entry.summary.as_ref().map(|s| s.content.clone()));
 
-    // body_text: strip HTML from body_html or summary
     let body_text = body_html.as_deref().map(strip_html);
 
     let word_count = body_text.as_deref().map(|t| count_words(t) as i64);
 
-    // Collect categories
     let categories: Vec<String> = entry.categories.iter().map(|c| c.term.clone()).collect();
     let source_meta = serde_json::json!({ "categories": categories });
 

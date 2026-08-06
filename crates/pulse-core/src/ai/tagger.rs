@@ -77,7 +77,6 @@ impl Tagger for RulesTagger {
     }
 }
 
-/// The tagging background task.
 pub async fn tagger_task(mut rx: mpsc::Receiver<TagRequest>, db: DbHandle, tagger: Arc<dyn Tagger>) {
     tracing::info!("Tagger task started");
 
@@ -95,8 +94,7 @@ pub async fn tagger_task(mut rx: mpsc::Receiver<TagRequest>, db: DbHandle, tagge
     tracing::info!("Tagger task shutting down");
 }
 
-/// Tags where a substantive semantic match means `no-context` should be suppressed.
-/// If any of these fire, the post has enough content signal to not be vague.
+/// A substantive semantic match makes `no-context` inappropriate (specific ≠ vague).
 const SUBSTANTIVE_TAGS: &[&str] = &[
     "technical",
     "tutorial",
@@ -131,8 +129,7 @@ pub(crate) async fn process_tag_request(
         .await
         .map_err(TaggingError::Storage)?;
 
-    // Direct image URLs (i.redd.it, imgur, etc.) have no meaningful text to
-    // run structural rules against — skip them.
+    // Direct image URLs (i.redd.it, imgur, …) have no text for structural rules
     let is_direct_image = item.url.as_deref().map(is_image_url).unwrap_or(false);
 
     let mut tags: Vec<TagResult> = if is_direct_image {
@@ -141,8 +138,7 @@ pub(crate) async fn process_tag_request(
         tagger.tag(&item, &req.feed_type)
     };
 
-    // Suppress `no-context` when a substantive topic tag is present.
-    // A specific question (local-rec, civic, etc.) is not vague even if short.
+    // A specific question (local-rec, civic, …) is not vague even if short
     let has_substantive = tags
         .iter()
         .any(|t| SUBSTANTIVE_TAGS.contains(&t.tag.as_str()));
@@ -150,9 +146,8 @@ pub(crate) async fn process_tag_request(
         tags.retain(|t| t.tag != "no-context");
     }
 
-    // When `noise` fires with high confidence, strip semantic topic tags that
-    // would otherwise be false positives — a personal food post or scenery share
-    // cannot simultaneously be technical/security/policy/ai-ml content.
+    // High-confidence `noise` strips semantic topic tags — a personal food post
+    // cannot also be technical/security/policy/ai-ml content.
     const NOISE_SUPPRESSED_TAGS: &[&str] = &[
         "technical",
         "security",

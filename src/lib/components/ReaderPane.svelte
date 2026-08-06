@@ -132,7 +132,6 @@
   <div class="relative flex flex-col h-full bg-bg-0 text-ink-0">
 
     {#if mode === 'wide'}
-      <!-- Metadata bar -->
       <div class="border-b border-bd-0 bg-bg-1 flex items-center gap-2 shrink-0 text-ink-2 px-3.5 py-1.5 text-[10px] leading-none font-mono">
         {#if source}
           <SourceGlyph kind={source.kind} />
@@ -146,7 +145,6 @@
         {#if item.n > 0}<span class="text-ink-3">·</span><span class="text-ink-2">{item.n}c</span>{/if}
       </div>
     {:else}
-      <!-- Narrow top bar -->
       <div class="h-11 flex items-center gap-1.5 shrink-0 bg-bg-1 border-b border-bd-0 px-2">
         <IconBtn onclick={() => onBack?.()} ariaLabel="Back" name="arrow-l" size={18} color={T.ink1} />
         <span class="text-ink-2 flex-1 text-[11px] leading-none font-mono">
@@ -175,7 +173,6 @@
     </div>
 
     {#if mode === 'narrow'}
-      <!-- Save toast -->
       {#if saveToast}
         <div class="flex items-center justify-between bg-bg-1 text-ink-1 shrink-0 p-2 px-3 border-t border-t-bd-0 text-[11px] leading-none font-mono">
           <span>Saved <span class="text-amber">{source?.name ?? item.src}</span> post</span>

@@ -16,8 +16,7 @@
   let { showShortcuts = false }: { showShortcuts?: boolean } = $props();
 
   const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-  // IS_DESKTOP: true when running in Tauri on a non-mobile platform.
-  // navigator.maxTouchPoints > 1 is a reasonable heuristic used elsewhere in the app.
+  // IS_DESKTOP: Tauri on a non-mobile platform (maxTouchPoints > 1 heuristic)
   const IS_DESKTOP = IS_TAURI && (typeof navigator === 'undefined' || navigator.maxTouchPoints <= 1);
 
   async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -28,7 +27,6 @@
   const okCount     = $derived(sources.filter(s => s.status === 'ok').length);
   const errCount    = $derived(sources.filter(s => s.status === 'error').length);
 
-  // Diagnostics state
   let logPath = $state('');
   let sharingLogs = $state(false);
   let shareStatus = $state<'idle' | 'done' | 'error'>('idle');
@@ -60,7 +58,6 @@
     }
   }
 
-  // ── Advanced: import/export sources ──────────────────────────────────
   let showAdvanced = $state(false);
   let sourceJson = $state('');
   let importStatus = $state<'idle' | 'loading' | 'done' | 'error'>('idle');
@@ -165,12 +162,10 @@
   </div>
 </SettingsSection>
 
-<!-- Tagging -->
 <SettingsSection label="tagging">
   <div class="text-ink-3 text-[10px] leading-normal font-mono">Items are tagged on-device by a deterministic rule engine (structural rules + low-effort heuristics). No models, no downloads, no cloud.</div>
 </SettingsSection>
 
-<!-- Notifications -->
 <SettingsSection label="notifications">
   <div class="flex flex-col gap-2.5">
     <div class="flex items-center gap-2">
@@ -180,7 +175,6 @@
   </div>
 </SettingsSection>
 
-<!-- Keyboard shortcuts (desktop only) -->
 {#if showShortcuts}
   <SettingsSection label="keyboard shortcuts">
     <div class="flex flex-col gap-1.5">
@@ -194,18 +188,15 @@
   </SettingsSection>
 {/if}
 
-<!-- Storage -->
 <SettingsSection label="storage">
   <div class="text-ink-1 text-[11px] leading-[1.4] font-mono">{dbStats.totalItems} items · {sources.length} sources</div>
   <div class="mt-1 text-ink-3 text-[10px] leading-[1.4] font-mono">SQLite WAL{dbStats.dbSizeKb > 0 ? ` · ${dbStats.dbSizeKb >= 1024 ? (dbStats.dbSizeKb/1024).toFixed(1)+' MB' : dbStats.dbSizeKb+' KB'}` : ''}</div>
 </SettingsSection>
 
-<!-- Diagnostics -->
 {#if IS_TAURI}
 <SettingsSection label="diagnostics">
   <div class="flex flex-col gap-2.5">
 
-    <!-- Verbose logging toggle -->
     <div class="flex items-center gap-2">
       <div class="flex-1">
         <div class="text-ink-1 text-[11px] leading-none font-mono">Verbose logging</div>
@@ -246,7 +237,6 @@
 </SettingsSection>
 {/if}
 
-<!-- Performance -->
 {#if IS_TAURI}
 <SettingsSection label="performance">
   {#if coldstartTiming.data}
@@ -273,7 +263,6 @@
 </SettingsSection>
 {/if}
 
-<!-- About -->
 <SettingsSection label="about">
   <div class="text-ink-2 text-[11px] leading-normal font-mono">Pulse <span class="text-cyan">{version}</span></div>
   <div class="mt-0.5 text-ink-3 text-[10px] leading-normal font-mono">Tauri 2 · Svelte 5 · Rust · MIT</div>
@@ -296,7 +285,6 @@
   <div class="mt-2.5 text-ink-3 text-[10px] leading-[1.4] font-mono">No telemetry. All data stays on your device.</div>
 </SettingsSection>
 
-<!-- Advanced -->
 <SettingsSection label="advanced">
   <GhostButton
     onclick={() => { showAdvanced = !showAdvanced; if (showAdvanced) exportSources(); }}

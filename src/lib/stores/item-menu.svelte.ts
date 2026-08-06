@@ -1,9 +1,8 @@
 import type { FeedItem } from '../types';
 
-// Single, shared item-action menu state. Only ONE menu exists app-wide:
-// ItemRow triggers it, and AppShell renders it once at the shell root (outside
-// any transformed/overflow ancestor), so it can't be positioned inside a
-// virtualized row, scroll with the list, or appear multiple times.
+// One shared item-action menu app-wide: ItemRow opens it, AppShell renders it
+// once at the shell root, so it can't position inside a virtualized row or
+// scroll with the list.
 export const itemMenu = $state<{
   current: {
     item: FeedItem;

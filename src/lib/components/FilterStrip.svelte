@@ -24,7 +24,6 @@
 </script>
 
 <div class="flex flex-col shrink-0 border-t border-bd-0 bg-bg-1">
-  <!-- Tabs row -->
   <div class="flex items-center overflow-x-auto" style="scrollbar-width:none;">
     {#each tabs as tab}
       {@const a = tab.id === filter}

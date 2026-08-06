@@ -20,7 +20,6 @@ pub struct PulseConfig {
 }
 
 impl PulseConfig {
-    /// Create a config with default settings using the platform data directory
     pub fn default_config() -> Self {
         let data_dir = platform_data_dir();
         let db_path = data_dir.join("pulse.db");
@@ -36,13 +35,11 @@ impl PulseConfig {
         }
     }
 
-    /// Create a config pointing at a specific database path
     pub fn with_db_path(mut self, db_path: PathBuf) -> Self {
         self.db_path = db_path;
         self
     }
 
-    /// Create a config pointing at a specific data dir
     pub fn with_data_dir(mut self, data_dir: PathBuf) -> Self {
         self.data_dir = data_dir.clone();
         self.db_path = data_dir.join("pulse.db");

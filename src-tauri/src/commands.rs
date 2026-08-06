@@ -252,8 +252,7 @@ pub async fn update_source(
         .upsert_feed(updated)
         .await
         .map_err(|e| e.to_string())?;
-    // URL/kind edits must take effect immediately: kick the feed's sync task
-    // (respawns it if it stopped, otherwise triggers an immediate refresh).
+    // URL/kind edits must apply now: respawn the task or trigger an immediate refresh.
     core.scheduler.refresh_feed(id.clone()).await;
     Ok(())
 }
@@ -455,12 +454,10 @@ pub async fn get_groups(state: State<'_, AppState>) -> Result<Vec<GroupDto>, Str
     let groups = core.get_feed_groups().await.map_err(|e| e.to_string())?;
     let unread_map = core.get_unread_counts_by_feed().await.unwrap_or_default();
 
-    // Build unread per group by summing across feeds in each group
     let feeds = core.get_feeds().await.map_err(|e| e.to_string())?;
     let mut group_unread: HashMap<String, i64> = HashMap::new();
     for feed in &feeds {
         let n = *unread_map.get(&feed.id).unwrap_or(&0);
-        // Add to the feed's specific group (if it has one)
         if let Some(gid) = &feed.group_id {
             *group_unread.entry(gid.clone()).or_default() += n;
         }
@@ -468,10 +465,9 @@ pub async fn get_groups(state: State<'_, AppState>) -> Result<Vec<GroupDto>, Str
         *group_unread.entry("all".to_string()).or_default() += n;
     }
 
-    // Ensure "all" group exists at the front
     let mut dtos: Vec<GroupDto> = Vec::new();
 
-    // Add "All" pseudo-group (not in DB, synthesized)
+    // "All" pseudo-group is synthesized, not stored in the DB
     let total_unread = *group_unread.get("all").unwrap_or(&0);
     dtos.push(GroupDto {
         id: "all".into(),
@@ -517,7 +513,7 @@ pub async fn rename_group(
     name: String,
 ) -> Result<(), String> {
     let core = state.core().await?;
-    // Fetch the existing group to preserve other fields, then upsert with new name
+    // Preserve other fields; upsert with the new name
     let groups = core.get_feed_groups().await.map_err(|e| e.to_string())?;
     let existing = groups
         .into_iter()
@@ -580,7 +576,6 @@ pub async fn sync_all(state: State<'_, AppState>) -> Result<SyncResultDto, Strin
     let feeds = core.get_feeds().await.map_err(|e| e.to_string())?;
     let mut total_new = 0i64;
 
-    // Run syncs concurrently
     let handles: Vec<_> = feeds
         .iter()
         .map(|f| {
@@ -704,13 +699,11 @@ pub async fn get_log_content(
     Ok(collected[start..].join("\n"))
 }
 
-/// Return the log directory path so the frontend can display or open it.
 #[tauri::command]
 pub fn get_log_path(state: State<'_, AppState>) -> String {
     state.data_dir.join("logs").to_string_lossy().to_string()
 }
 
-/// Open the log directory in the system file manager (desktop only).
 #[tauri::command]
 pub fn open_logs_folder(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;

@@ -3,7 +3,6 @@ use scraper::Html;
 /// Strip HTML tags from a string and decode HTML entities, returning plain text.
 pub fn strip_html(html: &str) -> String {
     let fragment = Html::parse_fragment(html);
-    // Collect all text nodes
     let mut text = String::new();
     for node in fragment.tree.nodes() {
         if let scraper::node::Node::Text(t) = node.value() {
@@ -30,7 +29,7 @@ pub fn normalize_text(title: &str, body: Option<&str>) -> String {
         format!("{} {}", title_clean, body_clean)
     };
 
-    // Truncate to 2000 chars for rule engine (model uses 512 tokens, handled separately)
+    // Truncate for the rule engine (2000 chars)
     if combined.len() > 2000 {
         combined[..2000].to_string()
     } else {
