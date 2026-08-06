@@ -110,7 +110,7 @@
               {@const list = safe.map(adaptItem)}
               {@const ids = list.map(i => i.id)}
               <div class="flex flex-col border rounded-md overflow-hidden" style="background:{T.bg2};border:1px solid {T.bd1};box-shadow:0 2px 8px rgba(0,0,0,0.35);min-height:160px;">
-                <div class="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
+                <div class="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b" style="background:rgba(78,205,214,0.08);border-color:{T.bd1};">
                   <button
                     onclick={() => onOpenGroup(g.groupId)}
                     class="flex-1 min-w-0 text-left cursor-pointer bg-transparent border-none p-0 font-mono text-[13px] leading-none font-semibold truncate uppercase tracking-[0.5px]"

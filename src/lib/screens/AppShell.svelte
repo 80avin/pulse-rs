@@ -374,6 +374,7 @@
                 {/if}
               </div>
             {/if}
+            {#if overviewMode}<div class="flex-1 min-h-0"></div>{/if}
             <BottomTools {showSources} {showSettings} syncing={syncState.syncing} {syncState} onToggleSources={() => { showSources = !showSources; }} onToggleSettings={() => { showSettings = !showSettings; }} />
           </div>
         {/if}
