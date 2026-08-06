@@ -9,6 +9,7 @@
   import Icon from './Icon.svelte';
   import TagFilterRow from './TagFilterRow.svelte';
   import TimelineList from './TimelineList.svelte';
+  import SavedList from './SavedList.svelte';
   import GhostButton from './shared/GhostButton.svelte';
   import IconBtn from './shared/IconBtn.svelte';
   import type { FeedItem } from '$lib/types';
@@ -151,13 +152,17 @@
     </div>
   {/if}
 
-  <TimelineList
-    items={displayItems}
-    emptyMessage={timelineFilter.feedId || timelineFilter.tag ? 'no matching items' : filter !== 'all' ? `no ${filter} items in this view` : 'no items'}
-    {openId}
-    onItemClick={(id, allIds) => onOpen(id, allIds, displayItems)}
-    onTagClick={handleTagClick}
-  />
+  {#if timelineFilter.isSaved === true}
+    <SavedList onOpen={(id, allIds, list) => onOpen(id, allIds, list)} />
+  {:else}
+    <TimelineList
+      items={displayItems}
+      emptyMessage={timelineFilter.feedId || timelineFilter.tag ? 'no matching items' : filter !== 'all' ? `no ${filter} items in this view` : 'no items'}
+      {openId}
+      onItemClick={(id, allIds) => onOpen(id, allIds, displayItems)}
+      onTagClick={handleTagClick}
+    />
+  {/if}
 
   <!-- Filter strip (narrow, toggleable) -->
   {#if mode === 'narrow' && showFilter}
