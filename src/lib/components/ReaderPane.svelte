@@ -1,6 +1,6 @@
 <script lang="ts">
   import { T } from '$lib/tokens';
-  import { items, sources, markRead, toggleSaved, saveWithNote, hideItem, getItem } from '$lib/stores/data.svelte';
+  import { items, sources, markRead, toggleSaved, saveWithNote, hideItem, getItem, knownItems } from '$lib/stores/data.svelte';
   import { settings } from '$lib/settings.svelte';
   import { openExternal, shareItem } from '$lib/utils';
   import { untrack } from 'svelte';
@@ -17,20 +17,27 @@
   // One reader pane for both breakpoints. `mode` switches the chrome (metadata
   // bar + no-nav on wide; top bar + swipe + back on narrow); ReaderView, the
   // action bar, and the note flow are shared.
-  let { mode, itemId, allIds, onBack, onNavigate }: {
+  let { mode, itemId, list, onBack, onNavigate }: {
     mode: 'wide' | 'narrow';
     itemId: string;
-    allIds: string[];
+    list: import('$lib/types').FeedItem[];
     onBack?: () => void;
     onNavigate?: (id: string) => void;
   } = $props();
 
-  // Keep the last-known item even if it's evicted from `items` (e.g. marking it
-  // read while the "unread" filter is active). The cached reference stays live
-  // for state mutations until the next item is opened.
-  const storeItem = $derived(items.find(i => i.id === itemId));
+  // The opener hands us the exact list the item was clicked from, so the
+  // reader never guesses which cache an item lives in. `allIds` drives
+  // prev/next across that same list.
+  const allIds = $derived(list.map(i => i.id));
+  const storeItem = $derived(list.find(i => i.id === itemId) ?? items.find(i => i.id === itemId) ?? knownItems[itemId]);
   let cachedItem = $state<import('$lib/types').FeedItem | null>(null);
-  $effect(() => { if (storeItem) cachedItem = storeItem; });
+  $effect(() => {
+    if (storeItem) cachedItem = storeItem;
+    // Never let a stale cached item (from a previously-opened row) stand in
+    // for the current itemId: that both hides the real item and blocks the
+    // fetch-by-ID fallback below.
+    else if (cachedItem && cachedItem.id !== itemId) cachedItem = null;
+  });
   // Fetch-by-ID fallback: the reader only sees the paginated `items` cache, so
   // items that aren't in it (e.g. old saved items) would otherwise show
   // "item not found" even though they exist in the DB.
@@ -164,7 +171,7 @@
       }}
       role="feed"
     >
-      <ReaderView itemId={itemId} noteMode={mode === 'wide' ? 'inline' : 'sheet'} onPopoverChange={(open) => { popoverOpen = open; }} showMetadata={mode === 'wide' ? false : true} />
+      <ReaderView item={item} noteMode={mode === 'wide' ? 'inline' : 'sheet'} onPopoverChange={(open) => { popoverOpen = open; }} showMetadata={mode === 'wide' ? false : true} />
     </div>
 
     {#if mode === 'narrow'}
@@ -228,12 +235,12 @@
     {/if}
   </div>
 {:else}
-  {#if fetchState === 'loading'}
-    <div class="h-full flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">loading…</div>
-  {:else}
+  {#if fetchState === 'missing'}
     <div class="h-full flex flex-col items-center justify-center gap-4">
       <div class="text-ink-3 text-[11px] leading-none font-mono">item not found</div>
       <button onclick={onBack} class="bg-transparent border border-bd-1 text-ink-2 cursor-pointer rounded px-3 py-2 text-[10px] leading-none font-mono">← back to list</button>
     </div>
+  {:else}
+    <div class="h-full flex items-center justify-center text-ink-3 text-[11px] leading-none font-mono">loading…</div>
   {/if}
 {/if}

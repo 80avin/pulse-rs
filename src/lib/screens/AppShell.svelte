@@ -36,25 +36,28 @@
   // ── Shared navigation state (one shell, both breakpoints) ───────────────
   let openId = $state('');
   let timelineIds = $state<string[]>([]);
+  let readerList = $state<import('$lib/types').FeedItem[]>([]);
   let activeTab = $state<TabId>('feed');
 
   const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
   const isWide = $derived(isDesktop());
 
-  function openItem(id: string, ids: string[]) {
+  function openItem(id: string, ids: string[], list: import('$lib/types').FeedItem[]) {
     openId = id;
     timelineIds = ids;
+    readerList = list;
     // Push a history entry so Android's system back closes the reader instead
     // of exiting the app (popstate restores the previous state).
     history.pushState({ tab: activeTab, openItemId: id } satisfies NavState, '');
   }
-  function openItemAndRead(id: string, ids: string[]) {
+  function openItemAndRead(id: string, ids: string[], list: import('$lib/types').FeedItem[]) {
     openId = id;
     timelineIds = ids;
+    readerList = list;
     if (settings.markReadOn === 'open') markRead(id);
   }
-  function closeReader() { openId = ''; }
+  function closeReader() { openId = ''; readerList = []; }
 
   // Narrow navigation (history-backed so Android back unwinds in-app)
   type NavState = { tab: string; openItemId: string | null };
@@ -65,7 +68,7 @@
     activeTab = newTab as TabId;
     openId = '';
   }
-  function goBack() { openId = ''; history.back(); }
+  function goBack() { openId = ''; readerList = []; history.back(); }
   function goToSearch() { changeTab('search'); }
   function openSourceFeed(sourceId: string) { setFeedFilter(sourceId); changeTab('feed'); }
   function handleTagFilter(tag: string) { setTagFilter(tag); changeTab('feed'); }
@@ -172,7 +175,7 @@
     }
     return list;
   });
-  const openItemObj = $derived(items.find(i => i.id === openId));
+  const openItemObj = $derived(readerList.find(i => i.id === openId) ?? items.find(i => i.id === openId));
   const groupSources = $derived(activeGroup === 'all' ? sources : sources.filter(s=>s.group===activeGroup));
   const unreadCount = $derived(pageCounts.unread);
   const taggedCount = $derived(dbStats.tagCount);
@@ -241,14 +244,14 @@
         case 'j': case 'ArrowDown': {
           const cur = displayItems.findIndex(i => i.id === openId);
           const next = displayItems[Math.min(cur + 1, displayItems.length - 1)];
-          if (next) openItemAndRead(next.id, displayItems.map(i => i.id));
+          if (next) openItemAndRead(next.id, displayItems.map(i => i.id), displayItems);
           break;
         }
         case 'k': case 'ArrowUp': {
           const cur = displayItems.findIndex(i => i.id === openId);
           if (cur <= 0) break;
           const prev = displayItems[cur - 1];
-          if (prev) openItemAndRead(prev.id, displayItems.map(i => i.id));
+          if (prev) openItemAndRead(prev.id, displayItems.map(i => i.id), displayItems);
           break;
         }
         case 'm': if (openItemObj) markRead(openItemObj.id, !openItemObj.read); break;
@@ -368,7 +371,7 @@
 
         <!-- Timeline pane -->
         <div class="shrink-0 flex flex-col border-r border-bd-0 overflow-hidden bg-bg-0" style="width:{timelineWidth}px">
-          <TimelinePane mode="wide" items={displayItems} {searchQuery} {openId} onOpen={(id, ids) => openItemAndRead(id, ids)} />
+          <TimelinePane mode="wide" items={displayItems} {searchQuery} {openId} onOpen={(id, ids, list) => openItemAndRead(id, ids, list)} />
         </div>
 
         <DragHandle edge="timeline" {onDragStart} {dragging} />
@@ -376,7 +379,7 @@
         <!-- Reader pane -->
         {#if openItemObj}
           <div class="flex-1 min-w-0 flex flex-col bg-bg-0 overflow-hidden">
-            <ReaderPane mode="wide" itemId={openItemObj.id} allIds={timelineIds} onBack={closeReader} onNavigate={(id) => openItemAndRead(id, timelineIds)} />
+            <ReaderPane mode="wide" itemId={openItemObj.id} list={readerList} onBack={closeReader} onNavigate={(id) => openItemAndRead(id, readerList.map(i => i.id), readerList)} />
           </div>
         {/if}
 
@@ -431,7 +434,7 @@
       <div class="shrink-0 h-[var(--sat)]"></div>
       <div class="flex-1 overflow-hidden flex flex-col relative">
         {#if activeTab === 'feed'}
-          <TimelinePane mode="narrow" items={items} openId={openId ?? ''} onOpen={openItem} onSearch={goToSearch} />
+          <TimelinePane mode="narrow" items={items} openId={openId ?? ''} onOpen={(id, ids, list) => openItem(id, ids, list)} onSearch={goToSearch} />
         {:else if activeTab === 'sources'}
           <div class="flex flex-col h-full bg-bg-0 text-ink-0">
             <div class="h-[44px] flex items-center px-[10px] border-b border-b-bd-0 bg-bg-1 shrink-0 gap-2">
@@ -447,9 +450,9 @@
             </div>
           </div>
         {:else if activeTab === 'search'}
-          <SearchView onItemOpen={(id, ids) => openItem(id, ids)} />
+          <SearchView onItemOpen={(id, ids, list) => openItem(id, ids, list)} />
         {:else if activeTab === 'saved'}
-          <MobileSaved onOpen={openItem} />
+          <MobileSaved onOpen={(id, ids, list) => openItem(id, ids, list)} />
         {:else if activeTab === 'settings'}
           <div class="flex flex-col h-full bg-bg-0 text-ink-0">
             <div class="h-[44px] flex items-center px-3.5 border-b border-b-bd-0 bg-bg-1 shrink-0">
@@ -466,7 +469,7 @@
 
         {#if openId}
           <div class="absolute inset-0 z-10 flex flex-col">
-            <ReaderPane mode="narrow" itemId={openId} allIds={timelineIds} onBack={goBack} onNavigate={(id) => { openId = id; }} />
+            <ReaderPane mode="narrow" itemId={openId} list={readerList} onBack={goBack} onNavigate={(id) => { openId = id; }} />
           </div>
         {/if}
       </div>

@@ -60,8 +60,11 @@ export async function getItem(itemId: string): Promise<FeedItem | null> {
   if (!IS_TAURI) return null;
   try {
     const b = await tauriInvoke<BackendItem>('get_item', { itemId });
-    return adaptItem(b);
-  } catch {
+    const item = adaptItem(b);
+    rememberItem(item);
+    return item;
+  } catch (e) {
+    logger.warn('get_item failed', { itemId, error: e });
     return null;
   }
 }
@@ -81,6 +84,27 @@ function adaptSource(b: BackendSource): Source {
 
 // --- Reactive state ---
 export const items   = $state<FeedItem[]>(IS_TAURI ? [] : MOCK_ITEMS.map(i => ({ ...i })));
+
+// App-wide item cache: every list (timeline, saved, search) registers the
+// items it renders so the reader can open anything that was ever displayed,
+// even if it fell out of the paginated `items` cache. Mutations keep it in
+// sync. Capped to avoid unbounded growth.
+const KNOWN_CAP = 2000;
+export const knownItems = $state<Record<string, FeedItem>>({});
+export function rememberItem(item: FeedItem) {
+  knownItems[item.id] = item;
+  const keys = Object.keys(knownItems);
+  if (keys.length > KNOWN_CAP) {
+    for (let i = 0; i < keys.length - KNOWN_CAP; i++) delete knownItems[keys[i]];
+  }
+}
+
+// Find an item wherever it lives: live timeline cache first, then the shared
+// known-items cache. Used by mutations so state updates reach the reader even
+// for items that aren't in the current timeline page.
+export function findItem(id: string): FeedItem | undefined {
+  return items.find(i => i.id === id) ?? knownItems[id];
+}
 export const sources = $state<Source[]>(IS_TAURI ? [] : MOCK_SOURCES.map(s => ({ ...s })));
 export const groups  = $state<Group[]>(IS_TAURI ? [] : MOCK_GROUPS.map(g => ({ ...g })));
 
@@ -210,7 +234,7 @@ if (IS_TAURI) initStore();
 
 export async function markRead(id: string, read = true) {
   const { timelineFilter } = await import('./timeline.svelte');
-  const item = items.find(i => i.id === id);
+  const item = findItem(id);
   const wasRead = item?.read;
   if (item) {
     item.read = read;
@@ -261,7 +285,7 @@ function evictIfFiltered(id: string, timelineFilter: { isRead: boolean | null; i
 
 export async function toggleSaved(id: string) {
   const { timelineFilter } = await import('./timeline.svelte');
-  const item = items.find(i => i.id === id);
+  const item = findItem(id);
   if (!item) {
     if (IS_TAURI) {
       await tauriInvoke('toggle_saved', { id, saved: true });
@@ -284,7 +308,7 @@ export async function toggleSaved(id: string) {
 }
 
 export async function setNote(id: string, note: string | null) {
-  const item = items.find(i => i.id === id);
+  const item = findItem(id);
   const wasNote = item?.note;
   if (item) item.note = note === null ? undefined : note;
   if (IS_TAURI) {
@@ -307,7 +331,7 @@ export function normalizeTag(tag: string): string | null {
 /** Replace the user-defined tags for an item (full-set semantics). */
 export async function setItemTags(id: string, tags: string[]) {
   const cleaned = [...new Set(tags.map(normalizeTag).filter((t): t is string => t !== null))];
-  const item = items.find(i => i.id === id);
+  const item = findItem(id);
   const wasTags = item?.userTags;
   if (item) item.userTags = cleaned;
   if (IS_TAURI) {
@@ -322,7 +346,7 @@ export async function setItemTags(id: string, tags: string[]) {
 export async function saveWithNote(id: string, note: string) {
   const trimmed = note.trim();
   const finalNote = trimmed === '' ? null : trimmed;
-  const item = items.find(i => i.id === id);
+  const item = findItem(id);
   const wasSaved = item?.saved;
   const wasNote = item?.note;
   if (item && !item.saved) item.saved = true;
@@ -342,7 +366,7 @@ export async function saveWithNote(id: string, note: string) {
 export async function markAllRead(ids: string[]) {
   const { timelineFilter } = await import('./timeline.svelte');
   for (const id of ids) {
-    const item = items.find(i => i.id === id);
+    const item = findItem(id);
     if (item && !item.read) {
       item.read = true;
       const src = sources.find(s => s.id === item.src);
@@ -531,7 +555,7 @@ export async function deleteGroup(id: string): Promise<void> {
 
 // --- Internal helpers ---
 function tlEvict(id: string, timelineFilter: { isRead: boolean | null; isSaved: boolean | null }): boolean {
-  const item = items.find(i => i.id === id);
+  const item = findItem(id);
   if (!item) return false;
   const { isRead, isSaved } = timelineFilter;
   return (isRead !== null && item.read !== isRead) || (isSaved !== null && item.saved !== isSaved);

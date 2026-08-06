@@ -18,7 +18,7 @@
   let { mode, items, onOpen, onSearch, searchQuery = '', openId = '' }: {
     mode: 'wide' | 'narrow';
     items: FeedItem[];
-    onOpen: (id: string, allIds: string[]) => void;
+    onOpen: (id: string, allIds: string[], list: FeedItem[]) => void;
     onSearch?: () => void;
     searchQuery?: string;
     openId?: string;
@@ -153,7 +153,7 @@
     items={displayItems}
     emptyMessage={timelineFilter.feedId || timelineFilter.tag ? 'no matching items' : filter !== 'all' ? `no ${filter} items in this view` : 'no items'}
     {openId}
-    onItemClick={(id, allIds) => onOpen(id, allIds)}
+    onItemClick={(id, allIds) => onOpen(id, allIds, displayItems)}
     onTagClick={handleTagClick}
   />
 

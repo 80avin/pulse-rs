@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { T } from '$lib/tokens';
-  import { toggleSaved, tauriInvoke, adaptItem, sources, ageLabel } from '$lib/stores/data.svelte';
+  import { toggleSaved, tauriInvoke, adaptItem, sources, ageLabel, rememberItem } from '$lib/stores/data.svelte';
   import { settings } from '$lib/settings.svelte';
   import ItemRow from '$lib/components/ItemRow.svelte';
   import Icon from '$lib/components/Icon.svelte';
@@ -16,7 +16,7 @@
 
   // The bottom nav is rendered by AppShell; this pane only provides content.
   let { onOpen }: {
-    onOpen: (id: string, ids: string[]) => void;
+    onOpen: (id: string, ids: string[], list: FeedItem[]) => void;
   } = $props();
 
   let saved = $state<FeedItem[]>([]);
@@ -34,7 +34,9 @@
         limit: 100,
         cursor: cursor ? { publishedAt: cursor.publishedAt, itemId: cursor.itemId } : null,
       });
-      saved.push(...page.items.map(adaptItem));
+      const adapted = page.items.map(adaptItem);
+      for (const it of adapted) rememberItem(it);
+      saved.push(...adapted);
       cursor = page.nextCursor ?? null;
     } catch {
       /* ignore transient errors */
@@ -101,7 +103,7 @@
               {item}
               source={sources.find(s => s.id === item.src)}
               {density}
-              onclick={() => onOpen(item.id, allSavedIds)}
+              onclick={() => onOpen(item.id, allSavedIds, saved)}
             />
             <span class="absolute right-8 top-1 text-ink-4 text-[8px] leading-none font-mono" style="pointer-events:none;">{item.savedAt ? `saved ${ageLabel(item.savedAt)} ago` : ''}</span>
             <GhostButton

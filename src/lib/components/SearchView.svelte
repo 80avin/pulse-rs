@@ -11,7 +11,7 @@
   let {
     onItemOpen,
   }: {
-    onItemOpen?: (id: string, ids: string[]) => void;
+    onItemOpen?: (id: string, ids: string[], list: FeedItem[]) => void;
   } = $props();
 
   let query = $state('');
@@ -52,7 +52,7 @@
       <div class="text-ink-3 border-b border-bd-0 p-1.5 px-3 tracking-[0.6px] text-[9px] leading-none font-mono">{results.length} result{results.length === 1 ? '' : 's'}</div>
       {#each results as item}
         {@const source = sources.find(s => s.id === item.src)}
-        <ItemRow {item} {source} isFocused={false} density={settings.density} onclick={() => onItemOpen?.(item.id, results.map(i => i.id))} />
+        <ItemRow {item} {source} isFocused={false} density={settings.density} onclick={() => onItemOpen?.(item.id, results.map(i => i.id), results)} />
       {/each}
     {/if}
   </div>

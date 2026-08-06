@@ -2,7 +2,7 @@
   import { T } from '$lib/tokens';
   import type { FeedItem } from '$lib/types';
   import type { Snippet } from 'svelte';
-  import { sources, storeReady } from '$lib/stores/data.svelte';
+  import { sources, storeReady, rememberItem } from '$lib/stores/data.svelte';
   import { loadingMore, fetchNextPage } from '$lib/stores/timeline.svelte';
   import { settings } from '$lib/settings.svelte';
   import ItemRow from './ItemRow.svelte';
@@ -33,6 +33,9 @@
 
   const density = $derived(settings.density);
   const allIds = $derived(items.map(i => i.id));
+  // Register rendered items in the shared cache so the reader can open any of
+  // them later, even after they're evicted from the paginated store.
+  $effect(() => { for (const it of items) rememberItem(it); });
   // Custom pagination override: when `hasMore`/`onLoadMore` are supplied they
   // drive the near-bottom / auto-fill checks instead of the global timeline
   // store (used by MobileSaved). Default = existing timeline-store behavior.

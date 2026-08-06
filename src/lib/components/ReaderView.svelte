@@ -1,28 +1,30 @@
 <script lang="ts">
   import { T, TAG_COLORS } from '$lib/tokens';
   import { Dialog } from 'bits-ui';
-  import { items, sources, saveWithNote, toggleSaved, domainOf } from '$lib/stores/data.svelte';
+  import { sources, saveWithNote, toggleSaved, domainOf } from '$lib/stores/data.svelte';
   import { openExternal, sanitizeHtml, TAG_EVIDENCE } from '$lib/utils';
   import TagChip from './TagChip.svelte';
   import Icon from './Icon.svelte';
   import GhostButton from './shared/GhostButton.svelte';
   import { isDesktop } from '$lib/use-is-desktop.svelte';
+  import type { FeedItem } from '$lib/types';
 
   let {
-    itemId,
+    item,
     noteMode = 'none',
     onTagClick,
     onPopoverChange,
     showMetadata = true,
   }: {
-    itemId: string;
+    item: FeedItem;
     noteMode?: 'inline' | 'sheet' | 'none';
     onTagClick?: (tag: string) => void;
     onPopoverChange?: (open: boolean) => void;
     showMetadata?: boolean;
   } = $props();
 
-  const item = $derived(items.find(i => i.id === itemId));
+  // ReaderPane resolves the item (opener's list -> knownItems -> store ->
+  // fetch) and passes it in; ReaderView never re-resolves from global state.
   const source = $derived(item ? sources.find(s => s.id === item.src) : undefined);
   // domainOf guards malformed URLs (a bad feed URL used to crash the render).
   const primaryDomain = $derived(item?.url ? domainOf(item.url) : '');
