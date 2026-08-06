@@ -15,7 +15,7 @@
   const META: Record<TabId, { label: string; icon: string }> = {
     feed: { label: 'feed', icon: 'list' },
     sources: { label: 'sources', icon: 'rss' },
-    search: { label: 'search', icon: 'search' },
+    search: { label: 'home', icon: 'search' },
     saved: { label: 'saved', icon: 'bookmark' },
     settings: { label: 'settings', icon: 'cog' },
   };

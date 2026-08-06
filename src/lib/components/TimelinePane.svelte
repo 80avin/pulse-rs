@@ -16,15 +16,13 @@
 
   // One timeline pane for both breakpoints. `mode` switches the toolbar/filter
   // layout; the list, filter state, counts, and tag logic are shared.
-  let { mode, items, onOpen, onSearch, searchQuery = '', openId = '', onToggleOverview, overviewActive = false }: {
+  let { mode, items, onOpen, onSearch, searchQuery = '', openId = '' }: {
     mode: 'wide' | 'narrow';
     items: FeedItem[];
     onOpen: (id: string, allIds: string[], list: FeedItem[]) => void;
     onSearch?: () => void;
     searchQuery?: string;
     openId?: string;
-    onToggleOverview?: () => void;
-    overviewActive?: boolean;
   } = $props();
 
   let sort = $state('time');
@@ -74,18 +72,6 @@
         <span><span class="text-cyan">{counts.unread}</span><span class="text-ink-3"> unread</span></span>
         {#if searchQuery}<span class="text-ink-3">·</span><span class="text-amber">"{searchQuery}"</span>{/if}
         <span class="flex-1"></span>
-        {#if onToggleOverview}
-          <GhostButton
-            onclick={onToggleOverview}
-            title={overviewActive ? 'Back to timeline' : 'Show overview'}
-            ariaLabel={overviewActive ? 'Back to timeline' : 'Show overview'}
-            class="flex items-center gap-1 text-[12px] leading-none border border-bd-1 rounded px-2 py-1 hover:bg-bg-2"
-            style="color:{overviewActive ? T.cyan : T.ink1};"
-          >
-            <Icon name="list" size={12} color={overviewActive ? T.cyan : T.ink1} />
-            <span>{overviewActive ? 'timeline' : 'overview'}</span>
-          </GhostButton>
-        {/if}
         {#if counts.unread > 0}
           <GhostButton onclick={() => markAllRead(displayItems.map(i => i.id))} class="text-ink-2 text-[10px] leading-none">mark all read</GhostButton>
         {/if}
@@ -104,18 +90,6 @@
       <div class="flex items-center gap-1.5 flex-1">
         <span class="font-semibold text-[14px] leading-none font-mono text-ink-0 tracking-[1px]">PULSE<span class="text-cyan">.</span></span>
       </div>
-      {#if onToggleOverview}
-        <GhostButton
-          onclick={onToggleOverview}
-          title={overviewActive ? 'Back to timeline' : 'Show overview'}
-          ariaLabel={overviewActive ? 'Back to timeline' : 'Show overview'}
-          class="flex items-center gap-1 text-[12px] leading-none border border-bd-1 rounded px-2 py-1 hover:bg-bg-2"
-          style="color:{overviewActive ? T.cyan : T.ink1};"
-        >
-          <Icon name="list" size={12} color={overviewActive ? T.cyan : T.ink1} />
-          <span>{overviewActive ? 'timeline' : 'overview'}</span>
-        </GhostButton>
-      {/if}
       <IconBtn onclick={doSync} ariaLabel="Sync feeds" name="sync" size={18} color={syncState.syncing ? T.cyan : T.ink1}>
         <span class={syncState.syncing ? 'syncing' : ''}>
           <Icon name="sync" size={18} color={syncState.syncing ? T.cyan : T.ink1} />

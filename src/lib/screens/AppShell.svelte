@@ -18,14 +18,13 @@
   import SourceExplorer from '$lib/components/SourceExplorer.svelte';
   import TimelinePane from '$lib/components/TimelinePane.svelte';
   import ReaderPane from '$lib/components/ReaderPane.svelte';
-  import Overview from '$lib/components/Overview.svelte';
+  import Home from '$lib/components/Home.svelte';
   import GroupTabs from '$lib/components/GroupTabs.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import Onboarding from '$lib/components/Onboarding.svelte';
   import ItemActionsMenu from '$lib/components/ItemActionsMenu.svelte';
   import PulseBottomNav from '$lib/components/PulseBottomNav.svelte';
   import MobileSaved from './MobileSaved.svelte';
-  import SearchView from '$lib/components/SearchView.svelte';
   import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
   import GhostButton from '$lib/components/shared/GhostButton.svelte';
   import IconBtn from '$lib/components/shared/IconBtn.svelte';
@@ -183,6 +182,8 @@
   const taggedCount = $derived(dbStats.tagCount);
 
   function selectGroup(id: string) { searchQuery = ''; setGroupFilter(id === 'all' ? null : id); }
+  function enterOverview() { overviewMode = true; openId = ''; readerList = []; }
+  function exitOverview() { overviewMode = false; }
   function setActiveTag(tag: string) { setTagFilter(activeTag === tag ? null : tag); }
   function handleFilterChange(filter: string) {
     switch (filter) {
@@ -278,12 +279,6 @@
     <div class="flex items-center justify-center w-full h-full bg-bg-0 text-red text-[11px] leading-[1.6] font-mono">
       failed to load data — check console for details
     </div>
-  {:else if overviewMode}
-    <Overview
-      onOpenGroup={(id) => { selectGroup(id); overviewMode = false; }}
-      onExit={() => { overviewMode = false; }}
-      onOpenItem={(id, ids, list) => openItemAndRead(id, ids, list)}
-    />
   {:else if isWide}
     <div class="flex flex-col w-full h-full bg-bg-0 text-ink-0 overflow-hidden">
       <!-- App toolbar (window controls are handled by the native OS title bar) -->
@@ -305,13 +300,18 @@
             <GhostButton onclick={toggleLeftRail} ariaLabel="Expand sidebar" title="Expand sidebar" class="w-6 h-6 flex items-center justify-center rounded">
               <Icon name="chev-r" size={13} color={T.ink2} />
             </GhostButton>
-            {#each groups as g}
-              <button onclick={() => selectGroup(g.id)} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} unread`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px] hover:bg-bg-2" style={g.id===activeGroup?'background:rgba(78,205,214,0.12)':undefined}>
-                <span class="font-bold text-[10px] leading-none font-mono text-cyan={g.id===activeGroup} text-ink-2={g.id!==activeGroup}">{g.name.slice(0, 2).toUpperCase()}</span>
-                {#if g.n > 0}<span class="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-cyan"></span>{/if}
-              </button>
-            {/each}
-            <div class="flex-1"></div>
+            <GhostButton onclick={overviewMode ? exitOverview : enterOverview} ariaLabel={overviewMode ? 'Back to feeds' : 'Show overview'} title={overviewMode ? 'Back to feeds' : 'Show overview'} class="w-6 h-6 flex items-center justify-center rounded">
+              <Icon name={overviewMode ? 'list' : 'home'} size={13} color={overviewMode ? T.cyan : T.ink2} />
+            </GhostButton>
+            {#if !overviewMode}
+              {#each groups as g}
+                <button onclick={() => selectGroup(g.id)} title={`${g.name} (${g.n})`} aria-label={`${g.name} group, ${g.n} unread`} class="w-6 h-6 flex items-center justify-center border-none cursor-pointer relative rounded-[3px] hover:bg-bg-2" style={g.id===activeGroup?'background:rgba(78,205,214,0.12)':undefined}>
+                  <span class="font-bold text-[10px] leading-none font-mono text-cyan={g.id===activeGroup} text-ink-2={g.id!==activeGroup}">{g.name.slice(0, 2).toUpperCase()}</span>
+                  {#if g.n > 0}<span class="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-cyan"></span>{/if}
+                </button>
+              {/each}
+              <div class="flex-1"></div>
+            {/if}
             <GhostButton onclick={() => { showSources = !showSources; }} ariaLabel="Sources" title="Sources" class="w-6 h-6 flex items-center justify-center rounded">
               <Icon name="rss" size={13} color={showSources ? T.cyan : T.ink2} />
             </GhostButton>
@@ -321,69 +321,81 @@
           </div>
         {:else}
           <div class="shrink-0 bg-bg-1 border-r border-bd-0 flex flex-col overflow-hidden" style="width:{leftRailWidth}px">
-            <div class="flex justify-end pt-0.5 px-1">
+            <div class="flex items-center gap-1.5 p-1.5 px-2 shrink-0">
+              <div class="flex flex-1 min-w-0 items-center gap-1 p-0.5 bg-bg-0 border border-bd-1 rounded">
+                <button onclick={enterOverview} aria-pressed={overviewMode} class="flex-1 text-center border-none cursor-pointer py-1 rounded text-[12px] leading-none font-mono" style="color:{overviewMode ? T.cyan : T.ink2};background:{overviewMode ? 'rgba(78,205,214,0.08)' : 'transparent'};">overview</button>
+                <button onclick={exitOverview} aria-pressed={!overviewMode} class="flex-1 text-center border-none cursor-pointer py-1 rounded text-[12px] leading-none font-mono" style="color:{!overviewMode ? T.cyan : T.ink2};background:{!overviewMode ? 'rgba(78,205,214,0.08)' : 'transparent'};">feeds</button>
+              </div>
               <GhostButton onclick={toggleLeftRail} ariaLabel="Collapse sidebar" title="Collapse sidebar" class="flex items-center justify-center rounded w-5.5 h-5.5">
                 <Icon name="chev-l" size={12} color={T.ink3} />
               </GhostButton>
             </div>
-            <div class="px-2 pt-2 pb-1">
-              <div class="flex items-center gap-1.5 bg-bg-0 border border-bd-1 p-1.25 px-2 rounded">
-                <Icon name="search" size={11} color={T.ink3} />
-                <input bind:this={searchInputEl} bind:value={searchQuery} placeholder="search {dbStats.totalItems} items" class="flex-1 text-[11px] leading-none font-mono" aria-label="Search items" />
-                <KeyCap k="/" dim />
-              </div>
-            </div>
-            <FilterPills active={desktopFilter} onChange={handleFilterChange} />
-            <div class="border-b border-bd-0 pt-0.5 pb-1 shrink-0">
-              <div class="uppercase text-ink-2 px-3 pt-1.5 pb-0.5 tracking-[0.6px] text-[10px] leading-none font-mono">groups</div>
-              <div class="max-h-40 overflow-y-auto">
-                <GroupTabs {groups} active={activeGroup} onSelect={(id) => selectGroup(id)} orientation="vertical" />
-              </div>
-            </div>
-            <div class="flex-1 min-h-0 flex flex-col border-b border-bd-0">
-              <GhostButton onclick={() => showSourcesAccordion = !showSourcesAccordion} ariaLabel={`Sources for ${activeGroupLabel}`} ariaExpanded={showSourcesAccordion} class="flex items-center gap-1 w-full text-left p-1.5 px-3 pt-2.5 shrink-0">
-                <span class="uppercase flex-1 text-ink-2 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
-                <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
-                <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
-              </GhostButton>
-              {#if showSourcesAccordion}
-                <div class="flex-1 min-h-0 overflow-y-auto px-2">
-                  {#each groupSources as s}
-                    <button onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }} oncontextmenu={(e) => openSourceMenu(e, s)} class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1 hover:bg-bg-2 focus-visible:outline-1 focus-visible:outline-[var(--color-cyan)]" style={activeSource===s.id ? `background:rgba(78,205,214,0.06);border-left:2px solid ${T.cyan}` : 'border-left:2px solid transparent'} aria-current={activeSource===s.id ? 'true' : undefined}>
-                      <StatusDot status={s.status} size={5} />
-                      <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-[12px] leading-[1.2] font-mono" style="color:{activeSource===s.id ? T.ink0 : T.ink1};">{s.name}</span>
-                      {#if s.unread > 0}<span class="text-cyan text-[10px] leading-none font-mono">{s.unread}</span>{/if}
-                    </button>
-                  {/each}
+            {#if !overviewMode}
+              <div class="px-2 pt-2 pb-1">
+                <div class="flex items-center gap-1.5 bg-bg-0 border border-bd-1 p-1.25 px-2 rounded">
+                  <Icon name="search" size={11} color={T.ink3} />
+                  <input bind:this={searchInputEl} bind:value={searchQuery} placeholder="search {dbStats.totalItems} items" class="flex-1 text-[11px] leading-none font-mono" aria-label="Search items" />
+                  <KeyCap k="/" dim />
                 </div>
-                <div class="shrink-0 flex items-center gap-1 px-2 pb-1.5 pt-1">
-                  <GhostButton onclick={() => { showSources = !showSources; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 text-left px-1.5 py-1.5 text-[12px] leading-none">
-                    <Icon name="plus" size={11} color={T.ink3} />
-                    <span>Manage Sources</span>
-                  </GhostButton>
-                  <GhostButton onclick={() => { showOnboarding = true; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 justify-center px-1.5 py-1.5 text-[12px] leading-none" title="Discover feeds" ariaLabel="Discover feeds">
-                    <Icon name="list" size={11} color={T.ink3} />
-                    <span>discover</span>
-                  </GhostButton>
+              </div>
+              <FilterPills active={desktopFilter} onChange={handleFilterChange} />
+              <div class="border-b border-bd-0 pt-0.5 pb-1 shrink-0">
+                <div class="uppercase text-ink-2 px-3 pt-1.5 pb-0.5 tracking-[0.6px] text-[10px] leading-none font-mono">groups</div>
+                <div class="max-h-40 overflow-y-auto">
+                  <GroupTabs {groups} active={activeGroup} onSelect={(id) => selectGroup(id)} orientation="vertical" />
                 </div>
-              {/if}
-            </div>
+              </div>
+              <div class="flex-1 min-h-0 flex flex-col border-b border-bd-0">
+                <GhostButton onclick={() => showSourcesAccordion = !showSourcesAccordion} ariaLabel={`Sources for ${activeGroupLabel}`} ariaExpanded={showSourcesAccordion} class="flex items-center gap-1 w-full text-left p-1.5 px-3 pt-2.5 shrink-0">
+                  <span class="uppercase flex-1 text-ink-2 tracking-[0.6px] text-[10px] leading-none font-mono">sources</span>
+                  <span class="text-ink-2 text-[10px] leading-none font-mono">{groupSources.length}</span>
+                  <Icon name={showSourcesAccordion ? 'chev-dn' : 'chev-r'} size={10} color={T.ink3} />
+                </GhostButton>
+                {#if showSourcesAccordion}
+                  <div class="flex-1 min-h-0 overflow-y-auto px-2">
+                    {#each groupSources as s}
+                      <button onclick={() => { const next = activeSource === s.id ? null : s.id; setFeedFilter(next); }} oncontextmenu={(e) => openSourceMenu(e, s)} class="flex items-center gap-1.5 w-full border-none cursor-pointer text-left px-1.5 py-1 hover:bg-bg-2 focus-visible:outline-1 focus-visible:outline-[var(--color-cyan)]" style={activeSource===s.id ? `background:rgba(78,205,214,0.06);border-left:2px solid ${T.cyan}` : 'border-left:2px solid transparent'} aria-current={activeSource===s.id ? 'true' : undefined}>
+                        <StatusDot status={s.status} size={5} />
+                        <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-[12px] leading-[1.2] font-mono" style="color:{activeSource===s.id ? T.ink0 : T.ink1};">{s.name}</span>
+                        {#if s.unread > 0}<span class="text-cyan text-[10px] leading-none font-mono">{s.unread}</span>{/if}
+                      </button>
+                    {/each}
+                  </div>
+                  <div class="shrink-0 flex items-center gap-1 px-2 pb-1.5 pt-1">
+                    <GhostButton onclick={() => { showSources = !showSources; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 text-left px-1.5 py-1.5 text-[12px] leading-none">
+                      <Icon name="plus" size={11} color={T.ink3} />
+                      <span>Manage Sources</span>
+                    </GhostButton>
+                    <GhostButton onclick={() => { showOnboarding = true; }} class="flex items-center gap-1 flex-1 min-w-0 text-ink-3 justify-center px-1.5 py-1.5 text-[12px] leading-none" title="Discover feeds" ariaLabel="Discover feeds">
+                      <Icon name="list" size={11} color={T.ink3} />
+                      <span>discover</span>
+                    </GhostButton>
+                  </div>
+                {/if}
+              </div>
+            {/if}
             <BottomTools {showSources} {showSettings} syncing={syncState.syncing} {syncState} onToggleSources={() => { showSources = !showSources; }} onToggleSettings={() => { showSettings = !showSettings; }} />
           </div>
         {/if}
 
         <DragHandle edge="left" {onDragStart} {dragging} />
 
-        <div class="shrink-0 flex flex-col border-r border-bd-0 overflow-hidden bg-bg-0" style="width:{timelineWidth}px">
-          <TimelinePane mode="wide" items={displayItems} {searchQuery} {openId} onOpen={(id, ids, list) => openItemAndRead(id, ids, list)} onToggleOverview={() => overviewMode = !overviewMode} overviewActive={overviewMode} />
-        </div>
-
-        <DragHandle edge="timeline" {onDragStart} {dragging} />
-
-        {#if openItemObj}
+        {#if overviewMode}
           <div class="flex-1 min-w-0 flex flex-col bg-bg-0 overflow-hidden">
-            <ReaderPane mode="wide" itemId={openItemObj.id} list={readerList} onBack={closeReader} onNavigate={(id) => openItemAndRead(id, readerList.map(i => i.id), readerList)} />
+            <Home onOpenItem={(id, ids, list) => openItemAndRead(id, ids, list)} onOpenGroup={(id) => { selectGroup(id); exitOverview(); }} />
           </div>
+        {:else}
+          <div class="shrink-0 flex flex-col border-r border-bd-0 overflow-hidden bg-bg-0" style="width:{timelineWidth}px">
+            <TimelinePane mode="wide" items={displayItems} {searchQuery} {openId} onOpen={(id, ids, list) => openItemAndRead(id, ids, list)} />
+          </div>
+
+          <DragHandle edge="timeline" {onDragStart} {dragging} />
+
+          {#if openItemObj}
+            <div class="flex-1 min-w-0 flex flex-col bg-bg-0 overflow-hidden">
+              <ReaderPane mode="wide" itemId={openItemObj.id} list={readerList} onBack={closeReader} onNavigate={(id) => openItemAndRead(id, readerList.map(i => i.id), readerList)} />
+            </div>
+          {/if}
         {/if}
 
         <Modal open={showSettings} title="Settings" onClose={() => { showSettings = false; }} width="560px">
@@ -433,7 +445,7 @@
       <div class="shrink-0 h-[var(--sat)]"></div>
       <div class="flex-1 overflow-hidden flex flex-col relative">
         {#if activeTab === 'feed'}
-          <TimelinePane mode="narrow" items={items} openId={openId ?? ''} onOpen={(id, ids, list) => openItem(id, ids, list)} onSearch={goToSearch} onToggleOverview={() => overviewMode = !overviewMode} overviewActive={overviewMode} />
+          <TimelinePane mode="narrow" items={items} openId={openId ?? ''} onOpen={(id, ids, list) => openItem(id, ids, list)} onSearch={goToSearch} />
         {:else if activeTab === 'sources'}
           <div class="flex flex-col h-full bg-bg-0 text-ink-0">
             <div class="h-[44px] flex items-center px-[10px] border-b border-b-bd-0 bg-bg-1 shrink-0 gap-2">
@@ -449,7 +461,7 @@
             </div>
           </div>
         {:else if activeTab === 'search'}
-          <SearchView onItemOpen={(id, ids, list) => openItem(id, ids, list)} />
+          <Home onOpenItem={(id, ids, list) => openItem(id, ids, list)} onOpenGroup={(id) => { selectGroup(id); changeTab('feed'); }} />
         {:else if activeTab === 'saved'}
           <MobileSaved onOpen={(id, ids, list) => openItem(id, ids, list)} />
         {:else if activeTab === 'settings'}

@@ -211,5 +211,7 @@ pub struct ItemPageDto {
 pub struct GroupOverviewDto {
     pub group_id: String,
     pub group_name: String,
+    pub total_items: i64,
+    pub unread_count: i64,
     pub items: Vec<FeedItemDto>,
 }

@@ -540,6 +540,8 @@ pub async fn get_overview(
         .map(|o| GroupOverviewDto {
             group_id: o.group_id.clone(),
             group_name: o.group_name.clone(),
+            total_items: o.total_items,
+            unread_count: o.unread_count,
             items: o.items.iter().map(adapt_item).collect(),
         })
         .collect())

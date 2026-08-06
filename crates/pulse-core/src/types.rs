@@ -273,6 +273,8 @@ pub struct TimelinePage {
 pub struct GroupOverview {
     pub group_id: GroupId,
     pub group_name: String,
+    pub total_items: i64,
+    pub unread_count: i64,
     pub items: Vec<FeedItemView>,
 }
 
