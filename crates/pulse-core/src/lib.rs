@@ -698,9 +698,10 @@ impl PulseCore {
         &self,
         query: &str,
         limit: Option<usize>,
+        sort: &str,
     ) -> Result<Vec<FeedItemView>, PulseError> {
         self.search
-            .search(query, limit)
+            .search(query, limit, sort)
             .await
             .map_err(PulseError::Storage)
     }

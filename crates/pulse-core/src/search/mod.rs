@@ -16,16 +16,19 @@ impl SearchService {
     }
 
     /// Search for items matching the query string using FTS5.
+    /// `sort` is `relevance` (rank), `newest`, or `oldest`; anything else falls back to relevance.
     pub async fn search(
         &self,
         query: &str,
         limit: Option<usize>,
+        sort: &str,
     ) -> Result<Vec<FeedItemView>, StorageError> {
         let limit = limit.unwrap_or(DEFAULT_SEARCH_LIMIT);
         let query = query.to_string();
+        let sort = sort.to_string();
 
         self.db
-            .with_reader(|pool| async move { search_items(&pool, &query, limit).await })
+            .with_reader(|pool| async move { search_items(&pool, &query, limit, &sort).await })
             .await
     }
 
@@ -36,7 +39,7 @@ impl SearchService {
         limit: Option<usize>,
     ) -> Result<Vec<FeedItemView>, StorageError> {
         let query = format!("{}*", escape_fts5_query(prefix));
-        self.search(&query, limit).await
+        self.search(&query, limit, "relevance").await
     }
 }
 

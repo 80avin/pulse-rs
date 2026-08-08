@@ -688,10 +688,11 @@ pub async fn search_items(
     state: State<'_, AppState>,
     query: String,
     limit: Option<usize>,
+    sort: Option<String>,
 ) -> Result<Vec<FeedItemDto>, String> {
     let core = state.core().await?;
     let views = core
-        .search(&query, limit)
+        .search(&query, limit, sort.as_deref().unwrap_or("relevance"))
         .await
         .map_err(|e| e.to_string())?;
     Ok(views.iter().map(adapt_item).collect())

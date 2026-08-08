@@ -3,7 +3,11 @@ import type { BackendItem } from '../types';
 import type { FeedItem } from '../types';
 
 
-export async function searchItems(query: string, limit = 100): Promise<FeedItem[]> {
+export async function searchItems(
+  query: string,
+  limit = 100,
+  sort: 'relevance' | 'newest' | 'oldest' = 'relevance'
+): Promise<FeedItem[]> {
   if (!IS_TAURI) {
     const q = query.toLowerCase();
     return items.filter(i =>
@@ -12,6 +16,6 @@ export async function searchItems(query: string, limit = 100): Promise<FeedItem[
       i.tags.some(t => t.toLowerCase().includes(q))
     ).slice(0, limit);
   }
-  const bi = await tauriInvoke<BackendItem[]>('search_items', { query, limit });
+  const bi = await tauriInvoke<BackendItem[]>('search_items', { query, limit, sort });
   return bi.map(adaptItem);
 }

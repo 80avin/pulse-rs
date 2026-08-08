@@ -1,5 +1,7 @@
 use crate::error::FeedError;
-use crate::feeds::normalize::{collapse_whitespace, count_words, strip_html};
+use crate::feeds::normalize::{
+    collapse_whitespace, count_words, resolve_relative_urls, strip_html,
+};
 use crate::types::{Feed, FeedItem};
 use reqwest::Client;
 use uuid::Uuid;
@@ -95,7 +97,7 @@ pub async fn fetch_rss(client: &Client, feed: &Feed) -> Result<RssFetchResult, F
     let items = parsed
         .entries
         .into_iter()
-        .map(|entry| normalize_rss_entry(entry, &feed.id, &url, ns_uuid, fetched_at))
+        .map(|entry| normalize_rss_entry(entry, feed, ns_uuid, fetched_at))
         .collect();
 
     Ok(RssFetchResult {
@@ -111,8 +113,7 @@ pub async fn fetch_rss(client: &Client, feed: &Feed) -> Result<RssFetchResult, F
 
 fn normalize_rss_entry(
     entry: feed_rs::model::Entry,
-    feed_id: &str,
-    _feed_url: &str,
+    feed: &Feed,
     ns_uuid: Uuid,
     fetched_at: i64,
 ) -> FeedItem {
@@ -174,6 +175,14 @@ fn normalize_rss_entry(
         .cloned()
         .or_else(|| entry.summary.as_ref().map(|s| s.content.clone()));
 
+    // Resolve relative src/href values against the entry link, falling back to
+    // the feed's site URL then its feed URL.
+    let base = url
+        .as_deref()
+        .or(feed.site_url.as_deref())
+        .or(Some(feed.url.as_str()));
+    let body_html = body_html.map(|h| resolve_relative_urls(&h, base.unwrap_or("")));
+
     let body_text = body_html.as_deref().map(strip_html);
 
     let word_count = body_text.as_deref().map(|t| count_words(t) as i64);
@@ -183,7 +192,7 @@ fn normalize_rss_entry(
 
     FeedItem {
         id: item_id,
-        feed_id: feed_id.to_string(),
+        feed_id: feed.id.clone(),
         source_guid,
         title,
         url,
@@ -214,7 +223,8 @@ fn md5_hash(s: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use feed_rs::model::{Entry, Link, Text};
+    use crate::types::FeedType;
+    use feed_rs::model::{Content, Entry, Link, Text};
     use uuid::Uuid;
 
     fn entry() -> Entry {
@@ -233,8 +243,38 @@ mod tests {
         Link { href: href.into(), rel: None, media_type: None, href_lang: None, title: None, length: None }
     }
 
+    fn feed() -> Feed {
+        Feed {
+            id: "feed".into(),
+            url: "https://example.com/feed.xml".into(),
+            feed_type: FeedType::Rss,
+            title: None,
+            description: None,
+            site_url: Some("https://example.com".into()),
+            icon_url: None,
+            group_id: None,
+            poll_interval_secs: 3600,
+            is_enabled: true,
+            etag: None,
+            last_modified: None,
+            last_fetched_at: None,
+            last_success_at: None,
+            last_item_at: None,
+            failure_streak: 0,
+            total_fetches: 0,
+            total_failures: 0,
+            avg_latency_ms: None,
+            next_fetch_at: None,
+            source_config: serde_json::json!({}),
+            language: None,
+            hue: None,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
     fn guid(e: &Entry) -> String {
-        normalize_rss_entry(e.clone(), "feed", "https://x", Uuid::new_v4(), 1_700_000_000).source_guid
+        normalize_rss_entry(e.clone(), &feed(), Uuid::new_v4(), 1_700_000_000).source_guid
     }
 
     #[test]
@@ -274,5 +314,38 @@ mod tests {
         let mut a = entry();
         a.links = vec![link("https://example.com/stable")];
         assert_eq!(guid(&a), format!("sha256:{:x}", md5_hash("https://example.com/stable")));
+    }
+
+    #[test]
+    fn body_html_relative_urls_resolved_against_item_link() {
+        let mut e = entry();
+        e.content = Some(Content {
+            body: Some(r#"<img src="/img.png">"#.into()),
+            content_type: "text/html".parse().unwrap(),
+            length: None,
+            src: None,
+        });
+        e.links = vec![link("https://example.com/blog/2025/post")];
+        let item = normalize_rss_entry(e, &feed(), Uuid::new_v4(), 1_700_000_000);
+        assert_eq!(
+            item.body_html.as_deref(),
+            Some(r#"<img src="https://example.com/img.png">"#)
+        );
+    }
+
+    #[test]
+    fn body_html_relative_urls_fallback_to_feed_site_url() {
+        let mut e = entry();
+        e.content = Some(Content {
+            body: Some(r#"<img src="img.png">"#.into()),
+            content_type: "text/html".parse().unwrap(),
+            length: None,
+            src: None,
+        });
+        let item = normalize_rss_entry(e, &feed(), Uuid::new_v4(), 1_700_000_000);
+        assert_eq!(
+            item.body_html.as_deref(),
+            Some(r#"<img src="https://example.com/img.png">"#)
+        );
     }
 }

@@ -478,8 +478,15 @@ pub async fn search_items(
     pool: &SqlitePool,
     query: &str,
     limit: usize,
+    sort: &str,
 ) -> Result<Vec<FeedItemView>, StorageError> {
-    let rows = sqlx::query(
+    let order_by = match sort {
+        "newest" => "fi.published_at DESC, fi.id DESC",
+        "oldest" => "fi.published_at ASC, fi.id ASC",
+        _ => "rank",
+    };
+
+    let sql = format!(
         "SELECT fi.id, fi.title, fi.url, fi.author, fi.published_at, fi.fetched_at,
                 fi.word_count, fi.score, fi.comment_count, fi.comment_url, fi.body_text, fi.body_html,
                 json_extract(fi.source_meta, '$.external_url') AS external_url,
@@ -487,7 +494,7 @@ pub async fn search_items(
                 f.group_id, fg.name AS group_name,
                 ist.is_read, ist.is_saved, ist.is_hidden, ist.saved_at, ist.note,
                 COALESCE(json_group_array(DISTINCT at.tag) FILTER (WHERE at.tag IS NOT NULL), '[]') AS ai_tags,
-            COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags
+                COALESCE(json_group_array(DISTINCT ut.tag) FILTER (WHERE ut.tag IS NOT NULL), '[]') AS user_tags
          FROM feed_items_fts
          JOIN feed_items fi ON fi.rowid = feed_items_fts.rowid
          JOIN feeds f ON fi.feed_id = f.id
@@ -498,14 +505,16 @@ pub async fn search_items(
          WHERE feed_items_fts MATCH ?
            AND ist.is_hidden = 0
          GROUP BY fi.id
-         ORDER BY rank
+         ORDER BY {order_by}
          LIMIT ?"
-    )
-    .bind(query)
-    .bind(limit as i64)
-    .fetch_all(pool)
-    .await
-    .map_err(StorageError::Sqlite)?;
+    );
+
+    let rows = sqlx::query(&sql)
+        .bind(query)
+        .bind(limit as i64)
+        .fetch_all(pool)
+        .await
+        .map_err(StorageError::Sqlite)?;
 
     rows.iter().map(row_to_feed_item_view).collect()
 }

@@ -21,9 +21,13 @@
     onExit?: () => void;
   } = $props();
 
+  type SearchSort = 'relevance' | 'newest' | 'oldest';
+  const SORTS = ['relevance', 'newest', 'oldest'] as const;
+
   let query = $state('');
   let results = $state<FeedItem[]>([]);
   let searching = $state(false);
+  let sort = $state<SearchSort>('relevance');
   let searchInputEl: HTMLInputElement | null = $state(null);
 
   let groups = $state<OverviewGroup[]>([]);
@@ -34,7 +38,7 @@
     const q = query.trim();
     if (q.length < 2) { results = []; searching = false; return; }
     searching = true;
-    const timer = setTimeout(async () => { results = await searchItems(q); searching = false; }, 250);
+    const timer = setTimeout(async () => { results = await searchItems(q, 100, sort); searching = false; }, 250);
     return () => clearTimeout(timer);
   });
 
@@ -70,7 +74,20 @@
       {:else if results.length === 0}
         <div class="text-center text-ink-3 py-10 px-5 text-[11px] leading-[1.6] font-mono">no results for "<span class="text-ink-2">{query}</span>"</div>
       {:else}
-        <div class="text-ink-3 border-b border-bd-0 p-1.5 px-3 tracking-[0.6px] text-[9px] leading-none font-mono">{results.length} result{results.length === 1 ? '' : 's'}</div>
+        <div class="flex items-center gap-2 border-b border-bd-0 p-1.5 px-3">
+          <span class="flex-1 text-ink-3 tracking-[0.6px] text-[9px] leading-none font-mono">{results.length} result{results.length === 1 ? '' : 's'}</span>
+          <div class="flex items-center gap-0.75" role="group" aria-label="Search sort order">
+            {#each SORTS as opt}
+              {@const isActive = sort === opt}
+              <button
+                onclick={() => { sort = opt; }}
+                aria-pressed={isActive}
+                class={'cursor-pointer bg-transparent p-[3px_8px] rounded-[3px] text-[10px] leading-none font-mono tracking-[0.3px] ' + (isActive ? 'text-cyan' : 'text-ink-2')}
+                style="border:1px solid {isActive ? T.cyan : T.bd1};background:{isActive ? 'rgba(78,205,214,0.10)' : 'transparent'};"
+              >{opt}</button>
+            {/each}
+          </div>
+        </div>
         {#each results as item}
           {@const source = sources.find(s => s.id === item.src)}
           <button

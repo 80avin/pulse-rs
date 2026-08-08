@@ -1,5 +1,7 @@
 use crate::error::FeedError;
-use crate::feeds::normalize::{collapse_whitespace, count_words, decode_html_entities, strip_html};
+use crate::feeds::normalize::{
+    collapse_whitespace, count_words, decode_html_entities, resolve_relative_urls, strip_html,
+};
 use crate::feeds::reddit_auth::RedditAuth;
 use crate::types::{Feed, FeedItem};
 use reqwest::Client;
@@ -170,7 +172,7 @@ pub async fn fetch_reddit(
         .data
         .children
         .into_iter()
-        .map(|child| normalize_reddit_post(child.data, &feed.id, ns_uuid, fetched_at))
+        .map(|child| normalize_reddit_post(child.data, &feed.id, &feed.url, ns_uuid, fetched_at))
         .collect();
 
     Ok(RedditFetchResult {
@@ -184,6 +186,7 @@ pub async fn fetch_reddit(
 fn normalize_reddit_post(
     post: RedditPost,
     feed_id: &str,
+    feed_url: &str,
     ns_uuid: Uuid,
     fetched_at: i64,
 ) -> FeedItem {
@@ -267,6 +270,10 @@ fn normalize_reddit_post(
     };
 
     let word_count = body_text.as_deref().map(|t| count_words(t) as i64);
+
+    // Resolve relative src/href values against the post URL (fallback: feed URL).
+    let base = url.as_deref().unwrap_or(feed_url);
+    let body_html = body_html.map(|h| resolve_relative_urls(&h, base));
 
     let preview_image_url = post
         .preview

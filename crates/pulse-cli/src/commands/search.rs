@@ -18,7 +18,9 @@ pub struct SearchArgs {
 
 pub async fn run(args: SearchArgs, core: &PulseCore, global_json: bool) -> anyhow::Result<()> {
     let use_json = args.json || global_json;
-    let items = core.search(&args.query, Some(args.limit)).await?;
+    let items = core
+        .search(&args.query, Some(args.limit), "relevance")
+        .await?;
 
     if use_json {
         print_json(&items);
