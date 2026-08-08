@@ -17,6 +17,8 @@ pub enum DbCommand {
     Stats(DbStatsArgs),
     /// VACUUM the database to reclaim space
     Vacuum,
+    /// Rewrite relative URLs in stored body_html to absolute form
+    FixRelativeUrls,
 }
 
 #[derive(Debug, Args)]
@@ -38,6 +40,7 @@ pub async fn run(args: DbArgs, core: &PulseCore, global_json: bool) -> anyhow::R
         DbCommand::Migrate(a) => cmd_migrate(a, core).await,
         DbCommand::Stats(a) => cmd_stats(a, core, global_json).await,
         DbCommand::Vacuum => cmd_vacuum(core).await,
+        DbCommand::FixRelativeUrls => cmd_fix_relative_urls(core).await,
     }
 }
 
@@ -81,5 +84,11 @@ async fn cmd_vacuum(core: &PulseCore) -> anyhow::Result<()> {
     // which also rebuilds the FTS index afterwards (VACUUM can renumber rowids).
     core.db.vacuum().await?;
     println!("VACUUM complete");
+    Ok(())
+}
+
+async fn cmd_fix_relative_urls(core: &PulseCore) -> anyhow::Result<()> {
+    let fixed = core.fix_relative_urls().await?;
+    println!("fixed {} item(s)", fixed);
     Ok(())
 }

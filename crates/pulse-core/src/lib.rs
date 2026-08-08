@@ -492,6 +492,15 @@ impl PulseCore {
             .map_err(PulseError::Storage)
     }
 
+    /// Backfill: rewrite relative URLs in stored body_html for existing rows.
+    /// Returns the number of items changed.
+    pub async fn fix_relative_urls(&self) -> Result<usize, PulseError> {
+        self.db
+            .fix_relative_urls()
+            .await
+            .map_err(PulseError::Storage)
+    }
+
     /// Fetch a feed's current items without subscribing (discover preview).
     /// The temp feed is never persisted; only the fetcher's URL/type/etag are
     /// read, so a transient `Feed` with default health fields is sufficient.

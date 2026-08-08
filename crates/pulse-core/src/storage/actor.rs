@@ -112,6 +112,10 @@ pub enum DbCommand {
     /// VACUUM can renumber implicit rowids, silently corrupting the external-content
     /// FTS mapping — the mandatory rebuild restores it.
     Vacuum { reply: oneshot::Sender<DbResult<()>> },
+
+    /// Backfill: rewrite relative src/href in stored body_html against the item
+    /// URL (fallback: feed URL). Returns the number of rows changed.
+    FixRelativeUrls { reply: oneshot::Sender<DbResult<usize>> },
 }
 
 /// The DB writer actor task. Uses a single-connection pool to serialize writes.
@@ -215,10 +219,52 @@ pub async fn db_writer_task(mut rx: mpsc::Receiver<DbCommand>, pool: SqlitePool)
                 let result = vacuum_db(&pool).await;
                 let _ = reply.send(result);
             }
+
+            DbCommand::FixRelativeUrls { reply } => {
+                let result = fix_relative_urls(&pool).await;
+                let _ = reply.send(result);
+            }
         }
     }
 
     tracing::info!("DB writer actor shutting down");
+}
+
+/// Backfill existing rows whose body_html still holds relative src/href values.
+/// Resolution is applied at ingestion; pre-existing rows need this maintenance
+/// pass. Base URL is the item's own URL, falling back to the feed URL.
+async fn fix_relative_urls(pool: &SqlitePool) -> DbResult<usize> {
+    let rows = sqlx::query(
+        "SELECT fi.id, fi.url, fi.body_html, f.url AS feed_url
+         FROM feed_items fi
+         JOIN feeds f ON f.id = fi.feed_id
+         WHERE fi.body_html IS NOT NULL",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(StorageError::Sqlite)?;
+
+    let mut changed = 0usize;
+    for row in rows {
+        use sqlx::Row;
+        let item_id: String = row.try_get("id").map_err(StorageError::Sqlite)?;
+        let item_url: Option<String> = row.try_get("url").map_err(StorageError::Sqlite)?;
+        let body_html: String = row.try_get("body_html").map_err(StorageError::Sqlite)?;
+        let feed_url: String = row.try_get("feed_url").map_err(StorageError::Sqlite)?;
+
+        let base = item_url.filter(|u| !u.is_empty()).unwrap_or(feed_url);
+        let resolved = crate::feeds::normalize::resolve_relative_urls(&body_html, &base);
+        if resolved != body_html {
+            sqlx::query("UPDATE feed_items SET body_html = ? WHERE id = ?")
+                .bind(&resolved)
+                .bind(&item_id)
+                .execute(pool)
+                .await
+                .map_err(StorageError::Sqlite)?;
+            changed += 1;
+        }
+    }
+    Ok(changed)
 }
 
 async fn upsert_items(pool: &SqlitePool, items: &[FeedItem]) -> DbResult<usize> {
@@ -909,6 +955,12 @@ impl DbHandle {
         self.send(|reply| DbCommand::Vacuum { reply }).await
     }
 
+    /// Rewrite relative URLs in stored body_html; returns rows changed.
+    pub async fn fix_relative_urls(&self) -> DbResult<usize> {
+        self.send(|reply| DbCommand::FixRelativeUrls { reply })
+            .await
+    }
+
     /// Get reference to reader pool for read-only queries
     pub fn reader_pool(&self) -> &SqlitePool {
         &self.reader_pool
@@ -1060,6 +1112,37 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(read, 1);
+    }
+
+    #[tokio::test]
+    async fn fix_relative_urls_backfills_stored_body_html() {
+        let pool = test_pool().await;
+        seed_item(&pool, "i1", false).await;
+        // seed_item's feed url is https://example.com/rss; give the item its own
+        // URL and a body_html with a relative image, as a pre-fix ingested row.
+        sqlx::query("UPDATE feed_items SET url = ?, body_html = ? WHERE id = ?")
+            .bind("https://example.com/blog/post")
+            .bind(r#"<img src="/images/pic.png"><a href="other.html">x</a>"#)
+            .bind("i1")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let changed = fix_relative_urls(&pool).await.unwrap();
+        assert_eq!(changed, 1);
+
+        let stored: String =
+            sqlx::query_scalar("SELECT body_html FROM feed_items WHERE id = ?")
+                .bind("i1")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(stored.contains("https://example.com/images/pic.png"));
+        assert!(stored.contains("https://example.com/blog/other.html"));
+
+        // Idempotent: no relative URLs left, nothing to change.
+        let changed_again = fix_relative_urls(&pool).await.unwrap();
+        assert_eq!(changed_again, 0);
     }
 }
 
