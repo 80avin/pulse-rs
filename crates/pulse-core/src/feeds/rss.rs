@@ -176,12 +176,14 @@ fn normalize_rss_entry(
         .or_else(|| entry.summary.as_ref().map(|s| s.content.clone()));
 
     // Resolve relative src/href values against the entry link, falling back to
-    // the feed's site URL then its feed URL.
-    let base = url
-        .as_deref()
-        .or(feed.site_url.as_deref())
-        .or(Some(feed.url.as_str()));
-    let body_html = body_html.map(|h| resolve_relative_urls(&h, base.unwrap_or("")));
+    // the feed's site URL then its feed URL. Only an ABSOLUTE base resolves
+    // correctly — a relative item link must not short-circuit the fallback.
+    let base = [url.as_deref(), feed.site_url.as_deref(), Some(feed.url.as_str())]
+        .into_iter()
+        .flatten()
+        .find(|b| reqwest::Url::parse(b).map(|u| u.has_host()).unwrap_or(false))
+        .unwrap_or("");
+    let body_html = body_html.map(|h| resolve_relative_urls(&h, base));
 
     let body_text = body_html.as_deref().map(strip_html);
 

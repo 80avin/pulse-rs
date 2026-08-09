@@ -272,7 +272,12 @@ fn normalize_reddit_post(
     let word_count = body_text.as_deref().map(|t| count_words(t) as i64);
 
     // Resolve relative src/href values against the post URL (fallback: feed URL).
-    let base = url.as_deref().unwrap_or(feed_url);
+    // Only an ABSOLUTE base resolves correctly.
+    let base = [url.as_deref(), Some(feed_url)]
+        .into_iter()
+        .flatten()
+        .find(|b| reqwest::Url::parse(b).map(|u| u.has_host()).unwrap_or(false))
+        .unwrap_or("");
     let body_html = body_html.map(|h| resolve_relative_urls(&h, base));
 
     let preview_image_url = post

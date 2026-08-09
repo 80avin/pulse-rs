@@ -75,6 +75,15 @@ pub async fn run_migrations(pool: &SqlitePool) -> Result<(), StorageError> {
         .await?;
     }
 
+    if !applied.contains(&6) {
+        // Data migration: rewrite stored body_html so relative src/href/srcset
+        // become absolute (and http media -> https). Runs once; existing items
+        // that predate the ingestion-time resolver get fixed here.
+        let fixed = crate::storage::actor::fix_relative_urls(pool).await?;
+        record_version(pool, 6).await?;
+        tracing::info!(fixed, "M0006_fix_relative_urls rewrote relative URLs");
+    }
+
     tracing::info!("Database migrations complete");
     Ok(())
 }

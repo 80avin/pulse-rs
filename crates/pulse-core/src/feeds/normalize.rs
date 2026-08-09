@@ -79,41 +79,92 @@ pub fn collapse_whitespace(s: &str) -> String {
 
 static URL_ATTR_RE: OnceLock<Regex> = OnceLock::new();
 
-const SKIP_URL_PREFIXES: [&str; 7] = ["data:", "http://", "https://", "mailto:", "tel:", "#", "//"];
+const SKIP_URL_PREFIXES: [&str; 4] = ["data:", "mailto:", "tel:", "#"];
 
-/// Rewrite relative `src`/`href` attribute values in an HTML string to absolute
-/// URLs resolved against `base_url`. Values that already carry a scheme, a
-/// protocol-relative prefix (`//`), a fragment, or an empty/whitespace value are
-/// left untouched. Only attribute values are rewritten — the rest of the HTML is
-/// byte-identical. If `base_url` doesn't parse, the html is returned unchanged.
+fn upgrade_https(url: String) -> String {
+    if let Some(rest) = url.strip_prefix("http://") {
+        format!("https://{rest}")
+    } else {
+        url
+    }
+}
+
+/// Resolve `value` against `base`. `upgrade_http` upgrades an `http://` result
+/// to `https://` — the app's CSP only allows `img-src https:`, so media
+/// (`src`/`srcset`) must not stay on `http://`. Returns `None` when the value
+/// should be left byte-identical.
+fn resolve_one(value: &str, base: &reqwest::Url, upgrade_http: bool) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || SKIP_URL_PREFIXES.iter().any(|p| trimmed.starts_with(p)) {
+        return None;
+    }
+    if trimmed.starts_with("https://") {
+        return None;
+    }
+    if let Some(rest) = trimmed.strip_prefix("http://") {
+        return upgrade_http.then(|| format!("https://{rest}"));
+    }
+    let joined = base.join(trimmed).ok()?.to_string();
+    Some(if upgrade_http { upgrade_https(joined) } else { joined })
+}
+
+fn resolve_srcset(value: &str, base: &reqwest::Url) -> Option<String> {
+    let entries = value
+        .split(',')
+        .map(|entry| {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                return String::new();
+            }
+            let mut parts = entry.splitn(2, char::is_whitespace);
+            let url = parts.next().unwrap_or("").trim();
+            let desc = parts.next().unwrap_or("").trim();
+            let resolved = resolve_one(url, base, true).unwrap_or_else(|| url.to_string());
+            if desc.is_empty() {
+                resolved
+            } else {
+                format!("{resolved} {desc}")
+            }
+        })
+        .collect::<Vec<_>>();
+    Some(entries.join(", "))
+}
+
+/// Rewrite relative `src`/`href`/`srcset` attribute values in an HTML string to
+/// absolute URLs resolved against `base_url`. Values that already carry a scheme,
+/// a fragment, or an empty/whitespace value are left untouched (protocol-relative
+/// `//host/...` IS resolved). Only attribute values are rewritten — the rest of
+/// the HTML is byte-identical. If `base_url` doesn't parse, the html is returned
+/// unchanged.
 pub fn resolve_relative_urls(html: &str, base_url: &str) -> String {
     let Ok(base) = reqwest::Url::parse(base_url) else {
         return html.to_string();
     };
     let re = URL_ATTR_RE
-        .get_or_init(|| Regex::new(r#"(?i)(src|href)\s*=\s*(['"])([^'"]+)(['"])"#).unwrap());
+        .get_or_init(|| Regex::new(r#"(?i)(src|href|srcset)\s*=\s*(['"])([^'"]+)(['"])"#).unwrap());
 
     let mut out = String::with_capacity(html.len());
     let mut last = 0;
     for caps in re.captures_iter(html) {
         let m = caps.get(0).unwrap();
         out.push_str(&html[last..m.start()]);
+        let attr = caps.get(1).unwrap().as_str().to_ascii_lowercase();
         let value = caps.get(3).unwrap();
-        let trimmed = value.as_str().trim();
-        if trimmed.is_empty() || SKIP_URL_PREFIXES.iter().any(|p| trimmed.starts_with(p)) {
-            out.push_str(m.as_str());
+        let resolved = if attr == "srcset" {
+            resolve_srcset(value.as_str(), &base)
         } else {
-            match base.join(trimmed) {
-                Ok(joined) => {
-                    let mstr = m.as_str();
-                    let start = value.start() - m.start();
-                    let end = value.end() - m.start();
-                    out.push_str(&mstr[..start]);
-                    out.push_str(joined.as_str());
-                    out.push_str(&mstr[end..]);
-                }
-                Err(_) => out.push_str(m.as_str()),
+            resolve_one(value.as_str(), &base, attr == "src")
+        };
+        match resolved {
+            Some(replacement) => {
+                let mstr = m.as_str();
+                let start = value.start() - m.start();
+                let end = value.end() - m.start();
+                out.push_str(&mstr[..start]);
+                out.push_str(&replacement);
+                out.push_str(&mstr[end..]);
             }
+            None => out.push_str(m.as_str()),
         }
         last = m.end();
     }
@@ -186,9 +237,21 @@ mod tests {
     }
 
     #[test]
-    fn resolve_relative_urls_leaves_protocol_relative_unchanged() {
+    fn resolve_relative_urls_resolves_protocol_relative() {
         let html = r#"<img src="//cdn.example.com/x.png">"#;
-        assert_eq!(resolve_relative_urls(html, "https://example.com"), html);
+        assert_eq!(
+            resolve_relative_urls(html, "https://example.com"),
+            r#"<img src="https://cdn.example.com/x.png">"#
+        );
+    }
+
+    #[test]
+    fn resolve_relative_urls_upgrades_http_media_to_https_but_not_links() {
+        let html = r#"<img src="http://example.com/a.png"><a href="http://example.com/b">b</a>"#;
+        assert_eq!(
+            resolve_relative_urls(html, "https://example.com"),
+            r#"<img src="https://example.com/a.png"><a href="http://example.com/b">b</a>"#
+        );
     }
 
     #[test]

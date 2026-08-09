@@ -233,7 +233,7 @@ pub async fn db_writer_task(mut rx: mpsc::Receiver<DbCommand>, pool: SqlitePool)
 /// Backfill existing rows whose body_html still holds relative src/href values.
 /// Resolution is applied at ingestion; pre-existing rows need this maintenance
 /// pass. Base URL is the item's own URL, falling back to the feed URL.
-async fn fix_relative_urls(pool: &SqlitePool) -> DbResult<usize> {
+pub(crate) async fn fix_relative_urls(pool: &SqlitePool) -> DbResult<usize> {
     let rows = sqlx::query(
         "SELECT fi.id, fi.url, fi.body_html, f.url AS feed_url
          FROM feed_items fi
