@@ -1,14 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+  <!-- <rect x="0" w="0" fill="red" width="100%" height="100%"/> -->
 
   <!-- Outer Dark Blue Ring -->
-  <path d="M 46 160 A 74 74 0 1 1 154 160" fill="none" stroke="#1A4363" stroke-width="9" stroke-linecap="round" />
+  <path d="M96 210 a74 74 0 1 1 108 0" fill="none" stroke="#1A4363" stroke-width="9" stroke-linecap="round" />
 
   <!-- Middle Orange Ring -->
-  <path d="M 64 135 A 44 44 0 1 1 136 135" fill="none" stroke="#E5855E" stroke-width="9" stroke-linecap="round" />
+  <path d="M114 185 a44 44 0 1 1 72 0" fill="none" stroke="#E5855E" stroke-width="9" stroke-linecap="round" />
 
   <!-- Center Head (Circle) -->
-  <circle cx="100" cy="110" r="14" fill="none" stroke="#1A4363" stroke-width="9" />
+  <circle cx="150" cy="160" r="14" fill="none" stroke="#9cc7e8" stroke-width="9"/>
 
   <!-- Bottom Shoulders (Arch) -->
-  <path d="M 62 166 A 40 40 0 0 1 138 166" fill="none" stroke="#1A4363" stroke-width="9" stroke-linecap="round" />
+  <path d="M112 216 a40 40 0 0 1 76 0" fill="none" stroke="#1A4363" stroke-width="9" stroke-linecap="round" />
 </svg>

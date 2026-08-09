@@ -1,4 +1,4 @@
-# <img src="./src-tauri/icons/logo-light.svg" width="32px" /> Pulse
+# <img src="./src-tauri/icons/logo-dark-nopad.svg" height="32px" /> Pulse
 
 <!--toc:start-->
 - [Pulse](#pulse)
