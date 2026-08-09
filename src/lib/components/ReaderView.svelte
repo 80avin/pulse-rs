@@ -44,48 +44,71 @@
 
   // Feed-body links: open in the external browser (never navigate the webview,
   // which has no back), and show the destination on hover (desktop) or
-  // long-press (touch), like a browser.
+  // long-press (touch), like a browser. Implemented as an action so the
+  // container div carries no inline interactive handlers (a11y).
   let linkTip = $state<{ x: number; y: number; url: string } | null>(null);
   let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let suppressLinkClick = false;
 
-  function linkFrom(e: Event): HTMLAnchorElement | null {
-    const t = e.target as HTMLElement | null;
-    return t?.closest ? (t.closest('a') as HTMLAnchorElement | null) : null;
-  }
-
-  function onBodyClick(e: MouseEvent) {
-    const a = linkFrom(e);
-    if (!a) return;
-    e.preventDefault();
-    if (suppressLinkClick) { suppressLinkClick = false; return; }
-    const href = a.getAttribute('href');
-    if (href) openExternal(href);
-  }
-
-  function onBodyMouseMove(e: MouseEvent) {
-    const a = linkFrom(e);
-    const href = a?.getAttribute('href');
-    linkTip = href ? { x: e.clientX + 10, y: e.clientY + 18, url: href } : null;
-  }
-
-  function onBodyMouseLeave() { linkTip = null; }
-
-  function onBodyTouchStart(e: TouchEvent) {
-    const a = linkFrom(e);
-    const href = a?.getAttribute('href');
-    if (!a || !href) return;
-    const t = e.touches[0];
-    if (pressTimer) clearTimeout(pressTimer);
-    pressTimer = setTimeout(() => {
-      suppressLinkClick = true;
-      linkTip = { x: t.clientX, y: t.clientY - 34, url: href };
-    }, 500);
-  }
-
-  function onBodyTouchEnd() {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    if (suppressLinkClick) { suppressLinkClick = false; linkTip = null; }
+  function bodyLinks(node: HTMLElement) {
+    function linkFrom(t: EventTarget | null): HTMLAnchorElement | null {
+      return t instanceof HTMLElement ? (t.closest('a') as HTMLAnchorElement | null) : null;
+    }
+    function onClick(e: Event) {
+      const a = linkFrom(e.target);
+      if (!a) return;
+      e.preventDefault();
+      if (suppressLinkClick) { suppressLinkClick = false; return; }
+      const href = a.getAttribute('href');
+      if (href) openExternal(href);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Enter') return;
+      const a = linkFrom(e.target);
+      if (!a) return;
+      e.preventDefault();
+      const href = a.getAttribute('href');
+      if (href) openExternal(href);
+    }
+    function onMove(e: MouseEvent) {
+      const a = linkFrom(e.target);
+      const href = a?.getAttribute('href');
+      linkTip = href ? { x: e.clientX + 10, y: e.clientY + 18, url: href } : null;
+    }
+    function onLeave() { linkTip = null; }
+    function onTouchStart(e: TouchEvent) {
+      const a = linkFrom(e.target);
+      const href = a?.getAttribute('href');
+      if (!a || !href) return;
+      const t = e.touches[0];
+      if (pressTimer) clearTimeout(pressTimer);
+      pressTimer = setTimeout(() => {
+        suppressLinkClick = true;
+        linkTip = { x: t.clientX, y: t.clientY - 34, url: href };
+      }, 500);
+    }
+    function onTouchEnd() {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      if (suppressLinkClick) { suppressLinkClick = false; linkTip = null; }
+    }
+    node.addEventListener('click', onClick);
+    node.addEventListener('keydown', onKey);
+    node.addEventListener('mousemove', onMove);
+    node.addEventListener('mouseleave', onLeave);
+    node.addEventListener('touchstart', onTouchStart, { passive: true });
+    node.addEventListener('touchend', onTouchEnd);
+    node.addEventListener('touchcancel', onTouchEnd);
+    return {
+      destroy() {
+        node.removeEventListener('click', onClick);
+        node.removeEventListener('keydown', onKey);
+        node.removeEventListener('mousemove', onMove);
+        node.removeEventListener('mouseleave', onLeave);
+        node.removeEventListener('touchstart', onTouchStart);
+        node.removeEventListener('touchend', onTouchEnd);
+        node.removeEventListener('touchcancel', onTouchEnd);
+      },
+    };
   }
 
   function startNoteEdit() { noteDraft = item?.note ?? ''; noteEditing = true; }
@@ -181,17 +204,7 @@
         {/if}
       {/if}
 
-      <div
-        role="article"
-        class="item-body mt-5.5 max-w-180 text-[15px] leading-[1.65] font-sans text-ink-0"
-        onclick={onBodyClick}
-        onkeydown={(e) => { if (e.key === 'Enter') { const a = linkFrom(e); if (a) { e.preventDefault(); const href = a.getAttribute('href'); if (href) openExternal(href); } } }}
-        onmousemove={onBodyMouseMove}
-        onmouseleave={onBodyMouseLeave}
-        ontouchstart={onBodyTouchStart}
-        ontouchend={onBodyTouchEnd}
-        ontouchcancel={onBodyTouchEnd}
-      >
+      <div role="article" use:bodyLinks class="item-body mt-5.5 max-w-180 text-[15px] leading-[1.65] font-sans text-ink-0">
         {#if item.bodyHtml}{@html sanitizeHtml(item.bodyHtml)}{:else if item.body}<p class="m-0 whitespace-pre-line">{item.body}</p>{/if}
         {#if linkTip}
           <div class="fixed z-50 pointer-events-none bg-bg-2 border border-bd-1 rounded px-2 py-1 text-[10px] leading-none font-mono text-ink-2" style="left:{linkTip.x}px;top:{linkTip.y}px;max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
