@@ -2,7 +2,7 @@
 
 ## Overview
 
-Pulse is a local-first feed intelligence system. All data lives on-device. Network access is limited to feed fetching. AI inference runs locally. The system has no backend server, no user accounts, and no cloud sync.
+Pulse is a local-first feed reader with on-device, deterministic tagging. All data lives on-device. Network access is limited to feed fetching and enrichment (OpenGraph metadata). There is **no ML stack** — tagging comes from a rule engine only. The system has no backend server, no user accounts, no cloud sync, and no telemetry.
 
 The architecture prioritizes:
 - **Correctness over cleverness** — deterministic data flows, explicit error paths
@@ -16,49 +16,46 @@ The architecture prioritizes:
 ┌─────────────────────────────────────────────────────────────────┐
 │                        INTERFACE LAYER                          │
 │  ┌──────────────────────┐    ┌──────────────────────────────┐   │
-│  │    pulse-cli (TUI)   │    │   src-tauri (Tauri commands) │   │
+│  │  pulse-cli (clap)    │    │  src-tauri (Tauri commands)  │   │
 │  └──────────┬───────────┘    └──────────────┬───────────────┘   │
 └─────────────│────────────────────────────────│───────────────────┘
               │                                │
               └───────────────┬────────────────┘
-                              │ calls
+                              │ calls PulseCore
 ┌─────────────────────────────▼───────────────────────────────────┐
 │                      pulse-core LIBRARY                         │
 │                                                                 │
 │  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐    │
-│  │  Timeline   │  │   Search     │  │    Config           │    │
-│  │  (query +   │  │  (FTS5 +     │  │   (settings,        │    │
-│  │  pagination)│  │   ranking)   │  │    user prefs)      │    │
-│  └──────┬──────┘  └──────┬───────┘  └─────────────────────┘    │
+│  │  Timeline   │  │   Search     │  │  Config             │    │
+│  │  Service    │  │  Service     │  │  (data dir, sync,   │    │
+│  │  (cursor    │  │  (FTS5,      │  │   reddit auth)      │    │
+│  │  paging)    │  │  rank sort)  │  └─────────────────────┘    │
+│  └──────┬──────┘  └──────┬───────┘                             │
 │         │                │                                      │
 │  ┌──────▼────────────────▼──────────────────┐                   │
 │  │              Storage Layer               │                   │
-│  │   (rusqlite + migrations + FTS5 sync)    │                   │
+│  │  (sqlx + SQLite, migrations, FTS5 sync,  │                   │
+│  │   writer actor + read pool)              │                   │
 │  └──────────────────────┬───────────────────┘                   │
 │                         │                                       │
 │  ┌──────────────────────▼───────────────────────────────────┐   │
-│  │                  AI Tagging Pipeline                     │   │
-│  │  ┌─────────────┐           ┌──────────────────────────┐  │   │
-│  │  │ Rule Engine │  (Phase1) │  ONNX Model Inference    │  │   │
-│  │  │ (keyword/   │           │  (ort crate, Phase 4)    │  │   │
-│  │  │  regex)     │           └──────────────────────────┘  │   │
-│  │  └─────────────┘                                         │   │
+│  │                 Tagging Pipeline                         │   │
+│  │  Tagger trait → RulesTagger → RuleEngine (rules only)    │   │
+│  │  Bounded queue (200) → tagger_task → insert_ai_tags      │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │                  Sync Engine                             │   │
-│  │  ┌───────────┐  ┌────────────┐  ┌─────────────────────┐ │   │
-│  │  │ Scheduler │  │  Backoff   │  │  Health Tracker     │ │   │
-│  │  │ (Tokio    │  │  (per-feed)│  │  (success rate,     │ │   │
-│  │  │  tasks)   │  │            │  │   latency)          │ │   │
-│  │  └───────────┘  └────────────┘  └─────────────────────┘ │   │
+│  │  SyncScheduler → per-feed tokio task → perform_sync      │   │
+│  │  ETag/Last-Modified caching · exponential backoff        │   │
+│  │  (60s → 4h cap, ±10% jitter) · health tracking           │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │                  Feed Sources                            │   │
 │  │  ┌───────────┐  ┌─────────────┐  ┌────────────────────┐ │   │
 │  │  │ RSS/Atom  │  │ Hacker News │  │  Reddit JSON API   │ │   │
-│  │  │ (feed-rs) │  │ (HN Firebase│  │  (no auth, .json)  │ │   │
+│  │  │ (feed-rs) │  │ (Firebase   │  │  (OAuth2 optional) │ │   │
 │  │  │           │  │  API)       │  │                    │ │   │
 │  │  └───────────┘  └─────────────┘  └────────────────────┘ │   │
 │  └──────────────────────────────────────────────────────────┘   │
@@ -72,203 +69,183 @@ The architecture prioritizes:
 └─────────────────────┘
 ```
 
-## Data Flow
+## Storage: sqlx + a single-writer actor
 
-### Feed Ingestion
+The persistence layer is **`sqlx`** (SQLite), not rusqlite. Two pools are opened against the same database file:
 
-```
-1. Scheduler fires for feed F
-2. HTTP GET with If-None-Match / If-Modified-Since headers
-3a. 304 Not Modified → update last_checked_at only
-3b. 200 OK → parse response bytes
-4. Source adapter normalizes to Vec<FeedItem>
-5. Deterministic UUIDv5 per item (namespace=feed_url, name=item_guid)
-6. Upsert into feed_items (INSERT OR IGNORE for new, no update for existing)
-7. Insert new item_states rows (is_read=0, is_saved=0, is_hidden=0)
-8. Trigger AI tagging pipeline for new items
-9. Update FTS5 index
-10. Update feed health metrics
-```
+- **Writer pool** (`open_writer_pool`) — `max_connections(1)`. Sets WAL, `synchronous = FULL` on Android / `NORMAL` on desktop, `busy_timeout = 5s`, `foreign_keys = ON`, and platform-aware `mmap_size`.
+- **Reader pool** (`open_reader_pool`) — `max_connections(3)`, read-only. WAL is inherited from the writer connection; readers never set it.
 
-### Timeline Query
-
-```
-1. User requests timeline (group=None|Some, limit, cursor, filters)
-2. Build SQL query with appropriate WHERE clauses
-3. JOIN feed_items + item_states + feeds (+ feed_groups if filtering)
-4. Apply read/saved/hidden filters
-5. Cursor-based pagination via (published_at, id) tuple
-6. Return FeedItemView structs (flattened for display)
-```
-
-### AI Tagging
-
-```
-1. New FeedItem arrives in tagging queue
-2. Normalize text: strip HTML, collapse whitespace, truncate to 512 tokens
-3. Phase 1: run rule engine → Vec<(tag, confidence, explanation)>
-   Phase 4: run ONNX model → embedding → tag classification
-4. Store tags in ai_tags table
-5. Tags available immediately for filtering
-```
-
-## Core Design Principles
-
-### 1. Pure Functions for Business Logic
-
-Feed normalization, item deduplication, tag rule evaluation, and timeline filtering are all pure functions with no IO side effects. They take data, return data. This makes them trivially testable and easy to reason about.
+SQLite is single-writer, so all mutations funnel through a **DB writer actor**: a single Tokio task that owns the writer pool and receives typed `DbCommand` messages over an `mpsc` channel. Each command carries a `oneshot` reply channel, so callers await the result.
 
 ```rust
-fn normalize_rss_item(raw: feed_rs::model::Entry, feed_id: &FeedId) -> FeedItem { ... }
-fn evaluate_rules(item: &FeedItem, rules: &[TagRule]) -> Vec<TagResult> { ... }
-fn apply_timeline_filter(items: &[FeedItemView], filter: &Filter) -> Vec<FeedItemView> { ... }
-```
-
-### 2. IO at the Edges
-
-Network fetches and SQLite reads/writes happen at the edges of the system. The feed adapter fetches bytes; the normalizer processes them; the storage layer persists the result. No module reaches across two layers.
-
-### 3. Explicit Error Types
-
-Each module defines its own error enum via `thiserror`. Errors carry enough context to be actionable without stack traces:
-
-```rust
-#[derive(Debug, thiserror::Error)]
-pub enum FeedError {
-    #[error("HTTP {status} fetching {url}: {message}")]
-    Http { url: String, status: u16, message: String },
-    #[error("Feed parse error for {url}: {source}")]
-    Parse { url: String, source: feed_rs::parser::ParseFeedError },
-    #[error("Feed not found: {id}")]
-    NotFound { id: FeedId },
+// crates/pulse-core/src/storage/actor.rs
+pub enum DbCommand {
+    UpsertItems { items, reply },        // INSERT OR IGNORE + item_states + FTS
+    UpdateItemState { item_id, patch, reply },
+    UpsertFeed { feed, reply },
+    InsertFeedGroup { group, reply },
+    UpdateFeedHealth { update, reply },
+    InsertAiTags { item_id, tags, reply },
+    ReplaceUserTags { item_id, tags, reply },
+    UpdateFeedSourceConfig { feed_id, source_config, reply },
+    DeleteFeed { feed_id, reply },
+    ClearFeedCache { feed_id, reply },
+    EnrichItem { item_id, body_text, source_meta_patch, reply },
+    DeleteFeedGroup { id, reply },
+    DeleteItemTags { item_id, reply },
+    MarkFeedRead { feed_id, reply },
+    Vacuum { reply },                    // rebuilds FTS after (rowids renumber)
+    FixRelativeUrls { reply },           // M0006 backfill maintenance
 }
 ```
 
-### 4. No Global Mutable State
+Reads never go through the actor. `DbHandle::with_reader(closure)` hands a clone of the reader pool to the closure, so concurrent readers are truly concurrent while all writes stay serialized on one connection. This eliminates the "N tasks × 1 mutex" thread-exhaustion problem without spawning extra OS threads.
 
-`pulse-core` is instantiated as a `PulseCore` struct that holds:
-- A `DbHandle` — a cloneable sender into the DB writer actor (see §5)
-- A `SyncScheduler` handle
-- A `TaggerHandle` for the AI pipeline
-
-This struct is passed explicitly to every subsystem. No `lazy_static!`, no `thread_local!`, no global singletons.
-
-### 5. DB Writer Actor — Single Owned Connection, No Mutex
-
-SQLite is single-writer. Rather than wrapping the connection in `Arc<Mutex<>>` and calling `spawn_blocking` from every task (which would spawn up to N OS threads all blocked waiting for the mutex under concurrent load), we use a **DB writer actor**: a single Tokio task that owns the `rusqlite::Connection` directly and receives write requests through an `mpsc` channel.
-
-```rust
-enum DbCommand {
-    UpsertItems { items: Vec<FeedItem>, reply: oneshot::Sender<Result<usize>> },
-    UpdateItemState { item_id: String, state: ItemStatePatch, reply: oneshot::Sender<Result<()>> },
-    // ... other write operations
-}
-
-// Single task, owns connection exclusively — no Mutex, no spawn_blocking for writes
-async fn db_writer_task(mut rx: mpsc::Receiver<DbCommand>, conn: rusqlite::Connection) {
-    while let Some(cmd) = rx.recv().await {
-        match cmd {
-            DbCommand::UpsertItems { items, reply } => {
-                let result = conn.upsert_items(&items);  // synchronous, no block needed
-                let _ = reply.send(result);
-            }
-            // ...
-        }
-    }
-}
-```
-
-Read operations use a **separate read-only connection** opened in WAL mode (WAL allows multiple concurrent readers). Reads do not go through the actor — they call `spawn_blocking` with their own connection handle:
-
-```rust
-#[derive(Clone)]
-pub struct DbHandle {
-    writer: mpsc::Sender<DbCommand>,
-    read_pool: Arc<ReadPool>,  // pool of read-only connections (WAL mode)
-}
-```
-
-This eliminates the "N tasks × 1 mutex" OS thread exhaustion problem entirely. The actor serializes all writes without spawning extra threads; readers are truly concurrent.
-
-## Crate Selection Rationale
+## Crate selection
 
 | Crate | Purpose | Rationale |
 |---|---|---|
-| `feed-rs` | RSS/Atom parsing | Handles RSS 0.9/1.0/2.0, Atom, JSON Feed. Well-maintained. Zero unsafe parsing. |
-| `rusqlite` + `bundled-full` | SQLite access | Bundles SQLite with FTS5/JSON1. No system SQLite dependency. Sync API matches SQLite's nature. |
-| `rusqlite_migration` | Schema migrations | Lightweight, simple. Runs migrations in order on startup. |
-| `reqwest` | HTTP client | Async, TLS, follows redirects, connection pooling. Compiles on Android via ring/rustls. |
-| `tokio` | Async runtime | Standard choice. Multi-threaded runtime for background sync tasks. |
-| `ort` | ONNX Runtime Rust | Official bindings. Supports mobile. Dynamic linking to system ORT or static build. |
-| `ratatui` | Terminal UI | Actively maintained fork of tui-rs. Flexible layout system. |
-| `clap` | CLI argument parsing | Derive macros, good error messages, shell completion generation. |
-| `uuid` v1 + v5 | ID generation | UUIDv5 for deterministic item IDs, UUIDv4 for feed/group IDs. |
-| `chrono` | Date/time | Full timezone support. SQLite stores as Unix timestamps (i64). |
-| `tracing` | Structured logging | Compatible with Tokio. Spans for sync cycles and AI inference. |
-| `thiserror` | Error types | Zero-cost derive macros for error enums. |
-| `anyhow` | Error propagation | For CLI and binary contexts where granular error types aren't needed. |
-| `serde` + `serde_json` | Serialization | Source metadata stored as JSON blobs in SQLite. |
+| `feed-rs` | RSS/Atom parsing | RSS 0.9/1.0/2.0, Atom, JSON Feed. Zero unsafe parsing. |
+| `sqlx` | SQLite access | Async SQLite with connection pools, `bundled` SQLite, WAL. The two-pool pattern keeps writes serialized while allowing concurrent reads. |
+| `reqwest` | HTTP client | Async, TLS via `rustls` (compiles on Android). One shared client on the scheduler. |
+| `tokio` | Async runtime | Standard choice; drives sync tasks, the writer actor, the tagger task. |
+| `clap` | CLI argument parsing | Derive macros, global `--data-dir` / `--db` / `--json`. |
+| `uuid` | ID generation | UUIDv5 for deterministic item IDs, UUIDv4 for feed/group IDs. |
+| `chrono` | Date/time | SQLite stores Unix timestamps (i64). |
+| `tracing` | Structured logging | Logs go to rolling `pulse.log.*` files in the data dir on Tauri. |
+| `thiserror` / `anyhow` | Errors | `thiserror` for library error enums, `anyhow` for the CLI. |
+| `serde` / `serde_json` | Serialization | `source_config` stored as JSON blobs; DTOs over IPC. |
 
-### Deliberately Not Used
+**Not used:** `rusqlite`, `diesel`, `ort` (ONNX), `tokenizers`, `ratatui` — the ML stack and the interactive TUI were removed in v0.6.
 
-- **`sqlx`** — Async SQLite via sqlx has correctness issues (WAL mode + async can cause reader starvation). The async story for SQLite is fundamentally awkward. The DB writer actor pattern with `rusqlite` is more correct.
-- **`diesel`** — ORM overhead, proc-macro compile time, harder to write explicit SQL for FTS5 queries.
-- **`async-std`** — Tokio is the clear ecosystem standard. No benefit to using async-std.
-- **`crossbeam`** — Tokio channels cover all inter-task communication needs.
+## Async model
 
-## Async Model
-
-The Tokio runtime runs in the CLI and Tauri process. Key async boundaries:
+The Tokio runtime runs in the CLI and the Tauri process. Key async boundaries:
 
 ```
-┌─ Tokio Runtime ─────────────────────────────────────┐
-│                                                     │
-│  ┌─ main task ─────────────────────────────────┐   │
-│  │  CLI command dispatch or Tauri event loop   │   │
-│  └─────────────────────────────────────────────┘   │
-│                                                     │
-│  ┌─ sync task (per active feed) ───────────────┐   │
-│  │  sleep(interval) → fetch → normalize →      │   │
-│  │  DbHandle.send(UpsertItems) → await reply   │   │
-│  └─────────────────────────────────────────────┘   │
-│                                                     │
-│  ┌─ DB writer actor ───────────────────────────┐   │
-│  │  Owns Connection (no Mutex, no Arc)         │   │
-│  │  Drains mpsc DbCommand channel              │   │
-│  └─────────────────────────────────────────────┘   │
-│                                                     │
-│  ┌─ read pool (spawn_blocking) ────────────────┐   │
-│  │  Read-only WAL connections for queries      │   │
-│  └─────────────────────────────────────────────┘   │
-│                                                     │
-│  ┌─ tagging task ──────────────────────────────┐   │
-│  │  Bounded mpsc channel (cap=200)             │   │
-│  │  Runs rule engine (sync, fast)              │   │
-│  │  Phase 4: spawn_blocking(ort inference)     │   │
-│  └─────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────┘
+┌─ Tokio Runtime ─────────────────────────────────────────────┐
+│                                                             │
+│  ┌─ main task ──────────────────────────────────────────┐   │
+│  │  CLI command dispatch or Tauri event loop            │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─ sync task (per active feed) ────────────────────────┐   │
+│  │  sleep(next_fetch_at) → perform_sync → upsert →      │   │
+│  │  tagger.tag_item(...) for each new item              │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─ DB writer actor ────────────────────────────────────┐   │
+│  │  Owns single-connection writer pool                  │   │
+│  │  Drains mpsc DbCommand channel, replies via oneshot  │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─ reader pool (up to 3 concurrent) ───────────────────┐   │
+│  │  Read-only WAL connections for queries               │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─ tagger task ────────────────────────────────────────┐   │
+│  │  Bounded mpsc channel (cap 200)                      │   │
+│  │  Runs RuleEngine synchronously (fast, no blocking)   │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-The sync scheduler spawns one Tokio task per feed. Each task sleeps for its configured interval, fetches, normalizes, and persists. Tasks are lightweight (just sleeping most of the time) so having 50 tasks for 50 feeds is fine.
+## Data flow
 
-## Platform Portability
+### Feed ingestion
 
-`pulse-core` must compile and run on:
+```
+1. Sync task fires for feed F (at next_fetch_at)
+2. HTTP GET with If-None-Match / If-Modified-Since
+3a. 304 Not Modified → update last_checked_at only
+3b. 200 OK → parse and normalize to Vec<FeedItem>
+4. Deterministic UUIDv5 per item (namespace = feed url, name = source_guid)
+5. body_html is passed through resolve_relative_urls at ingestion:
+   relative src/href → absolute against the item URL; http media → https
+   (a CSP-safe pass — img-src only allows https:)
+6. DbCommand::UpsertItems (INSERT OR IGNORE; FTS + item_states inserted
+   only when the row was actually new)
+7. Each new item is queued via tagger.tag_item(id, feed_type)
+8. update_feed_health: EMA latency, failure_streak, ETag/Last-Modified;
+   after a failure compute_next_fetch applies exponential backoff
+   (base × 2^streak, cap 4h, ±10% jitter); feeds disable after 10
+   consecutive failures
+```
+
+### Timeline query
+
+```
+1. User requests a page (group/feed/read/saved/tag filter, cursor, limit)
+2. get_timeline builds the WHERE clause; hidden items always excluded
+3. JOIN feed_items + feeds + feed_groups + item_states + ai_tags + user_tags
+4. Cursor-based pagination on (published_at, id) — or (saved_at, id) when
+   the saved view is active
+5. Returns FeedItemView structs (flattened) + nextCursor + counts
+```
+
+### Tagging
+
+```
+1. New item queued (bounded channel, cap 200; drop + warn when full)
+2. tagger_task → process_tag_request:
+   a. load item
+   b. skip direct image URLs (no text to match)
+   c. RulesTagger.tag(item, feed_type) → Vec<TagResult>
+   d. drop no-context when a substantive tag fires; strip semantic tags
+      when noise ≥ 0.70
+   e. db.insert_ai_tags (ON CONFLICT(item_id, tag, tagger_source) DO UPDATE)
+3. Tags available immediately for the tag filter / tag chips
+```
+
+See [tagging.md](tagging.md) for the full tagging pipeline.
+
+### Enrichment (OpenGraph)
+
+Link posts are enriched after sync in a bounded concurrent pass (`enrich_pending`, default concurrency 5): fetch OG title/description/image, mark `enriched_at` in `source_meta`. Direct image URLs and non-HTTP hosts are skipped. This is what populates `og_image` thumbnails and the reader's description text.
+
+## Frontend shell
+
+The SvelteKit UI is a single responsive shell (`src/lib/screens/AppShell.svelte`). `useIsDesktop` (`matchMedia('(min-width: 768px)')`) selects the layout:
+
+- **Wide (desktop)** — an app toolbar, a left rail with an **Overview / Feeds** toggle, group tabs, a sources list, a resizable timeline column, and a reader pane. Keyboard navigation (`j/k/m/s/o/x`, `/` focus search, `?` cheatsheet) is handled in the shell.
+- **Narrow (Android)** — a bottom-nav shell with Feed / Sources / Search / Saved / Settings tabs, history-backed navigation so system back unwinds in-app, swipe gestures in the reader, and the share-intent listener.
+
+**Home / Overview** (`src/lib/components/Home.svelte`) is the search tab on mobile and the overview screen on desktop: a global FTS search box plus a grid of per-group cards (recent items + total/unread counts + drill-in via `get_overview`).
+
+**Saved view** (`SavedList.svelte`) pages saved items and groups them by the calendar month in which they were **saved** (from `item_states.saved_at`), newest first.
+
+**Overlays and context menus** — the UI uses a small overlay registry (`src/lib/stores/overlays.svelte.ts`) that blocks shell-level keyboard shortcuts while any overlay is open. `ContextMenu.svelte` renders a right-click popup or a bottom sheet and registers itself in the registry. Source rows open a context menu with view / refresh / mark-read / edit / remove actions.
+
+**Reader item resolution** (`ReaderPane.svelte`) — the opener hands the reader the exact list the item was clicked from. Resolution walks: opener's list → the paginated `items` store → `knownItems` cache → a fetch-by-ID fallback (`get_item`). Feed-body links open externally (never in the webview) with a hover/long-press URL preview via a `use:bodyLinks` action.
+
+**First-run onboarding / discover** (`Onboarding.svelte`) shows when a cold start finishes with no sources. It offers the 68-feed curated catalog from `pulse-core/src/onboarding.rs`, grouped by category (Mailing Lists flagged experimental), with per-feed **preview** (`preview_feed` Tauri command → transient items, never persisted). The Android share flow uses `detect_feed_url` (`crates/pulse-core/src/feeds/detect.rs`) to turn a shared URL into an addable feed.
+
+## Tauri IPC layer
+
+`src-tauri/src/commands.rs` holds all `#[tauri::command]` functions. They receive `State<AppState>` (which wraps `Arc<PulseCore>` plus the data dir and a live log filter) and return serializable DTOs from `src-tauri/src/models.rs` (camelCase). Registered commands cover: sources (`get_sources`/`add_source`/`update_source`/`delete_source`), items (`get_items_page`/`get_item`/`mark_items_read`/`mark_source_read`/`toggle_saved`/`set_item_note`/`hide_item`), tags (`get_user_tags`/`set_user_tags`/`get_tag_stats`), groups (`get_groups`/`add_group`/`rename_group`/`delete_group`), overview (`get_overview`), onboarding (`get_popular_feeds`/`add_onboard_feeds`/`preview_feed`), sync (`sync_source`/`sync_all`), search (`search_items`), stats (`get_db_stats`), settings (`get_settings`/`save_settings`), share/detect (`detect_feed`/`get_pending_share`), and logging (`log_from_frontend`/`set_log_level`/`get_log_content`/`get_log_path`/`open_logs_folder`/`share_log_file`). No business logic lives in the shell.
+
+The Android share bridge (`ShareBridge.kt` → JNI → `lib.rs`) buffers incoming URLs in `PENDING_SHARE` and emits `share://incoming-url`; `+layout.svelte` listens and opens the ShareSheet.
+
+## Platform portability
+
+`pulse-core` compiles and runs on:
 - Linux x86_64 (development, CLI)
 - macOS arm64 (development, desktop)
 - Android aarch64 (production primary target)
 - Windows x86_64 (desktop, secondary)
 
 Key constraints:
-- `reqwest` uses `rustls` (not native-tls) for TLS. `rustls` compiles cleanly on Android.
-- `rusqlite` with `bundled` feature bundles its own SQLite so there's no system dependency.
-- `ort` requires the ONNX Runtime native library. On Android, this ships as a `.so` in the APK.
-- All file paths go through `pulse-core`'s config layer, which resolves platform-appropriate data directories.
+- `reqwest` uses `rustls` (+ `rustls-platform-verifier` on Android for the system trust store), not native-tls.
+- `sqlx` is used with the `bundled` SQLite feature — no system SQLite dependency.
+- `PulseConfig::is_android` gates pragma differences (FULL vs NORMAL sync, mmap disabled) and the Android data dir.
+- All file paths go through `PulseConfig::platform_data_dir()`:
+  - Linux/macOS: `$XDG_DATA_HOME/pulse` (fallback `~/.local/share/pulse`)
+  - Windows: `%APPDATA%\pulse`
+  - Android: app-private data dir (keyed to package ID, survives APK updates)
 
-## Known Architecture Risks
+## Known architecture risks
 
-1. **SQLite write contention**: Single-writer actor model. All writes go through a dedicated DB writer task via an mpsc command channel. This eliminates contention between sync tasks and user actions. Reads use a separate connection pool and never block writers.
-
-2. **ONNX Runtime size on Android**: The ORT native library is ~6-8MB. This significantly increases APK size. Mitigation: use quantized models, consider dynamic linking to system ORT if available.
-
-3. **Reddit JSON API reliability**: Reddit's unofficial JSON endpoint is not guaranteed to remain available. Mitigation: treat Reddit as a best-effort source; the OAuth2 script-app flow provides a fallback; the feed health system handles source instability gracefully.
+1. **SQLite single-writer**: all writes serialize through one connection. Under a large sync this is the hot path, but batch upserts run in a single transaction and reads are unaffected (WAL).
+2. **Reddit JSON API reliability**: the public `.json` endpoint is best-effort; an OAuth2 script-app flow is supported (`--reddit-client-id`/`--reddit-client-secret`), and the feed health system disables persistently failing feeds.
+3. **FTS ↔ VACUUM**: `VACUUM` can renumber implicit rowids and corrupt the external-content FTS mapping — `DbCommand::Vacuum` always rebuilds the FTS index afterward.
