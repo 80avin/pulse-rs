@@ -38,7 +38,8 @@
     const q = query.trim();
     if (q.length < 2) { results = []; searching = false; return; }
     searching = true;
-    const timer = setTimeout(async () => { results = await searchItems(q, 100, sort); searching = false; }, 250);
+    const currentSort = sort; // reading sort synchronously to trigger svelte dep tracking
+    const timer = setTimeout(async () => { results = await searchItems(q, 100, currentSort); searching = false; }, 250);
     return () => clearTimeout(timer);
   });
 
