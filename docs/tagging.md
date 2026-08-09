@@ -2,7 +2,7 @@
 
 ## Philosophy
 
-Tagging in Pulse is deterministic and fully on-device. There are **no ML models** — the FastText / MiniLM / CLIP stack was removed in v0.6. Every tag is produced by a rule engine that matches structural signals (title prefixes, domains, score thresholds) and keyword/regex patterns against the item's title and body. Nothing leaves the device, nothing is downloaded, and there are no feature flags.
+Tagging in Pulse is deterministic and fully on-device. There are **no ML models**. Every tag is produced by a rule engine that matches structural signals (title prefixes, domains, score thresholds) and keyword/regex patterns against the item's title and body. Nothing leaves the device, nothing is downloaded, and there are no feature flags.
 
 Tags answer the question *"Is this the kind of post I want to see?"* — not *"What is this post about?"*. They are **filters** designed to let users exclude noise. The tagger is the app's spam filter: a post that doesn't earn a tag is implicitly excluded by any filter that selects *for* a tag.
 
@@ -120,11 +120,11 @@ Disabled by default (kept in the ruleset but `enabled: false`):
 |---|---|---|
 | `ragebait` | 0.50 | Opt-in only. High false-positive risk — engagement heuristics were deliberately excluded. |
 
-> **Note on vocabulary.** The core filter vocabulary documented in CLAUDE.md lists 20 tags. The rules file additionally ships `no-context`, `inappropriate`, and `noise` (all enabled) as quality-control tags, plus a disabled `ragebait` rule. `low-effort` is produced by the runtime check, not a `TagRule`.
+> **Note on vocabulary.** The core filter vocabulary documented in AGENTS.md lists 20 tags. The rules file additionally ships `no-context`, `inappropriate`, and `noise` (all enabled) as quality-control tags, plus a disabled `ragebait` rule. `low-effort` is produced by the runtime check, not a `TagRule`.
 
 ## Tag storage
 
-Tags are stored in the `ai_tags` table with `tagger_source = 'rule'` and the matching `rule_id`. The insert uses `ON CONFLICT(item_id, tag, tagger_source) DO UPDATE`, so re-tagging an item refreshes confidence/explanation in place. `model_name` / `model_version` columns still exist in the schema (legacy) but are always `NULL`.
+Tags are stored in the `ai_tags` table with `tagger_source = 'rule'` and the matching `rule_id`. The insert uses `ON CONFLICT(item_id, tag, tagger_source) DO UPDATE`, so re-tagging an item refreshes confidence/explanation in place. `model_name` / `model_version` columns exist in the schema (reserved) but are always `NULL`.
 
 The tag distribution for the UI comes from `get_tag_stats` — a `COUNT(*) ... GROUP BY tag` over `ai_tags`.
 

@@ -213,17 +213,17 @@ Staleness indicators are informational, not blocking. Users can always read prev
 
 Android aggressively kills background processes and restricts background network access.
 
-### Sync Scope: Foreground-Only (Phase 1-2)
+### Sync Scope: Foreground-Only
 
 Tauri 2 on Android provides **no first-class equivalent of Android `WorkManager` or `JobScheduler`**. Tauri runs as a standard Activity. When the user backgrounds the app, Android can kill the process within minutes under memory pressure. There is no mechanism in Tauri's current API surface to register a periodic background job that survives app backgrounding.
 
-**Phase 1-2 sync is foreground-only**: sync runs only while the CLI or Tauri app is in the foreground. This is the honest baseline. Key mitigations:
+**Sync runs only while the CLI or Tauri app is in the foreground.** This is the honest baseline. Key mitigations:
 - The sync model is fully resumable — each feed's state is tracked independently
 - Offline content (everything fetched while open) is always available
 - The UI shows staleness indicators so users know when content is old
 - Each app open triggers a sync cycle
 
-**Phase 3 prerequisite**: True background sync on Android requires a Kotlin plugin that registers a `WorkManager` periodic task. This is significant implementation work (JNI bridge, Kotlin plugin API, Gradle manifest changes) and must be planned as a distinct Phase 3 deliverable, not assumed to come for free from Tauri.
+True background sync on Android would require a Kotlin plugin that registers a `WorkManager` periodic task (JNI bridge, Kotlin plugin API, Gradle manifest changes) — significant implementation work beyond the current Tauri surface.
 
 ### Battery Efficiency
 
@@ -239,7 +239,6 @@ Sync task design minimizes battery impact:
 On Android, we should check connectivity before attempting syncs. Tauri provides network information APIs. The sync scheduler should:
 - Skip sync if no network (cache offline indicator)
 - Optionally skip sync on metered connection (user preference)
-- Prefer Wi-Fi for model downloads (AI pipeline)
 
 ## Sync Pipeline Summary
 
@@ -274,7 +273,7 @@ feed_sync_task (per feed)
 TaggingTask (singleton)
     │
     ├─ Drain tagging queue
-    ├─ Run rule engine (Phase 1)
+    ├─ Run rule engine
     └─ DB: INSERT into ai_tags
 ```
 

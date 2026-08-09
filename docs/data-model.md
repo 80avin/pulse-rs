@@ -161,8 +161,8 @@ CREATE TABLE ai_tags (
     confidence      REAL NOT NULL,               -- fixed rule confidence (0.0 to 1.0)
     tagger_source   TEXT NOT NULL,               -- always 'rule'
     rule_id         TEXT,                        -- which rule fired
-    model_name      TEXT,                        -- LEGACY — always NULL
-    model_version   TEXT,                        -- LEGACY — always NULL
+    model_name      TEXT,                        -- always NULL (reserved)
+    model_version   TEXT,                        -- always NULL (reserved)
     explanation     TEXT NOT NULL,               -- human-readable reason (matched text)
     created_at      INTEGER NOT NULL
 );
@@ -172,7 +172,7 @@ CREATE INDEX idx_ai_tags_tag ON ai_tags(tag);
 CREATE UNIQUE INDEX idx_ai_tags_unique ON ai_tags(item_id, tag, tagger_source);
 ```
 
-Writes use `ON CONFLICT(item_id, tag, tagger_source) DO UPDATE` (refresh confidence/explanation in place). `model_name`/`model_version` columns are vestigial from the pre-v0.6 ML stack and are always `NULL` — no model code touches them. The `tagger_source` enum in code still has a `Model` variant so a future BYO adapter can implement the `Tagger` trait without a schema change, but nothing currently emits it.
+Writes use `ON CONFLICT(item_id, tag, tagger_source) DO UPDATE` (refresh confidence/explanation in place). `model_name`/`model_version` columns are reserved and always `NULL` — no code writes them. The `tagger_source` enum keeps a `Model` variant so a future BYO adapter can implement the `Tagger` trait without a schema change, but nothing currently emits it.
 
 The tag filter / tag chips read the tag distribution from `get_tag_stats` (`COUNT(DISTINCT item_id)` + `COUNT(*) GROUP BY tag`).
 
@@ -193,9 +193,9 @@ CREATE INDEX idx_user_tags_tag ON user_tags(tag);
 
 Updated with full-set semantics (`replace_user_tags`: delete + reinsert, trimming/lowercasing tags and capping at 40 chars). Timeline and search queries expose both `ai_tags` and `user_tags` and match the tag filter against either.
 
-### Legacy tables (created by M0001, unused by current code)
+### Unused tables (created by M0001)
 
-- **`ai_models`** — the ML model registry from the removed on-device stack (FastText/MiniLM/CLIP). No Rust code reads or writes it. Keep the table so old databases migrate cleanly, but nothing depends on it.
+- **`ai_models`** — a model-registry table defined in the initial schema. No Rust code reads or writes it. Kept so old databases migrate cleanly; nothing depends on it.
 - **`filter_rules`** — a planned auto-hide/highlight rule engine. The schema exists but no code touches it; filtering is done by the timeline `tag`/`read`/`saved` predicates instead.
 
 ### FTS5 Virtual Table
@@ -214,7 +214,7 @@ CREATE VIRTUAL TABLE feed_items_fts USING fts5(
 
 Notes:
 
-- **Column name is `id`, not `item_id`.** M0005 (`M0005_fts_content_fix.sql`) recreated the index because the original was created with a column named `item_id` that doesn't exist in the content table — external-content FTS resolves index columns by name, so any content-table access failed with `no such column: T.item_id`.
+- **Column name is `id`, not `item_id`.** External-content FTS resolves index columns by name against the content table, so the index column must match the content-table column. (M0005 corrected an earlier index that used `item_id`.)
 - FTS maintenance is **application-managed plus triggers**. New rows are inserted into `feed_items_fts` from the writer actor using the just-inserted `rowid` (only when `INSERT OR IGNORE` actually inserted). A `DELETE` trigger and an `AFTER UPDATE OF body_text, title, author` trigger (M0002, replaced in M0005) keep the index in sync.
 - `VACUUM` renumbers implicit rowids and can silently corrupt the external-content mapping — `DbCommand::Vacuum` runs `INSERT INTO feed_items_fts(feed_items_fts) VALUES('rebuild')` afterwards.
 

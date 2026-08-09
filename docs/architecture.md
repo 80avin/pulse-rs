@@ -71,7 +71,7 @@ The architecture prioritizes:
 
 ## Storage: sqlx + a single-writer actor
 
-The persistence layer is **`sqlx`** (SQLite), not rusqlite. Two pools are opened against the same database file:
+The persistence layer is **`sqlx`** (SQLite). Two pools are opened against the same database file:
 
 - **Writer pool** (`open_writer_pool`) — `max_connections(1)`. Sets WAL, `synchronous = FULL` on Android / `NORMAL` on desktop, `busy_timeout = 5s`, `foreign_keys = ON`, and platform-aware `mmap_size`.
 - **Reader pool** (`open_reader_pool`) — `max_connections(3)`, read-only. WAL is inherited from the writer connection; readers never set it.
@@ -117,7 +117,7 @@ Reads never go through the actor. `DbHandle::with_reader(closure)` hands a clone
 | `thiserror` / `anyhow` | Errors | `thiserror` for library error enums, `anyhow` for the CLI. |
 | `serde` / `serde_json` | Serialization | `source_config` stored as JSON blobs; DTOs over IPC. |
 
-**Not used:** `rusqlite`, `diesel`, `ort` (ONNX), `tokenizers`, `ratatui` — the ML stack and the interactive TUI were removed in v0.6.
+**Not used:** `rusqlite`, `diesel`, `ort` (ONNX), `tokenizers`, `ratatui`. SQLite access is via `sqlx`; there is no ML stack and no interactive TUI.
 
 ## Async model
 

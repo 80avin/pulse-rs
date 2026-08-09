@@ -55,15 +55,6 @@ pnpm tauri android build   # Android APK
 
 > **Note:** `pulse ai run` and anything that writes to SQLite will fail under the default sandbox. Disable the sandbox for those commands.
 
-### Python training scripts
-
-```bash
-uv venv && source .venv/bin/activate   # always use uv, not pip
-uv pip install -r scripts/requirements.txt
-python scripts/train_fasttext.py
-python scripts/train_miniml.py
-```
-
 ## Architecture
 
 ### Crate layout
