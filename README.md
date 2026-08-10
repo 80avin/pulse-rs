@@ -15,7 +15,7 @@
 [![Rust](https://img.shields.io/badge/Rust-1.95+-orange?logo=rust)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?logo=tauri)](https://tauri.app/)
 [![SvelteKit](https://img.shields.io/badge/SvelteKit-5.x-ff3e00?logo=svelte)](https://kit.svelte.dev/)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Android-lightgrey)](#platform-support)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20Android-lightgrey)](#platform-support)
 
 A local-first feed reader that brings Hacker News, Reddit, and your favorite RSS/Atom feeds into one fast, curated, cross-platform app. **No cloud, no telemetry, no account.**
 
@@ -142,6 +142,7 @@ cargo build -p pulse-cli
 | Platform | Status |
 | -------- | ------ |
 | Linux    | ✅     |
+| Windows  | ✅ NSIS + MSI |
 | Android  | ✅ APK |
 
 ---

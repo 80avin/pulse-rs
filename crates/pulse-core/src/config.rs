@@ -73,13 +73,8 @@ pub fn platform_data_dir() -> PathBuf {
 
     #[cfg(target_os = "windows")]
     {
-        let appdata = std::env::var("APPDATA").unwrap_or_else(|_| {
-            dirs_home()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .to_string_lossy()
-                .into_owned()
-        });
-        PathBuf::from(appdata).join("pulse")
+        let appdata = std::env::var("APPDATA").map_or_else(|_| PathBuf::from("."), PathBuf::from);
+        appdata.join("pulse")
     }
 
     #[cfg(not(any(target_os = "android", target_os = "windows")))]
