@@ -53,7 +53,9 @@ pub const POPULAR_FEEDS: &[PopularFeed] = &[
     PopularFeed { name: "danluu", url: "https://danluu.com/atom.xml", kind: FeedType::Rss, category: "Engineering & Research" },
     PopularFeed { name: "Lobsters", url: "https://lobste.rs/rss", kind: FeedType::Rss, category: "Engineering & Research" },
     PopularFeed { name: "The LLVM Project Blog", url: "https://blog.llvm.org/index.xml", kind: FeedType::Rss, category: "Engineering & Research" },
-    PopularFeed { name: "kernel-recipes", url: "https://kernel-recipes.org/en/2026/feed/", kind: FeedType::Rss, category: "Engineering & Research" },
+    PopularFeed { name: "kernel-recipes-2026", url: "https://kernel-recipes.org/en/2026/feed/", kind: FeedType::Rss, category: "Engineering & Research" },
+    PopularFeed { name: "kernel-recipes-2025", url: "https://kernel-recipes.org/en/2025/feed/", kind: FeedType::Rss, category: "Engineering & Research" },
+    PopularFeed { name: "kernel-recipes-2024", url: "https://kernel-recipes.org/en/2024/feed/", kind: FeedType::Rss, category: "Engineering & Research" },
     // ── Compilers & PL ──
     PopularFeed { name: "SIGPLAN Blog", url: "https://blog.sigplan.org/feed", kind: FeedType::Rss, category: "Compilers & PL" },
     PopularFeed { name: "PLDI papers (dblp)", url: "https://dblp.org/feed/streams/conf/pldi.rss", kind: FeedType::Rss, category: "Compilers & PL" },
